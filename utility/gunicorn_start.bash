@@ -10,6 +10,7 @@ NUM_WORKERS=4                               							            # how many worker
 DJANGO_SETTINGS_MODULE=config.settings.production         						            # which settings file should Django use
 DJANGO_WSGI_MODULE=config.wsgi              						            # WSGI module name
 TIMEOUT=300  # 5 minutes
+WORKER_CLASS='gevent'
 
 echo "Starting $NAME as `whoami`"
 
@@ -32,4 +33,6 @@ exec ${DJANGOENVDIR}/bin/gunicorn ${DJANGO_WSGI_MODULE}:application \
   --bind=unix:$SOCKFILE \
   --log-level=debug \
   --log-file=- \
-  --timeout=$TIMEOUT
+  --timeout=$TIMEOUT \
+  -k gevent \
+  --worker-connections=1000
