@@ -7,8 +7,8 @@ SOCKFILE=/home/developer/uzum/run/gunicorn.sock  		  # we will communicte using 
 USER=developer                                        					              # the user to run as
 GROUP=developer                                     							            # the group to run as
 NUM_WORKERS=3                                    							            # how many worker processes should Gunicorn spawn (2 * CPUs + 1)
-DJANGO_SETTINGS_MODULE=uzum.config.settings.production         						            # which settings file should Django use
-DJANGO_WSGI_MODULE=uzum.config.wsgi                     						            # WSGI module name
+DJANGO_SETTINGS_MODULE=config.settings.production         						            # which settings file should Django use
+DJANGO_WSGI_MODULE=config.wsgi                     						            # WSGI module name
 
 echo "Starting $NAME as `whoami`"
 
