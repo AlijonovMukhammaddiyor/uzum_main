@@ -183,3 +183,8 @@ SPECTACULAR_SETTINGS["SERVERS"] = [  # noqa: F405
 # Your stuff...
 # ------------------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = ["https://api.shortintroduce.com", "https://api.alijonov.com"]
+
+CORS_ORIGIN_WHITELIST = [
+    "https://api.alijonov.com",
+    # Add other allowed origins if needed
+]
