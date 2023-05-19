@@ -12,8 +12,8 @@ def create_banners(banners):
             except Banner.DoesNotExist:
                 new_banners.append(banner)
 
-        banners = prepare_banners_data(new_banners)
-        result = Banner.objects.bulk_create(banners, ignore_conflicts=True)
+        banners_ = prepare_banners_data(new_banners)
+        result = Banner.objects.bulk_create(banners_, ignore_conflicts=True)
 
         return result
     except Exception as e:

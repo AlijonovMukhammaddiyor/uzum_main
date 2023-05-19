@@ -1,6 +1,9 @@
+import asyncio
+import logging
 import math
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from requests.adapters import HTTPAdapter
 
 import requests
 
@@ -12,8 +15,15 @@ from uzum.jobs.constants import (
     MAX_OFFSET,
     PAGE_SIZE,
     PRODUCTIDS_CONCURRENT_REQUESTS,
+    PRODUCTS_URL,
 )
-from uzum.jobs.product.utils import make_request_product_ids
+from uzum.jobs.helpers import generateUUID, get_random_user_agent
+
+# Set up a basic configuration for logging
+logging.basicConfig(level=logging.INFO)
+
+# Optionally, disable logging for specific libraries
+logging.getLogger("requests").setLevel(logging.ERROR)
 
 
 def campaign_products_payload(offset: int, limit: int, offerCategoryId: str) -> dict:
@@ -64,6 +74,8 @@ def prepare_banners_data(banners_api):
                 )
             )
 
+        return banners
+
     except Exception as e:
         print(f"Error in prepare_banners_data: {e}")
         return None
@@ -83,7 +95,10 @@ def create_banners(banners_api):
 def get_campaign_products_ids(offer_category_id: int, title: str):
     try:
         # has to make parallel requests to get all products
-        response = make_request_product_ids(campaign_products_payload(0, 20, offer_category_id))
+        session = requests.Session()
+        response = make_request_campaign_product_ids(
+            campaign_products_payload(0, 20, offer_category_id), session=session
+        )
 
         if response.status_code == 200:
             # time.sleep(3)
@@ -128,6 +143,11 @@ def concurrent_requests_for_campaign_product_ids(offer_category_id: int, total: 
         product_ids = []
         last_length = 0
         index = 0
+        max_connections = 50
+        session = requests.Session()
+        adapter = HTTPAdapter(pool_maxsize=max_connections)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
         while index < num_req:
             if len(product_ids) - last_length > 4000:
                 print("Sleeping for 3 seconds")
@@ -137,14 +157,15 @@ def concurrent_requests_for_campaign_product_ids(offer_category_id: int, total: 
             with ThreadPoolExecutor(max_workers=PRODUCTIDS_CONCURRENT_REQUESTS) as executor:
                 futures = {
                     executor.submit(
-                        make_request_product_ids,
+                        make_request_campaign_product_ids,
                         campaign_products_payload(
                             promise["offset"],
                             promise["pageSize"],
                             promise["offerCategoryId"],
                         ),
+                        session=session,
                     ): promise
-                    for promise in promises[index : index + PRODUCTIDS_CONCURRENT_REQUESTS]
+                    for promise in promises[index: index + PRODUCTIDS_CONCURRENT_REQUESTS]
                 }
                 for future in as_completed(futures):
                     promise = futures[future]
@@ -173,3 +194,28 @@ def concurrent_requests_for_campaign_product_ids(offer_category_id: int, total: 
     except Exception as e:
         print(f"Error in concurrent_requests_for_campaign_product_ids: {e}")
         return None
+
+
+def make_request_campaign_product_ids(
+    data,
+    retries=3,
+    backoff_factor=0.3,
+    session=None,
+):
+    for i in range(retries):
+        try:
+            return session.post(
+                PRODUCTS_URL,
+                json=data,
+                headers={
+                    **CATEGORIES_HEADER,
+                    "User-Agent": get_random_user_agent(),
+                    "x-iid": generateUUID(),
+                },
+            )
+        except Exception as e:
+            if i == retries - 1:  # This is the last retry, raise the exception
+                raise e
+            print(f"Error in makeRequestProductIds (attemp:{i}): ", e)
+            sleep_time = backoff_factor * (2**i)
+            time.sleep(sleep_time)

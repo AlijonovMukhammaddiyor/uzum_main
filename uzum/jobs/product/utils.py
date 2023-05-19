@@ -4,9 +4,8 @@ from datetime import datetime
 import pytz
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import requests
-
+import asyncio
+import httpx
 from uzum.badge.models import Badge
 from uzum.category.models import Category
 from uzum.jobs.badge.singleEntry import create_badge
@@ -15,6 +14,13 @@ from uzum.jobs.category.singleEntry import (
     create_category_analytics,
 )
 
+import logging
+
+# Set up a basic configuration for logging
+logging.basicConfig(level=logging.INFO)
+
+# Optionally, disable logging for specific libraries
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 from uzum.jobs.constants import (
     CATEGORIES_HEADER,
@@ -32,11 +38,12 @@ from uzum.shop.models import Shop, ShopAnalytics
 from uzum.sku.models import Sku, SkuAnalytics
 
 
-def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids, page_size: int):
+async def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids, page_size: int):
     try:
         print("\n\nStarting getAllProductIdsFromUzum...")
         start_time = time.time()
         promises = []
+
         current_index = 0
         while current_index < len(categories_dict):
             # while current_index < 1:
@@ -64,26 +71,25 @@ def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids, page
                 current_req_index += 1
             current_index += 1
         # print(promises)
-        print("Total number of requests: ", len(promises))
+        print(f"Total number of requests: {len(promises)}")
 
         failed_ids = []
-        concurrent_requests_for_ids(promises, 0, product_ids, failed_ids)
+        await concurrent_requests_for_ids(promises, 0, product_ids, failed_ids)
         if len(failed_ids) > 0:
             failed_again_ids = []
             print(f"Failed Ids length: {len(failed_ids)}")
-            concurrent_requests_for_ids(failed_ids, 0, product_ids, failed_again_ids)
+            await concurrent_requests_for_ids(failed_ids, 0, product_ids, failed_again_ids)
 
             if len(failed_again_ids) > 0:
                 final_failed_ids = []
-                concurrent_requests_for_ids(failed_again_ids, 0, product_ids, final_failed_ids)
+                await concurrent_requests_for_ids(failed_again_ids, 0, product_ids, final_failed_ids)
 
-                print("Total number of failed product ids: ", len(final_failed_ids))
+                print(f"Total number of failed product ids: { len(final_failed_ids)}")
 
-        print("Total number of product ids: ", len(product_ids))
-        print("Total number of unique product ids: ", len(set(product_ids)))
+        print(f"Total number of product ids: {len(product_ids)}")
+        print(f"Total number of unique product ids: {len(set(product_ids))}")
         print(
-            "Total time taken by get_all_product_ids_from_uzum: ",
-            time.time() - start_time,
+            f"Total time taken by get_all_product_ids_from_uzum: {time.time() - start_time}",
         )
         print("Ending getAllProductIdsFromUzum...\n\n")
     except Exception as e:
@@ -92,51 +98,81 @@ def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids, page
         return None
 
 
-def concurrent_requests_for_ids(data: list[dict], index: int, product_ids: list[int], failed_ids: list[int]):
+async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids: list[int], failed_ids: list[int]):
     try:
         index = 0
         start_time = time.time()
         last_length = 0
-        while index < len(data):
-            # while index < 1:
-            if len(product_ids) - last_length > 4000:
-                print(
-                    f"Current index of productIds: {index}/ {len(data)} - {time.time() - start_time} seconds - {len(product_ids) - last_length} added - {len(failed_ids)} failed"
-                )
-                start_time = time.time()
-                print("Sleeping for 3 seconds")
-                time.sleep(3)
-                last_length = len(product_ids)
+        async with httpx.AsyncClient() as client:
+            while index < len(data):
+                # while index < 1:
+                if len(product_ids) - last_length > 4000:
+                    print(
+                        f"Current index of productIds: {index}/ {len(data)} - {time.time() - start_time} seconds - {len(product_ids) - last_length} added - {len(failed_ids)} failed"
+                    )
+                    start_time = time.time()
+                    time.sleep(3)
+                    last_length = len(product_ids)
 
-            with ThreadPoolExecutor(max_workers=PRODUCTIDS_CONCURRENT_REQUESTS) as executor:
-                futures = {
-                    executor.submit(
-                        make_request_product_ids,
+                tasks = [
+                    make_request_product_ids(
                         products_payload(
                             promise["offset"],
                             promise["pageSize"],
                             promise["categoryId"],
                         ),
-                    ): promise
-                    for promise in data[index : index + PRODUCTIDS_CONCURRENT_REQUESTS]
-                }
-                for future in as_completed(futures):
-                    promise = futures[future]
-                    try:
-                        res = future.result()
+                        client=client,
+                    )
+                    for promise in data[index: index + PRODUCTIDS_CONCURRENT_REQUESTS]
+                ]
+
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for idx, res in enumerate(results):
+                    if isinstance(res, Exception):
+                        print("Error in concurrentRequestsForIds inner:", res)
+                        failed_ids.append(data[index + idx])
+                    else:
                         res_data = res.json()
                         if "errors" not in res_data:
                             products = res_data["data"]["makeSearch"]["items"]
                             for product in products:
                                 product_ids.append(product["catalogCard"]["productId"])
                         else:
-                            failed_ids.append(promise["categoryId"])
+                            failed_ids.append(data[index + idx]["categoryId"])
 
-                    except Exception as e:
-                        print("Error in concurrentRequestsForIds inner: ", e, promise)
-                        failed_ids.append(promise)
+                index += PRODUCTIDS_CONCURRENT_REQUESTS
 
-            index += PRODUCTIDS_CONCURRENT_REQUESTS
+                # with ThreadPoolExecutor(max_workers=PRODUCTIDS_CONCURRENT_REQUESTS) as executor:
+                #     futures = {
+                #         executor.submit(
+                #             make_request_product_ids,
+                #             products_payload(
+                #                 promise["offset"],
+                #                 promise["pageSize"],
+                #                 promise["categoryId"],
+                #             ),
+                #             session=session,
+                #         ): promise
+                #         for promise in data[index : index + PRODUCTIDS_CONCURRENT_REQUESTS]
+                #     }
+                #     for future in as_completed(futures):
+                #         promise = futures[future]
+                #         try:
+                #             res = future.result()
+                #             res_data = res.json()
+                #             if "errors" not in res_data:
+                #                 products = res_data["data"]["makeSearch"]["items"]
+                #                 for product in products:
+                #                     product_ids.append(product["catalogCard"]["productId"])
+                #             else:
+                #                 failed_ids.append(promise["categoryId"])
+
+                #         except Exception as e:
+                #             print("Error in concurrentRequestsForIds inner: ", e, promise)
+                #             failed_ids.append(promise)
+
+                # index += PRODUCTIDS_CONCURRENT_REQUESTS
 
     except Exception as e:
         print("Error in concurrentRequestsForIds: ", e)
@@ -144,14 +180,15 @@ def concurrent_requests_for_ids(data: list[dict], index: int, product_ids: list[
         return None
 
 
-def make_request_product_ids(
+async def make_request_product_ids(
     data,
     retries=3,
     backoff_factor=0.3,
+    client=None,
 ):
     for i in range(retries):
         try:
-            return requests.post(
+            return await client.post(
                 PRODUCTS_URL,
                 json=data,
                 headers={
@@ -165,103 +202,102 @@ def make_request_product_ids(
                 raise e
             print(f"Error in makeRequestProductIds (attemp:{i}): ", e)
             sleep_time = backoff_factor * (2**i)
-            time.sleep(sleep_time)
+            await asyncio.sleep(sleep_time)
 
 
-def get_product_details_via_ids(product_ids: list[int], products_api: list[dict]):
+async def get_product_details_via_ids(product_ids: list[int], products_api: list[dict]):
     try:
         print("Starting get_product_details_via_ids...")
         start_time = time.time()
         failed_ids = []
 
-        concurrent_requests_product_details(product_ids, failed_ids, 0, products_api)
+        await concurrent_requests_product_details(product_ids, failed_ids, 0, products_api)
 
         if len(failed_ids) > 0:
             failed_again_ids = []
-            print("Failed Ids length: ", len(failed_ids))
+            print(f"Failed Ids length: {len(failed_ids)}")
             time.sleep(5)
-            concurrent_requests_product_details(failed_ids, failed_again_ids, 0, products_api)
+            await concurrent_requests_product_details(failed_ids, failed_again_ids, 0, products_api)
 
             if len(failed_again_ids) > 0:
                 failed_failed = []
-                print("Failed again Ids length: ", len(failed_again_ids))
-                concurrent_requests_product_details(failed_again_ids, failed_failed, 0, products_api)
+                print(f"Failed again Ids length: {len(failed_again_ids)}")
+                await concurrent_requests_product_details(failed_again_ids, failed_failed, 0, products_api)
                 time.sleep(5)
                 if len(failed_failed) > 0:
                     final_failed = []
-                    print("Failed failed Ids length: ", len(failed_failed))
-                    concurrent_requests_product_details(failed_failed, final_failed, 0, products_api)
-                    print("Total number of failed product ids: ", len(final_failed))
-                    print("Failed failed Ids: ", final_failed)
+                    print(
+                        f"Failed failed Ids length: {len(failed_failed)}",
+                    )
+                    await concurrent_requests_product_details(failed_failed, final_failed, 0, products_api)
+                    print(f"Total number of failed product ids: {len(final_failed)}")
+                    print(f"Failed failed Ids: {final_failed}")
 
         print("Total number of products: ", len(products_api))
-        print(
-            "Total time taken by get_product_details_via_ids: ",
-            time.time() - start_time,
-        )
+        print(f"Total time taken by get_product_details_via_ids: {time.time() - start_time}")
         print("Ending get_product_details_via_ids...\n\n")
     except Exception as e:
         print("Error in getProductDetailsViaId: ", e)
         return None
 
 
-def concurrent_requests_product_details(
+async def concurrent_requests_product_details(
     product_ids: list[int], failed_ids: list[int], index: int, products_api: list[dict]
 ):
     try:
         index = 0
         start_time = time.time()
         last_length = 0
-        while index < len(product_ids):
-            # while index < 3000:
-            # while index < 20:
-            if len(products_api) - last_length >= 1000:
-                print(
-                    f"Current index of productIds: {index}/ {len(product_ids)} - {time.time() - start_time} seconds - {len(products_api) - last_length} products added - {len(failed_ids)} failed"
-                )
-                last_length = len(products_api)
-                time.sleep(2)  # sleep for 2 seconds
-                start_time = time.time()
+        async with httpx.AsyncClient() as client:
+            while index < len(product_ids):
+                if len(products_api) - last_length >= 1000:
+                    print(
+                        f"Current index of productIds: {index}/ {len(product_ids)} - {time.time() - start_time} seconds - {len(products_api) - last_length} products added - {len(failed_ids)} failed"
+                    )
+                    last_length = len(products_api)
+                    time.sleep(2)  # sleep for 2 seconds
+                    start_time = time.time()
 
-            with ThreadPoolExecutor(max_workers=PRODUCT_CONCURRENT_REQUESTS_LIMIT) as executor:
-                futures = {
-                    executor.submit(
-                        make_request_product_detail,
+                tasks = [
+                    make_request_product_detail(
                         PRODUCT_URL + str(id),
-                    ): id
-                    for id in product_ids[index : index + PRODUCT_CONCURRENT_REQUESTS_LIMIT]
-                }
-                for future in as_completed(futures):
-                    product_id = futures[future]
-                    try:
-                        res = future.result()
+                        client=client,
+                    )
+                    for id in product_ids[index: index + PRODUCT_CONCURRENT_REQUESTS_LIMIT]
+                ]
+
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for idx, res in enumerate(results):
+                    if isinstance(res, Exception):
+                        print("Error in concurrent_requests_product_details inner:", res)
+                        failed_ids.append(product_ids[index + idx])
+                    else:
                         if res.status_code != 200:
                             print(
-                                f"Error in concurrent_requests_product_details inner: {res.status_code} - {product_id}",
+                                f"Error in concurrent_requests_product_details inner: {res.status_code} - {product_ids[index + idx]}",
                             )
+                            failed_ids.append(product_ids[index + idx])
+                            continue
                         # print(res.json())
+
                         res_data = res.json()
                         if "errors" not in res_data:
                             products_api.append(res_data["payload"]["data"])
                         else:
-                            failed_ids.append(product_id)
+                            failed_ids.append(product_ids[index + idx])
 
-                    except Exception as e:
-                        failed_ids.append(product_id)
-                        print(
-                            f"Error in concurrent_requests_product_details inner: {e} - {product_id}",
-                        )
+                index += PRODUCT_CONCURRENT_REQUESTS_LIMIT
 
-            index += PRODUCT_CONCURRENT_REQUESTS_LIMIT
     except Exception as e:
         print(f"Error in concurrent_requests_product_details: {e}")
         return None
 
 
-def make_request_product_detail(url, retries=3, backoff_factor=0.3):
+async def make_request_product_detail(url, retries=3, backoff_factor=0.3, client=None):
     for i in range(retries):
         try:
-            response = requests.get(
+            response = await client.get(
                 url,
                 headers={
                     **PRODUCT_HEADER,
@@ -278,12 +314,14 @@ def make_request_product_detail(url, retries=3, backoff_factor=0.3):
         except Exception as e:
             if i == retries - 1:  # This is the last retry, raise the exception
                 print("Sleeping for 5 seconds...")
-                time.sleep(5)
+                await asyncio.sleep(5)
                 raise e
             else:
-                print(f"Error in make_request_product_detail (attempt {i + 1}): {e}-- {url}")
+                print(f"Error in make_request_product_detail (attempt {i + 1}):{url}")
+                print(e)
                 sleep_time = backoff_factor * (2**i)
-                time.sleep(sleep_time)
+                # time.sleep(sleep_time)
+                await asyncio.sleep(sleep_time)
 
 
 def prepareProductData(
