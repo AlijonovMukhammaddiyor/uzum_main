@@ -276,3 +276,6 @@ dump.rdb
 uzum/media/
 
 .pytest_cache/
+
+
+.env

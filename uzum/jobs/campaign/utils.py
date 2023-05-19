@@ -50,7 +50,6 @@ def prepare_banners_data(banners_api):
         banners = []
 
         for banner in banners_api:
-
             if "category/" in banner.get("link"):
                 pass
 
@@ -145,7 +144,7 @@ def concurrent_requests_for_campaign_product_ids(offer_category_id: int, total: 
                             promise["offerCategoryId"],
                         ),
                     ): promise
-                    for promise in promises[index: index + PRODUCTIDS_CONCURRENT_REQUESTS]
+                    for promise in promises[index : index + PRODUCTIDS_CONCURRENT_REQUESTS]
                 }
                 for future in as_completed(futures):
                     promise = futures[future]
