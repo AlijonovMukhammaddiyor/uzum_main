@@ -188,3 +188,7 @@ CORS_ORIGIN_WHITELIST = [
     "https://api.alijonov.com",
     # Add other allowed origins if needed
 ]
+CSRF_TRUSTED_ORIGINS = [
+    "https://api.alijonov.com",
+    # Add other allowed origins if needed
+]
