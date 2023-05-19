@@ -70,7 +70,7 @@ def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids, page
         concurrent_requests_for_ids(promises, 0, product_ids, failed_ids)
         if len(failed_ids) > 0:
             failed_again_ids = []
-            print("Failed Ids length: ", len(failed_ids))
+            print(f"Failed Ids length: {len(failed_ids)}")
             concurrent_requests_for_ids(failed_ids, 0, product_ids, failed_again_ids)
 
             if len(failed_again_ids) > 0:
