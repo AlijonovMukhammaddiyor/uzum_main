@@ -6,9 +6,10 @@ DJANGOENVDIR=/home/developer/uzum/uzum_env            			    # Django project en
 SOCKFILE=/home/developer/uzum/run/gunicorn.sock  		  # we will communicte using this unix socket
 USER=developer                                        					              # the user to run as
 GROUP=developer                                     							            # the group to run as
-NUM_WORKERS=3                                    							            # how many worker processes should Gunicorn spawn (2 * CPUs + 1)
+NUM_WORKERS=4                               							            # how many worker processes should Gunicorn spawn (2 * CPUs + 1)
 DJANGO_SETTINGS_MODULE=config.settings.production         						            # which settings file should Django use
-DJANGO_WSGI_MODULE=config.wsgi                     						            # WSGI module name
+DJANGO_WSGI_MODULE=config.wsgi              						            # WSGI module name
+TIMEOUT=5 * 60  # 5 minutes
 
 echo "Starting $NAME as `whoami`"
 
@@ -30,4 +31,5 @@ exec ${DJANGOENVDIR}/bin/gunicorn ${DJANGO_WSGI_MODULE}:application \
   --user=$USER --group=$GROUP \
   --bind=unix:$SOCKFILE \
   --log-level=debug \
-  --log-file=-
+  --log-file=- \
+  --timeout=$TIMEOUT
