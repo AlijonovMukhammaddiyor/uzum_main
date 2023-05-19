@@ -1,12 +1,12 @@
 import traceback
 
 from uzum.category.models import Category, CategoryAnalytics
+from asgiref.sync import sync_to_async
 
 
 def get_all_categories():
     try:
-        categories = Category.objects.all().order_by("categoryId")
-        return categories
+        return Category.objects.all().order_by("categoryId")
     except Exception as e:
         print(f"Error in get_all_categories: {e}")
         return None
@@ -47,7 +47,9 @@ def get_categories_with_less_than_n_products(n):
             }]
     """
     try:
+        # all_categories = sync_to_async(Category.objects.all().order_by("categoryId"))
         all_categories = get_all_categories()
+        # all_categories = []
         print(
             f"getCategoriesWithLessThanNProducts: all categories fetched {len(all_categories)}",
         )
@@ -87,6 +89,7 @@ def get_categories_with_less_than_n_products(n):
         return filtered_categories
     except Exception as e:
         print(f"Error in getCategoriesWithLessThanNProducts: {e}")
+        print(traceback.print_exc())
         return None
 
 

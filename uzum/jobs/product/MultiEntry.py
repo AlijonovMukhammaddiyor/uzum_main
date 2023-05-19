@@ -27,9 +27,7 @@ def create_products_bulk(products):
 def create_product_analytics_bulk(analytics):
     try:
         result = ProductAnalytics.objects.bulk_create(analytics, ignore_conflicts=True)
-        print(
-            f"createProductAnalyticsBulk: {len(result)} objects inserted, {len(analytics) - len(result)} objects skipped"
-        )
+        print(f"createProductAnalyticsBulk: {len(result)} inserted, {len(analytics) - len(result)} skipped")
         return {analytic.product.product_id: analytic for analytic in result}
 
     except Exception as e:

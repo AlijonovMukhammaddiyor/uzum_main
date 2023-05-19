@@ -61,7 +61,7 @@ def prepare_categories_for_bulk_create(
     cat_parents: list[tuple[int, int]],
 ):
     try:
-        current_categories = get_all_categories()
+        current_categories = Category.objects.all().order_by("categoryId")
         # make dict of all categories: key - categoryId, value - anything
         categories_dict = {category.categoryId: category for category in current_categories}
 

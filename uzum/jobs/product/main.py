@@ -7,18 +7,17 @@ from uzum.jobs.product.utils import (
 )
 
 
-def create_and_update_products():
+async def create_and_update_products(filtered_categories):
     print("create_and_update_products started")
     # 1. Get all categories which have less than N products
 
-    categories = get_categories_with_less_than_n_products(MAX_OFFSET + PAGE_SIZE)
-    if not categories:
+    if not filtered_categories:
         print("No categories found")
         return
     # 2. Get all product ids from uzum
     product_ids: list[int] = []
-    get_all_product_ids_from_uzum(
-        categories,
+    await get_all_product_ids_from_uzum(
+        filtered_categories,
         product_ids,
         page_size=PAGE_SIZE,
     )
@@ -27,7 +26,8 @@ def create_and_update_products():
 
     # 3. Fetch all products from uzum using product ids
     products_api: list[dict] = []
-    get_product_details_via_ids(product_ids, products_api)
+    await get_product_details_via_ids(product_ids, products_api)
 
-    # 4. Create products and skus
-    create_products_from_api(products_api)
+    # UNTIL here, everything is alright
+
+    return products_api
