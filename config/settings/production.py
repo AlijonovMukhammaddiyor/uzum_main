@@ -1,6 +1,8 @@
 from .base import *  # noqa
 from .base import env
 
+print("Settings: production.py")
+
 # GENERAL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
@@ -8,7 +10,9 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["api.shortintroduce.com"])
 
-ALLOWED_HOSTS += ["139.59.58.165:8000"]
+ALLOWED_HOSTS += ["139.59.58.165"]
+
+print("ALLOWED_HOSTS: ", ALLOWED_HOSTS)
 
 # DATABASES
 # ------------------------------------------------------------------------------
