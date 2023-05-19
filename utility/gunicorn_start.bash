@@ -9,7 +9,7 @@ GROUP=developer                                     							            # the gro
 NUM_WORKERS=4                               							            # how many worker processes should Gunicorn spawn (2 * CPUs + 1)
 DJANGO_SETTINGS_MODULE=config.settings.production         						            # which settings file should Django use
 DJANGO_WSGI_MODULE=config.wsgi              						            # WSGI module name
-TIMEOUT=5 * 60  # 5 minutes
+TIMEOUT=300  # 5 minutes
 
 echo "Starting $NAME as `whoami`"
 
