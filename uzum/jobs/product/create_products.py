@@ -145,25 +145,6 @@ def prepareProductData(
                 product.photos = json.dumps(extract_product_photos(product_api["photos"]))
                 is_modified = True
 
-            # badges ManyToMany field. Compare badges(list of badge objects) with product.badges(list of badge objects)
-            # if they are not equal, then update the product
-            if len(badges) != product.badges.count():
-                product.badges.set(badges)
-                is_modified = True
-            else:
-                badges = set(badges)
-                existing_badges = set(product.badges.all())
-
-                for badge in badges:
-                    if badge not in existing_badges:
-                        product.badges.add(badge)
-                        is_modified = True
-
-                for badge in existing_badges:
-                    if badge not in badges:
-                        product.badges.remove(badge)
-                        is_modified = True
-
             if is_modified:
                 product.save()
         else:
@@ -188,8 +169,6 @@ def prepareProductData(
 
             result = Product(**result)
 
-            # result.badges.set(badges.map(lambda badge: badge.badge_id))
-            # result.badges.set(list(map(lambda badge: badge.badge_id, badges)))
         # analytics
         analytics = {
             "created_at": datetime.now(tz=pytz.timezone("Asia/Tashkent")),
@@ -197,8 +176,8 @@ def prepareProductData(
             "rating": product_api["rating"],
             "orders_amount": product_api["ordersAmount"],
             "product_id": product_api["id"],
-            # "campaigns": product_campaigns_dict[product_api["id"]],
         }
+
         for sku_api in product_api["skuList"]:
             sku, sku_analytic = prepareSku(
                 sku_api,

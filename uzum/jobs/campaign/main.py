@@ -11,21 +11,20 @@ def update_or_create_campaigns():
     """
     try:
         main_content = get_main_page_data()
-
+        product_associations = {}
+        shop_associations = {}
         product_campaigns = defaultdict(list)
 
         if main_content:
             for content in main_content:
-                print(f"Content found {content['__typename']}")
+                print(f"Content - {content['__typename']}")
                 if content["__typename"] == "BannerBlock":
                     # it is banners
-                    print("Banners found")
                     banners = content["content"]
-                    create_banners(banners)
+                    create_banners(banners, product_associations, shop_associations)
                     # banners.extend(prepare_banners_data(banners_api))
                 if content["__typename"] == "InlineBanner":
-                    print("Inline banner found")
-                    create_banners([content])
+                    create_banners([content], product_associations, shop_associations)
                     # banners.append(prepare_banners_data([content]))
 
                 if content["__typename"] == "ExtendableOffer" or content["__typename"] == "CarouselOffer":
@@ -35,7 +34,7 @@ def update_or_create_campaigns():
                     for product in product_ids:
                         product_campaigns[product].append(campaign)
 
-        return product_campaigns
+        return product_campaigns, product_associations, shop_associations
     except Exception as e:
         print(f"Error in update_or_create_campaigns: {e}")
         return None

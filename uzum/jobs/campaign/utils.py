@@ -2,6 +2,7 @@ import asyncio
 import logging
 import math
 import time
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
 
@@ -78,17 +79,6 @@ def prepare_banners_data(banners_api):
 
     except Exception as e:
         print(f"Error in prepare_banners_data: {e}")
-        return None
-
-
-def create_banners(banners_api):
-    try:
-        banners = prepare_banners_data(banners_api)
-        result = Banner.objects.bulk_create(banners, ignore_conflicts=True)
-
-        return result
-    except Exception as e:
-        print(f"Error in create_banners: {e}")
         return None
 
 
@@ -186,7 +176,7 @@ def concurrent_requests_for_campaign_product_ids(offer_category_id: int, total: 
             index += PRODUCTIDS_CONCURRENT_REQUESTS
 
         print(
-            f"Offer category {offer_category_id} took {time.time() - start_time:.2} seconds - ",
+            f"Offer category {offer_category_id} took {time.time() - start_time:.2f} seconds - ",
             f"Total number of products: {len(product_ids)}/{eligable_total}",
         )
         return product_ids, failed_ids
@@ -219,3 +209,36 @@ def make_request_campaign_product_ids(
             print(f"Error in makeRequestProductIds (attemp:{i}): ", e)
             sleep_time = backoff_factor * (2**i)
             time.sleep(sleep_time)
+
+
+def associate_with_shop_or_product(link: str):
+    try:
+        if "product/" in link:
+            product_id, skuid = get_product_and_aku_ids(link)
+            if product_id:
+                return {"product_id": product_id, "sku_id": skuid}
+        elif "category/" not in link:
+            words = link.split("/")
+            if len(words) == 4:
+                return {"shop_id": words[-1]}
+
+        return None
+    except Exception as e:
+        print(f"Error in associate_with_shop_or_product: {e}")
+        return None
+
+
+def get_product_and_aku_ids(url: str):
+    try:
+        product_id_match = re.search(r'/(\d+)\??', url)
+        product_id = product_id_match.group(1) if product_id_match else None
+
+        # Extract the skuid from the URL (if present)
+        skuid_match = re.search(r'skuid=(\d+)', url)
+        skuid = skuid_match.group(1) if skuid_match else None
+
+        return product_id, skuid
+
+    except Exception as e:
+        print(f"Error in get_product_and_aku_ids: {e}")
+        return None

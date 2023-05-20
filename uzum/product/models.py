@@ -20,18 +20,12 @@ class Product(models.Model):
     shop = models.ForeignKey(
         "shop.Shop", on_delete=models.DO_NOTHING, related_name="products", db_index=True
     )
+
     category = models.ForeignKey(
         "category.Category",
         on_delete=models.DO_NOTHING,
         related_name="products",
         db_index=True,
-    )
-    reviews = models.ManyToManyField(
-        "review.Review",
-        related_name="products",
-    )
-    badges = models.ManyToManyField(
-        "badge.Badge", related_name="products", db_index=True
     )
 
     attributes = models.TextField(null=True, blank=True)  # json.dumps(attributes)
@@ -60,6 +54,16 @@ class ProductAnalytics(models.Model):
         Product, on_delete=models.DO_NOTHING, related_name="analytics"
     )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    banners = models.ManyToManyField(
+        "banner.Banner",
+        db_index=True
+    )
+
+    badges = models.ManyToManyField(
+        "badge.Badge",
+        db_index=True
+    )
 
     reviews_amount = models.IntegerField(default=0)
     rating = models.FloatField(default=0)

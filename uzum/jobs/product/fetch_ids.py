@@ -29,8 +29,8 @@ async def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids
         promises = []
 
         current_index = 0
-        while current_index < len(categories_dict):
-            # while current_index < 1:
+        # while current_index < len(categories_dict):
+        while current_index < 1:
             current_id = categories_dict[current_index]["categoryId"]
             current_category = categories_dict[current_index]
             # print("current_category: ", current_category)
@@ -93,7 +93,7 @@ async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids:
                 if len(product_ids) - last_length > 4000:
                     string_show = f"Fetched: {len(product_ids) - last_length}, Failed: {len(failed_ids)}"
                     print(
-                        f"Current: {index}/ {len(data)} - {time.time() - start_time:.2} secs - {string_show}"
+                        f"Current: {index}/ {len(data)} - {time.time() - start_time:.2f} secs - {string_show}"
                     )
                     start_time = time.time()
                     time.sleep(3)
