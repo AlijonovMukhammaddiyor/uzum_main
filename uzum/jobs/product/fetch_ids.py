@@ -29,8 +29,7 @@ async def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids
         promises = []
 
         current_index = 0
-        # while current_index < len(categories_dict):
-        while current_index < 1:
+        while current_index < len(categories_dict):
             current_id = categories_dict[current_index]["categoryId"]
             current_category = categories_dict[current_index]
             # print("current_category: ", current_category)
