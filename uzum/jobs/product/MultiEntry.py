@@ -158,6 +158,18 @@ def create_products_from_api(produts_api: list[dict], product_campaigns: dict = 
 
         print(f"create_products_from_api completed - {time.time() - start_1:.2} secs")
 
+        del products_data
+        del products_analytics
+        del product_skus
+        del product_skus_analytics
+        del shops_analytics
+        del shops_list
+        del shops_dict
+        del badges_dict
+        del badges_to_set
+        del total_new_skus
+        del shop_analytics_track
+
     except Exception as e:
         print(f"Error in createProductsFromApi: {e}")
         traceback.print_exc()

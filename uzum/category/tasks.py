@@ -33,6 +33,8 @@ def update_uzum_data(args=None, **kwargs):
         page_size=PAGE_SIZE,
     )
 
+    product_ids = list(set(product_ids))
+
     product_campaigns = update_or_create_campaigns()
 
     shop_analytics_done = {}
@@ -45,6 +47,7 @@ def update_uzum_data(args=None, **kwargs):
         create_products_from_api(products_api, product_campaigns, shop_analytics_done)
         print(f"{i+1}. Sleeping for 30 seconds...")
         time.sleep(30)
+        del products_api
 
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
