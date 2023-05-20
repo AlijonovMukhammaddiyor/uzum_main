@@ -286,10 +286,10 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#task-time-limit
 # TODO: set to whatever value is adequate in your circumstances
-CELERY_TASK_TIME_LIMIT = 60 * 60 * 3  # 3 hours
+CELERY_TASK_TIME_LIMIT = 60 * 60 * 5  # 3 hours
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#task-soft-time-limit
 # TODO: set to whatever value is adequate in your circumstances
-CELERY_TASK_SOFT_TIME_LIMIT = 60 * 60 * 3  # 3 hours
+CELERY_TASK_SOFT_TIME_LIMIT = 60 * 60 * 5  # 3 hours
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#beat-scheduler
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#worker-send-task-events
@@ -342,7 +342,7 @@ SPECTACULAR_SETTINGS = {
 CELERY_BEAT_SCHEDULE = {
     "update_data": {
         "task": "update_uzum_data",
-        "schedule": crontab(minute=47, hour=12, day_of_week="*"),
+        "schedule": crontab(minute=25, hour=18, day_of_week="*"),
         "args": (),
     },
 }

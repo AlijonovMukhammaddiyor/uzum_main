@@ -2,6 +2,8 @@ import uuid
 
 from django.db import models
 
+from uzum.product.models import get_today_pretty
+
 
 class Category(models.Model):
     categoryId = models.IntegerField(unique=True, null=False, blank=False, primary_key=True)
@@ -37,6 +39,14 @@ class CategoryAnalytics(models.Model):
     totalProducts = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    date_pretty = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_index=True,
+        default=get_today_pretty,
+    )
 
     def __str__(self):
         return f"{self.category.categoryId}: {self.totalProducts}"

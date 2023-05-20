@@ -1,15 +1,12 @@
 import time
 import traceback
-
 from uzum.badge.models import Badge
-from uzum.category.models import Category
-from uzum.jobs.campaign.main import update_or_create_campaigns
-from uzum.jobs.product.utils import prepareProductData
+
+from uzum.jobs.product.create_products import prepareProductData
 from uzum.jobs.seller.MultiEntry import create_shop_analytics_bulk
 from uzum.jobs.sku.MultiEntry import create_sku_analytics_bulk, create_skus_bulk
 from uzum.product.models import Product, ProductAnalytics
 from uzum.shop.models import Shop
-from uzum.sku.models import Sku
 
 
 def create_products_bulk(products):
@@ -35,7 +32,7 @@ def create_product_analytics_bulk(analytics):
         return None
 
 
-def create_products_from_api(produts_api: list[dict]):
+def create_products_from_api(produts_api: list[dict], product_campaigns: dict = None, shop_analytics_done: dict = None):
     try:
         print("Starting createProductsFromApi...")
         start_1 = time.time()
@@ -46,16 +43,16 @@ def create_products_from_api(produts_api: list[dict]):
         shops_analytics = []
         shops_list = []
 
-        products = {}
-        for prod in get_all_products():
-            products[prod.product_id] = prod
-
-        skus = Sku.objects.all()
-        skus_dict = {sku.sku: sku for sku in skus}
         shops = Shop.objects.all()
-        shops_dict = {shop.seller_id: shop.seller_id for shop in shops}
-        categories_dict = {category.categoryId: category.categoryId for category in Category.objects.all()}
-        badges_dict = {badge.badge_id: badge for badge in Badge.objects.all()}
+        shops_dict = {
+            shop.seller_id: shop for shop in shops
+        }
+
+        badges_ = Badge.objects.all()
+        badges_dict = {
+            badge.badge_id: badge for badge in badges_
+        }
+
         badges_to_set = {}
         total_new_products = 0
         total_new_skus = [0, 0]
@@ -63,7 +60,6 @@ def create_products_from_api(produts_api: list[dict]):
 
         print("Starting update or create campaigns...")
         c_time = time.time()
-        product_campaigns = update_or_create_campaigns()
         print(f"Finished update or create campaigns... - {time.time() - c_time}")
 
         print("Starting to prepare data...")
@@ -77,13 +73,11 @@ def create_products_from_api(produts_api: list[dict]):
                 shop,
                 badges,
             ) = prepareProductData(
-                product,
-                products,
-                skus_dict,
-                shops_dict,
-                categories_dict,
-                shop_analytics_track,
-                badges_dict,
+                product_api=product,
+                shop_analytics_track=shop_analytics_track,
+                shops_dict=shops_dict,
+                badges_dict=badges_dict,
+                shop_analytics_done=shop_analytics_done
             )
 
             products_analytics.append(product_analytic)
@@ -110,7 +104,7 @@ def create_products_from_api(produts_api: list[dict]):
             start = time.time()
             Shop.objects.bulk_create(shops_list, ignore_conflicts=True)
             end = time.time()
-            print(f"Time taken to create shops: {end - start}")
+            print(f"Time taken to create shops: {end - start:.2} secs")
 
         if len(products_data) > 0:
             print(f"Creating products... - {len(products_data)}")
@@ -124,16 +118,16 @@ def create_products_from_api(produts_api: list[dict]):
                     if product:
                         product.badges.set(badges)
                         product.save()
-                print(f"Time taken to set badges: {time.time() - badge_start}")
+                print(f"Time taken to set badges: {time.time() - badge_start:.2} secs")
             end = time.time()
-            print(f"Time taken to create products: {end - start}")
+            print(f"Time taken to create products: {end - start:.2} secs")
             time.sleep(3)
         if len(product_skus) > 0:
             start = time.time()
             print(f"Creating skus... - {len(product_skus)}")
             create_skus_bulk(product_skus)
             end = time.time()
-            print(f"Time taken to create skus: {end - start}")
+            print(f"Time taken to create skus: {end - start:.2} secs")
             time.sleep(3)
 
         print(f"Creating product analytics... - {len(products_analytics)}")
@@ -148,21 +142,21 @@ def create_products_from_api(produts_api: list[dict]):
                     if temp:
                         temp.campaigns.set(campaigns)
                         temp.save()
-            print(f"Time taken to set campaigns: {time.time() - campaign_start}")
+            print(f"Time taken to set campaigns: {time.time() - campaign_start:.2} secs")
         end = time.time()
-        print(f"Time taken to create product analytics: {end - start}")
+        print(f"Time taken to create product analytics: {end - start:.2} secs")
 
         print(f"Creating sku analytics... - {len(product_skus_analytics)}")
         create_sku_analytics_bulk(product_skus_analytics)
         end_2 = time.time()
-        print(f"Time taken to create sku analytics: {end_2 - end}")
+        print(f"Time taken to create sku analytics: {end_2 - end:.2} secs")
 
         print(f"Creating shop analytics... - {len(shops_analytics)}")
         create_shop_analytics_bulk(shops_analytics)
         end_3 = time.time()
-        print(f"Time taken to create shop analytics: {end_3 - end_2}")
+        print(f"Time taken to create shop analytics: {end_3 - end_2:.2} secs")
 
-        print(f"create_products_from_api completed - {time.time() - start_1}")
+        print(f"create_products_from_api completed - {time.time() - start_1:.2} secs")
 
     except Exception as e:
         print(f"Error in createProductsFromApi: {e}")
