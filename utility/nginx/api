@@ -1,8 +1,5 @@
 server {
     server_name api.shortintroduce.com
-        location /static/ {
-               alias /home/developer/uzum/uzum/static/;
-           }
 
     location / {
         proxy_set_header Host $http_host;

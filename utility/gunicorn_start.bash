@@ -34,5 +34,6 @@ exec ${DJANGOENVDIR}/bin/gunicorn ${DJANGO_WSGI_MODULE}:application \
   --log-level=debug \
   --log-file=- \
   --timeout=$TIMEOUT \
-  -k gevent \
-  --worker-connections=1000
+  -k gthread \
+  --worker-connections=1000 \
+  --threads 2
