@@ -34,6 +34,10 @@ class ShopAnalytics(models.Model):
     total_reviews = models.IntegerField(default=0)
     rating = models.FloatField(default=0)
 
+    banners = models.ManyToManyField(
+        "banner.Banner",
+    )
+
     date_pretty = models.CharField(
         max_length=255,
         null=True,

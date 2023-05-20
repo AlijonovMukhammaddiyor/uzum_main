@@ -58,10 +58,6 @@ def create_products_from_api(produts_api: list[dict], product_campaigns: dict = 
         total_new_skus = [0, 0]
         shop_analytics_track = {}
 
-        print("Starting update or create campaigns...")
-        c_time = time.time()
-        print(f"Finished update or create campaigns... - {time.time() - c_time}")
-
         print("Starting to prepare data...")
         for product in produts_api:
             (
@@ -104,30 +100,21 @@ def create_products_from_api(produts_api: list[dict], product_campaigns: dict = 
             start = time.time()
             Shop.objects.bulk_create(shops_list, ignore_conflicts=True)
             end = time.time()
-            print(f"Time taken to create shops: {end - start:.2} secs")
+            print(f"Time taken to create shops: {end - start:.2f} secs")
 
         if len(products_data) > 0:
             print(f"Creating products... - {len(products_data)}")
             start = time.time()
             result = create_products_bulk(products_data)
-            if badges_to_set:
-                print("Setting badges...")
-                badge_start = time.time()
-                for product_id, badges in badges_to_set.items():
-                    product = result.get(product_id, None)
-                    if product:
-                        product.badges.set(badges)
-                        product.save()
-                print(f"Time taken to set badges: {time.time() - badge_start:.2} secs")
             end = time.time()
-            print(f"Time taken to create products: {end - start:.2} secs")
+            print(f"Time taken to create products: {end - start:.2f} secs")
             time.sleep(3)
         if len(product_skus) > 0:
             start = time.time()
             print(f"Creating skus... - {len(product_skus)}")
             create_skus_bulk(product_skus)
             end = time.time()
-            print(f"Time taken to create skus: {end - start:.2} secs")
+            print(f"Time taken to create skus: {end - start:.2f} secs")
             time.sleep(3)
 
         print(f"Creating product analytics... - {len(products_analytics)}")
@@ -142,21 +129,30 @@ def create_products_from_api(produts_api: list[dict], product_campaigns: dict = 
                     if temp:
                         temp.campaigns.set(campaigns)
                         temp.save()
-            print(f"Time taken to set campaigns: {time.time() - campaign_start:.2} secs")
+            print(f"Time taken to set campaigns: {time.time() - campaign_start:.2f} secs")
+        if badges_to_set:
+            print("Setting badges...")
+            badge_start = time.time()
+            for product_id, badges in badges_to_set.items():
+                temp = result.get(product_id, None)
+                if temp:
+                    temp.badges.set(badges)
+                    temp.save()
+            print(f"Time taken to set badges: {time.time() - badge_start:.2f} secs")
         end = time.time()
-        print(f"Time taken to create product analytics: {end - start:.2} secs")
+        print(f"Time taken to create product analytics: {end - start:.2f} secs")
 
         print(f"Creating sku analytics... - {len(product_skus_analytics)}")
         create_sku_analytics_bulk(product_skus_analytics)
         end_2 = time.time()
-        print(f"Time taken to create sku analytics: {end_2 - end:.2} secs")
+        print(f"Time taken to create sku analytics: {end_2 - end:.2f} secs")
 
         print(f"Creating shop analytics... - {len(shops_analytics)}")
         create_shop_analytics_bulk(shops_analytics)
         end_3 = time.time()
-        print(f"Time taken to create shop analytics: {end_3 - end_2:.2} secs")
+        print(f"Time taken to create shop analytics: {end_3 - end_2:.2f} secs")
 
-        print(f"create_products_from_api completed - {time.time() - start_1:.2} secs")
+        print(f"create_products_from_api completed - {time.time() - start_1:.2f} secs")
 
         del products_data
         del products_analytics

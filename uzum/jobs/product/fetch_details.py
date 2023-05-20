@@ -66,7 +66,7 @@ async def concurrent_requests_product_details(
                 if len(products_api) - last_length >= 1000:
                     string_to_show = f"Fetched: {len(products_api) - last_length}, Failed: {len(failed_ids)}"
                     print(
-                        f"Current: {index}/ {len(product_ids)} - {time.time() - start_time:.2} secs - {string_to_show}"
+                        f"Current: {index}/ {len(product_ids)} - {time.time() - start_time:.2f} secs - {string_to_show}"
                     )
                     last_length = len(products_api)
                     time.sleep(2)  # sleep for 2 seconds

@@ -63,7 +63,7 @@ def get_categories_with_less_than_n_products(n):
                 most_recent_analytics = CategoryAnalytics.objects.filter(category=category).latest("created_at")
             except Exception as e:
                 print(
-                    f"get_categories_with_less_than_n_products categoryAnalytics not found for {e} - {category.categoryId}"
+                    f"get_categories_with_less_than_n_products: {category.categoryId} - {e}"
                 )
                 continue
 
