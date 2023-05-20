@@ -102,6 +102,8 @@ async def concurrent_requests_product_details(
                         else:
                             failed_ids.append(product_ids[index + idx])
 
+                del results
+                del tasks
                 index += PRODUCT_CONCURRENT_REQUESTS_LIMIT
 
     except Exception as e:
