@@ -35,7 +35,7 @@ def create_product_analytics_bulk(analytics):
         return None
 
 
-def create_products_from_api(produts_api: list[dict]):
+def create_products_from_api(produts_api: list[dict], product_campaigns: dict = None):
     try:
         print("Starting createProductsFromApi...")
         start_1 = time.time()
@@ -63,7 +63,6 @@ def create_products_from_api(produts_api: list[dict]):
 
         print("Starting update or create campaigns...")
         c_time = time.time()
-        product_campaigns = update_or_create_campaigns()
         print(f"Finished update or create campaigns... - {time.time() - c_time}")
 
         print("Starting to prepare data...")
