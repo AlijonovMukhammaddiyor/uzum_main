@@ -5,11 +5,13 @@ import pytz
 from uzum.product.models import Product, ProductAnalytics
 
 
+def does_product_exist(product_id):
+    return Product.objects.filter(product_id=product_id).exists()
+
 def find_product(product_id):
     try:
         return Product.objects.get(product_id=product_id)
     except Product.DoesNotExist:
-        print(f"find_product: Product with product_id: {product_id} does not exist")
         return None
 
 

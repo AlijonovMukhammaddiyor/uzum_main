@@ -186,7 +186,7 @@ def concurrent_requests_for_campaign_product_ids(offer_category_id: int, total: 
             index += PRODUCTIDS_CONCURRENT_REQUESTS
 
         print(
-            f"Offer category {offer_category_id} took {time.time() - start_time} seconds - ",
+            f"Offer category {offer_category_id} took {time.time() - start_time:.2} seconds - ",
             f"Total number of products: {len(product_ids)}/{eligable_total}",
         )
         return product_ids, failed_ids

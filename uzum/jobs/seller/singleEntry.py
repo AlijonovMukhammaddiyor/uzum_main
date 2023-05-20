@@ -1,5 +1,12 @@
 from uzum.shop.models import Shop, ShopAnalytics
 
+def find_shop(shopId: int):
+    try:
+        result = Shop.objects.get(shopId=shopId)
+        return result
+
+    except Exception as _:
+        return None
 
 def create_shop(shop: dict):
     try:
