@@ -16,7 +16,6 @@ class Shop(models.Model):
     registration_date = models.DateTimeField(null=True, blank=True)
     title = models.TextField(null=True, blank=True)
     account_id = models.IntegerField(null=True, blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -28,16 +27,13 @@ class ShopAnalytics(models.Model):
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="analytics")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-
     total_products = models.IntegerField(default=0)
     total_orders = models.IntegerField(default=0)
     total_reviews = models.IntegerField(default=0)
     rating = models.FloatField(default=0)
-
     banners = models.ManyToManyField(
         "banner.Banner",
     )
-
     date_pretty = models.CharField(
         max_length=255,
         null=True,

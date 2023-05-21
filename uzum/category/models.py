@@ -7,12 +7,9 @@ from uzum.product.models import get_today_pretty
 
 class Category(models.Model):
     categoryId = models.IntegerField(unique=True, null=False, blank=False, primary_key=True)
-
     title = models.CharField(max_length=1024)
     seo = models.TextField(blank=True, null=True)
-
     adult = models.BooleanField(default=False, db_index=True)
-
     parent = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,
@@ -35,11 +32,8 @@ class CategoryAnalytics(models.Model):
         Category,
         on_delete=models.DO_NOTHING,
     )
-
     totalProducts = models.IntegerField(default=0)
-
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-
     date_pretty = models.CharField(
         max_length=255,
         null=True,

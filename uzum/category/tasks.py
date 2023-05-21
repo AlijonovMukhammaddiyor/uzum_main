@@ -44,9 +44,9 @@ def update_uzum_data(args=None, **kwargs):
 
     for i in range(0, len(product_ids), BATCH_SIZE):
         products_api: list[dict] = []
+        print(f"{i}/{len(product_ids)}")
         async_to_sync(get_product_details_via_ids)(product_ids[i:i + BATCH_SIZE], products_api)
         create_products_from_api(products_api, product_campaigns, shop_analytics_done)
-        print(f"{i+1}. Sleeping for 30 seconds...")
         time.sleep(30)
         del products_api
 

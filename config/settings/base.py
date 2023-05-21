@@ -337,12 +337,12 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
 }
-# Your stuff...
+
 # ------------------------------------------------------------------------------
 CELERY_BEAT_SCHEDULE = {
     "update_data": {
         "task": "update_uzum_data",
-        "schedule": crontab(minute=50, hour=1, day_of_week="*"),
+        "schedule": crontab(minute=5, hour=0, day_of_week="*"),
         "args": (),
     },
 }
