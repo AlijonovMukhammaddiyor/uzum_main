@@ -54,17 +54,14 @@ class ProductAnalytics(models.Model):
         Product, on_delete=models.DO_NOTHING, related_name="analytics"
     )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-
     banners = models.ManyToManyField(
         "banner.Banner",
         db_index=True
     )
-
     badges = models.ManyToManyField(
         "badge.Badge",
         db_index=True
     )
-
     reviews_amount = models.IntegerField(default=0)
     rating = models.FloatField(default=0)
     orders_amount = models.IntegerField(default=0)
@@ -73,7 +70,6 @@ class ProductAnalytics(models.Model):
         "campaign.Campaign",
         db_index=True,
     )
-
     date_pretty = models.CharField(
         max_length=255, null=True, blank=True, db_index=True, default=get_today_pretty
     )

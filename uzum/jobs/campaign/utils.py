@@ -213,11 +213,14 @@ def make_request_campaign_product_ids(
 
 def associate_with_shop_or_product(link: str):
     try:
-        if "product/" in link:
+        # check if link contains product/ or category/
+        print("Link: ", link)
+        if "/product/" in link:
+            print("Product link found")
             product_id, skuid = get_product_and_aku_ids(link)
             if product_id:
                 return {"product_id": product_id, "sku_id": skuid}
-        elif "category/" not in link:
+        elif "/category/" not in link:
             words = link.split("/")
             if len(words) == 4:
                 return {"shop_id": words[-1]}
@@ -230,14 +233,12 @@ def associate_with_shop_or_product(link: str):
 
 def get_product_and_aku_ids(url: str):
     try:
-        product_id_match = re.search(r'/(\d+)\??', url)
-        product_id = product_id_match.group(1) if product_id_match else None
-
-        # Extract the skuid from the URL (if present)
-        skuid_match = re.search(r'skuid=(\d+)', url)
-        skuid = skuid_match.group(1) if skuid_match else None
-
-        return product_id, skuid
+        product_id = url.split('/')[-1]
+        if "skuid" in product_id:
+            product_id = product_id.split('?')[0].split('-')[-1]
+        else:
+            product_id = product_id.split('-')[-1]
+        return product_id
 
     except Exception as e:
         print(f"Error in get_product_and_aku_ids: {e}")

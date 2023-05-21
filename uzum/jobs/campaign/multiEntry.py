@@ -19,6 +19,7 @@ def create_banners(banners, product_associations: dict, shop_associations: dict)
             assoc = associate_with_shop_or_product(banner['link'])
             if assoc:
                 if "product_id" in assoc:
+                    print("product_id", assoc["product_id"])
                     if assoc["product_id"] not in product_associations:
                         product_associations[assoc["product_id"]] = []
                     current_banner = None

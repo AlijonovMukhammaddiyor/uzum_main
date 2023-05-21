@@ -46,7 +46,7 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
                     print(f"Total number of failed product ids: {len(final_failed)}")
                     print(f"Failed failed Ids: {final_failed}")
 
-        print("Total number of products: ", len(products_api))
+        print(f"Total number of products: {len(products_api)}")
         print(f"Total time taken by get_product_details_via_ids: {time.time() - start_time}")
         print("Ending get_product_details_via_ids...\n\n")
     except Exception as e:
@@ -60,7 +60,8 @@ async def concurrent_requests_product_details(
     try:
         index = 0
         start_time = time.time()
-        last_length = 0
+        last_length = len(products_api)
+        print(f"Starting concurrent_requests_product_details... {len(product_ids)}")
         async with httpx.AsyncClient() as client:
             while index < len(product_ids):
                 if len(products_api) - last_length >= 1000:
