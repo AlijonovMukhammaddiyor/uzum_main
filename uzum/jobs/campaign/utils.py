@@ -217,9 +217,9 @@ def associate_with_shop_or_product(link: str):
         print("Link: ", link)
         if "/product/" in link:
             print("Product link found")
-            product_id, skuid = get_product_and_aku_ids(link)
+            product_id = get_product_and_aku_ids(link)
             if product_id:
-                return {"product_id": product_id, "sku_id": skuid}
+                return {"product_id": product_id}
         elif "/category/" not in link:
             words = link.split("/")
             if len(words) == 4:
