@@ -87,7 +87,7 @@ class ProductAnalytics(models.Model):
             return self.orders_amount - yesterday_analytics.orders_amount
 
         except Exception as e:
-            return [self.orders_amount, self.reviews_amount, False]
+            return self.orders_amount
 
     # def set_orders_money(self):
     #     """
