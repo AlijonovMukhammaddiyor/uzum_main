@@ -32,11 +32,11 @@ class Migration(migrations.Migration):
             name="phone_number",
             field=models.CharField(blank=True, max_length=20),
         ),
-        migrations.AddField(
-            model_name="user",
-            name="referral_code",
-            field=models.CharField(default="8A0747", max_length=6, unique=True),
-        ),
+        # migrations.AddField(
+        #     model_name="user",
+        #     name="referral_code",
+        #     field=models.CharField(default="8A0747", max_length=6, unique=True),
+        # ),
         migrations.AddField(
             model_name="user",
             name="referred_by",

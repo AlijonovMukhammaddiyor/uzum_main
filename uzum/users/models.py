@@ -24,7 +24,7 @@ class User(AbstractUser):
     fingerprint = models.CharField(max_length=255, blank=True)  # unique fingerprint of the user's device
 
     referred_by = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL)
-    referral_code = models.CharField(unique=True, default=uuid.uuid4().hex[:6].upper(), max_length=6)
+    # referral_code = models.CharField(unique=True, default=uuid.uuid4().hex[:6].upper(), max_length=6)
 
     shop = models.ForeignKey("shop.Shop", null=True, blank=True, on_delete=models.SET_NULL)
 
