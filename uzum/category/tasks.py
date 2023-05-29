@@ -39,13 +39,12 @@ def update_uzum_data(args=None, **kwargs):
     product_ids = list(set(product_ids))
 
     product_campaigns, product_associations, shop_association = update_or_create_campaigns()
-    print("Product associations: ", product_associations)
 
     shop_analytics_done = {}
 
     BATCH_SIZE = 10_000
 
-    for i in range(0, 10000, BATCH_SIZE):
+    for i in range(0, len(product_ids), BATCH_SIZE):
         products_api: list[dict] = []
         print(f"{i}/{len(product_ids)}")
         async_to_sync(get_product_details_via_ids)(product_ids[i : i + BATCH_SIZE], products_api)
@@ -88,6 +87,7 @@ def update_uzum_data(args=None, **kwargs):
             print("Error in setting shop banner(s): ", e)
 
     date_pretty = get_today_pretty()
+
     category_analytics = CategoryAnalytics.objects.filter(date_pretty=date_pretty)
 
     for category_an in category_analytics:
