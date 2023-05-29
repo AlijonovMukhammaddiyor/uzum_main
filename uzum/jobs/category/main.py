@@ -4,7 +4,6 @@ from uzum.jobs.category.MultiEntry import (
     create_categories,
     create_category_analytics_bulk,
 )
-
 from uzum.jobs.category.utils import (
     assign_parents,
     get_categories_tree,

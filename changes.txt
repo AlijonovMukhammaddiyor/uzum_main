@@ -1,0 +1,3 @@
+1. Sum of available_amount in each sku of a product is not equal to the total available_amount of the product
+   - need to add separate available_amount column in product analytics table
+UPDATE: just ignore product revenue for now as it is impossible to calculate which sku is sold how many times

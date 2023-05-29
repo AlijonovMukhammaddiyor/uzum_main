@@ -3,6 +3,8 @@ import traceback
 from uzum.category.models import Category, CategoryAnalytics
 from asgiref.sync import sync_to_async
 
+from uzum.product.models import get_today_pretty
+
 
 def get_all_categories():
     try:
@@ -31,7 +33,6 @@ def create_category_analytics_bulk(analytics):
         return result
     except Exception as e:
         print(f"Error in createCategoryAnalyticsBulk: {e}")
-        print(analytics)
         return None
 
 
@@ -48,29 +49,23 @@ def get_categories_with_less_than_n_products(n):
     """
     try:
         # all_categories = sync_to_async(Category.objects.all().order_by("categoryId"))
-        all_categories = get_all_categories()
+        # order_by("categoryId")
+        all_category_analytics = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty()).order_by(
+            "category__categoryId"
+        )
         # all_categories = []
         print(
-            f"getCategoriesWithLessThanNProducts: all categories fetched {len(all_categories)}",
+            f"getCategoriesWithLessThanNProducts: all category analytics fetched {len(all_category_analytics)}",
         )
-        # 1. make dict of all categories: key - categoryId, value - totalProducts and children
+        # 1. make dict of all categories: key - categoryId, value - total_products and children
         # children is ManyToManey field to itself. We need to get list children's categoryId
         all_categories_dict = {}
 
-        for category in all_categories:
-            # get most recently creted analytics
-            try:
-                most_recent_analytics = CategoryAnalytics.objects.filter(category=category).latest("created_at")
-            except Exception as e:
-                print(
-                    f"get_categories_with_less_than_n_products: {category.categoryId} - {e}"
-                )
-                continue
-
-            all_categories_dict[category.categoryId] = {
-                "categoryId": category.categoryId,
-                "totalProducts": most_recent_analytics.totalProducts,
-                "children": list(category.children.values_list("categoryId", flat=True)),
+        for category in all_category_analytics:
+            all_categories_dict[category.category.categoryId] = {
+                "categoryId": category.category.categoryId,
+                "total_products": category.total_products,
+                "children": list(category.category.children.values_list("categoryId", flat=True)),
             }
 
         filtered_categories = []
@@ -82,7 +77,7 @@ def get_categories_with_less_than_n_products(n):
         # calculate total products for all filtered categories
         total = 0
         for category in filtered_categories:
-            total += category["totalProducts"]
+            total += category["total_products"]
 
         print(f"getCategoriesWithLessThanNProducts: {total} products found")
 
@@ -98,7 +93,7 @@ def filter_categories(current: dict, categories_dict: dict, categories_list: lis
         if not current:
             return
 
-        if current["totalProducts"] < n or len(current["children"]) == 0:
+        if current["total_products"] < n or len(current["children"]) == 0:
             categories_list.append(current)
             return
 

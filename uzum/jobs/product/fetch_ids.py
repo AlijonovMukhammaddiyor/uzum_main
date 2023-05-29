@@ -34,7 +34,7 @@ async def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids
             current_id = categories_dict[current_index]["categoryId"]
             current_category = categories_dict[current_index]
             # print("current_category: ", current_category)
-            current_total = min(current_category["totalProducts"], MAX_OFFSET + MAX_PAGE_SIZE)
+            current_total = min(current_category["total_products"], MAX_OFFSET + MAX_PAGE_SIZE)
             req_count = math.ceil(current_total / page_size)
 
             current_offset = 0
@@ -92,9 +92,7 @@ async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids:
                 # while index < 1:
                 if len(product_ids) - last_length > 4000:
                     string_show = f"Fetched: {len(product_ids) - last_length}, Failed: {len(failed_ids)}"
-                    print(
-                        f"Current: {index}/ {len(data)} - {time.time() - start_time:.2f} secs - {string_show}"
-                    )
+                    print(f"Current: {index}/ {len(data)} - {time.time() - start_time:.2f} secs - {string_show}")
                     start_time = time.time()
                     time.sleep(3)
                     last_length = len(product_ids)
@@ -108,7 +106,7 @@ async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids:
                         ),
                         client=client,
                     )
-                    for promise in data[index: index + PRODUCTIDS_CONCURRENT_REQUESTS]
+                    for promise in data[index : index + PRODUCTIDS_CONCURRENT_REQUESTS]
                 ]
 
                 results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -124,7 +122,7 @@ async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids:
                             for product in products:
                                 product_ids.append(product["catalogCard"]["productId"])
                         else:
-                            failed_ids.append(data[index + idx]["categoryId"])
+                            failed_ids.append(data[index + idx])
 
                 index += PRODUCTIDS_CONCURRENT_REQUESTS
 
@@ -188,4 +186,3 @@ async def make_request_product_ids(
             print(f"Error in makeRequestProductIds (attemp:{i}): ", e)
             sleep_time = backoff_factor * (2**i)
             await asyncio.sleep(sleep_time)
-

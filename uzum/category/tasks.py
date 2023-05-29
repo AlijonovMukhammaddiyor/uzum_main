@@ -5,6 +5,7 @@ import pytz
 from asgiref.sync import async_to_sync
 
 from config import celery_app
+from uzum.category.models import Category, CategoryAnalytics
 from uzum.jobs.campaign.main import update_or_create_campaigns
 from uzum.jobs.category.main import create_and_update_categories
 from uzum.jobs.category.MultiEntry import get_categories_with_less_than_n_products
@@ -22,6 +23,7 @@ from uzum.shop.models import Shop, ShopAnalytics
 def update_uzum_data(args=None, **kwargs):
     print(get_today_pretty())
     print(datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%H:%M:%S" + " - " + "%d/%m/%Y"))
+
     create_and_update_categories()
     # await create_and_update_products()
 
@@ -37,15 +39,16 @@ def update_uzum_data(args=None, **kwargs):
     product_ids = list(set(product_ids))
 
     product_campaigns, product_associations, shop_association = update_or_create_campaigns()
+    print("Product associations: ", product_associations)
 
     shop_analytics_done = {}
 
     BATCH_SIZE = 10_000
 
-    for i in range(0, len(product_ids), BATCH_SIZE):
+    for i in range(0, 10000, BATCH_SIZE):
         products_api: list[dict] = []
         print(f"{i}/{len(product_ids)}")
-        async_to_sync(get_product_details_via_ids)(product_ids[i:i + BATCH_SIZE], products_api)
+        async_to_sync(get_product_details_via_ids)(product_ids[i : i + BATCH_SIZE], products_api)
         create_products_from_api(products_api, product_campaigns, shop_analytics_done)
         time.sleep(30)
         del products_api
@@ -60,7 +63,9 @@ def update_uzum_data(args=None, **kwargs):
             if len(product_analytics) == 0:
                 continue
 
-            product_analytics = product_analytics.order_by("-created_at").first()  # get most recently created analytics
+            product_analytics = product_analytics.order_by(
+                "-created_at"
+            ).first()  # get most recently created analytics
             product_analytics.banners.set(banners)
             product_analytics.save()
 
@@ -81,6 +86,22 @@ def update_uzum_data(args=None, **kwargs):
             print(f"Shop {link} banner(s) set")
         except Exception as e:
             print("Error in setting shop banner(s): ", e)
+
+    date_pretty = get_today_pretty()
+    category_analytics = CategoryAnalytics.objects.filter(date_pretty=date_pretty)
+
+    for category_an in category_analytics:
+        category_an.set_total_products_with_sale()
+        category_an.set_total_shops()
+        category_an.set_total_orders()
+        category_an.set_total_reviews()
+
+    Category.update_descendants()
+
+    shop_analytics = ShopAnalytics.objects.filter(date_pretty=date_pretty)
+
+    for shop_an in shop_analytics:
+        shop_an.set_total_products()
 
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")

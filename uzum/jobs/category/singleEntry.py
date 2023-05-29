@@ -8,13 +8,14 @@ from uzum.category.models import Category, CategoryAnalytics
 def does_category_exist(categoryId: int):
     return Category.objects.filter(categoryId=categoryId).exists()
 
-def create_category_analytics(categoryId: int, totalProducts: int):
+
+def create_category_analytics(categoryId: int, total_products: int):
     try:
         print("Creating category analytics...")
         category = Category.objects.get(categoryId=categoryId)
         anaytics = CategoryAnalytics.objects.create(
             category=category,
-            totalProducts=totalProducts,
+            total_products=total_products,
             created_at=datetime.now(),
         )
 

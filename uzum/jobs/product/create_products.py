@@ -42,7 +42,7 @@ def prepareProductData(
             )
             create_category_analytics(
                 categoryId=category_id,
-                totalProducts=product_api["category"]["productAmount"],
+                total_products=product_api["category"]["productAmount"],
             )
             try:
                 # parent_cat = Category.objects.get(categoryId=product_api["category"]["parent"]["id"])
@@ -174,6 +174,7 @@ def prepareProductData(
             "created_at": datetime.now(tz=pytz.timezone("Asia/Tashkent")),
             "reviews_amount": product_api["reviewsAmount"],
             "rating": product_api["rating"],
+            "available_amount": product_api["totalAvailableAmount"],
             "orders_amount": product_api["ordersAmount"],
             "product_id": product_api["id"],
         }

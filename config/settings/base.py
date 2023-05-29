@@ -94,6 +94,8 @@ LOCAL_APPS = [
     "uzum.review",
     "uzum.shop",
     "uzum.sku",
+    "uzum.payment",
+    "uzum.referral",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -346,3 +348,5 @@ CELERY_BEAT_SCHEDULE = {
         "args": (),
     },
 }
+
+SESSION_CACHE_ALIAS = "default"
