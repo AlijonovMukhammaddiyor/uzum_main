@@ -38,22 +38,6 @@ def get_categories_tree():
         return None
 
 
-def filter_categories(current, categories_dict, categories_list, n, memo={}):
-    if not current or current.keys()[0] in memo:
-        return
-
-    memo[current.keys()[0]] = True
-
-    if current.totalProducts < n or current.children.length == 0:
-        categories_list.append(current)
-        return
-
-    for child in current.children:
-        filter_categories(categories_dict[child], categories_dict, categories_list, memo, n)
-
-    return
-
-
 def prepare_categories_for_bulk_create(
     tree,
     cat_analytics: list[CategoryAnalytics],
@@ -68,7 +52,7 @@ def prepare_categories_for_bulk_create(
         for i, category in enumerate(tree):
             cat_analytics.append(
                 CategoryAnalytics(
-                    totalProducts=category["total"],
+                    total_products=category["total"],
                     category_id=int(category["category"]["id"]),
                     created_at=datetime.now(tz=pytz.timezone("Asia/Tashkent")),
                 ),

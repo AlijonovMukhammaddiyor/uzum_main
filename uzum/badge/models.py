@@ -6,6 +6,7 @@ class Badge(models.Model):
     Badge - is the badge that is shown on the product card.
     For example: "Sale", "30% off".
     """
+
     badge_id = models.IntegerField(unique=True, primary_key=True)
     created_at = models.DateTimeField(auto_now_add=True)
     text = models.TextField(null=True, blank=True)

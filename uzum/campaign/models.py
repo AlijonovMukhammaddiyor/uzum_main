@@ -8,6 +8,7 @@ class Campaign(models.Model):
     Campaign - is the campaign that is shown on the website to promote a product.
     For example: "Buy 2 get 1 free", "30% off".
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     offer_id = models.IntegerField(default=0)
     title = models.CharField(max_length=255)

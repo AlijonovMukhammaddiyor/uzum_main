@@ -9,6 +9,7 @@ class Banner(models.Model):
     Args:
         models (_type_): _description_
     """
+
     id = models.UUIDField(primary_key=True, editable=False, default=uuid.uuid4)
     typename = models.CharField(max_length=1024, default="Banner")
     created_at = models.DateTimeField(auto_now_add=True)

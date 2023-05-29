@@ -26,6 +26,6 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(CategoryAnalytics)
 class CategoryAnalyticsAdmin(admin.ModelAdmin):
-    list_display = ("category", "totalProducts", "created_at")
-    list_filter = ("category", "totalProducts", "created_at")
-    search_fields = ("category", "totalProducts", "created_at")
+    list_display = ("category", "total_products", "created_at")
+    list_filter = ("category", "total_products", "created_at")
+    search_fields = ("category", "total_products", "created_at")

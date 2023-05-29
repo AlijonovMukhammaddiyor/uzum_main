@@ -94,6 +94,8 @@ LOCAL_APPS = [
     "uzum.review",
     "uzum.shop",
     "uzum.sku",
+    "uzum.payment",
+    "uzum.referral",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -342,7 +344,9 @@ SPECTACULAR_SETTINGS = {
 CELERY_BEAT_SCHEDULE = {
     "update_data": {
         "task": "update_uzum_data",
-        "schedule": crontab(minute=5, hour=0, day_of_week="*"),
+        "schedule": crontab(minute=52, hour=23, day_of_week="*"),
         "args": (),
     },
 }
+
+SESSION_CACHE_ALIAS = "default"

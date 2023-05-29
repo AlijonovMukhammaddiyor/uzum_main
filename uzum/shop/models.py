@@ -1,7 +1,14 @@
 import uuid
+from datetime import datetime
+import pytz
+
 from django.db import models
 
-from uzum.product.models import get_today_pretty
+from uzum.product.models import ProductAnalytics
+
+
+def get_today_pretty():
+    return datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
 
 
 class Shop(models.Model):
@@ -44,3 +51,12 @@ class ShopAnalytics(models.Model):
 
     def __str__(self):
         return f"{self.shop.title} - {self.total_products}"
+
+    def set_total_products(self):
+        try:
+            # get all product analytics of this shop
+            product_analytics = ProductAnalytics.objects.filter(product__shop=self.shop, date_pretty=self.date_pretty)
+            self.total_products = product_analytics.count()
+            self.save()
+        except Exception as e:
+            print("Error in set_total_products: ", e)
