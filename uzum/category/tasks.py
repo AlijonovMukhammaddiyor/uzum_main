@@ -39,6 +39,7 @@ def update_uzum_data(args=None, **kwargs):
     product_ids = list(set(product_ids))
 
     product_campaigns, product_associations, shop_association = update_or_create_campaigns()
+    print("Product associations: ", product_associations)
 
     shop_analytics_done = {}
 
@@ -87,8 +88,6 @@ def update_uzum_data(args=None, **kwargs):
             print("Error in setting shop banner(s): ", e)
 
     date_pretty = get_today_pretty()
-    print("Updating category analytics...")
-
     category_analytics = CategoryAnalytics.objects.filter(date_pretty=date_pretty)
 
     for category_an in category_analytics:

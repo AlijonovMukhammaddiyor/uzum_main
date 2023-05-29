@@ -65,14 +65,12 @@ def prepare_banners_data(banners_api):
                 pass
 
             banners.append(
-                Banner(
-                    **{
-                        "typename": banner.get("__typename"),
-                        "description": banner.get("description"),
-                        "link": banner.get("link"),
-                        "image": banner.get("image", {"high": None})["high"],
-                    }
-                )
+                {
+                    "typename": banner.get("__typename"),
+                    "description": banner.get("description"),
+                    "link": banner.get("link"),
+                    "image": banner.get("image", {"high": None})["high"],
+                }
             )
 
         return banners
@@ -155,7 +153,7 @@ def concurrent_requests_for_campaign_product_ids(offer_category_id: int, total: 
                         ),
                         session=session,
                     ): promise
-                    for promise in promises[index: index + PRODUCTIDS_CONCURRENT_REQUESTS]
+                    for promise in promises[index : index + PRODUCTIDS_CONCURRENT_REQUESTS]
                 }
                 for future in as_completed(futures):
                     promise = futures[future]
@@ -233,11 +231,11 @@ def associate_with_shop_or_product(link: str):
 
 def get_product_and_aku_ids(url: str):
     try:
-        product_id = url.split('/')[-1]
+        product_id = url.split("/")[-1]
         if "skuid" in product_id:
-            product_id = product_id.split('?')[0].split('-')[-1]
+            product_id = product_id.split("?")[0].split("-")[-1]
         else:
-            product_id = product_id.split('-')[-1]
+            product_id = product_id.split("-")[-1]
         return product_id
 
     except Exception as e:

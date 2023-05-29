@@ -122,7 +122,7 @@ async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids:
                             for product in products:
                                 product_ids.append(product["catalogCard"]["productId"])
                         else:
-                            failed_ids.append(data[index + idx]["categoryId"])
+                            failed_ids.append(data[index + idx])
 
                 index += PRODUCTIDS_CONCURRENT_REQUESTS
 

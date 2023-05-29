@@ -214,7 +214,8 @@ class CategoryAnalytics(models.Model):
                 if product_analytic.rating > 0:
                     rating_count += 1
 
-            self.average_rating = total_rating / rating_count
+            if rating_count > 0:
+                self.average_rating = total_rating / rating_count
             self.total_reviews = reviews
             self.save()
 
