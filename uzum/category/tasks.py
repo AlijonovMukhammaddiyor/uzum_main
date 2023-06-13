@@ -47,12 +47,12 @@ def update_uzum_data(args=None, **kwargs):
     for i in range(0, len(product_ids), BATCH_SIZE):
         products_api: list[dict] = []
         print(f"{i}/{len(product_ids)}")
-        async_to_sync(get_product_details_via_ids)(product_ids[i : i + BATCH_SIZE], products_api)
+        async_to_sync(get_product_details_via_ids)(product_ids[i: i + BATCH_SIZE], products_api)
         create_products_from_api(products_api, product_campaigns, shop_analytics_done)
         time.sleep(30)
         del products_api
 
-    print("Setting banners...")
+    print("Setting banners...", product_associations, shop_association)
     print(product_associations, shop_association)
     for product_id, banners in product_associations.items():
         try:
@@ -89,6 +89,8 @@ def update_uzum_data(args=None, **kwargs):
     date_pretty = get_today_pretty()
 
     category_analytics = CategoryAnalytics.objects.filter(date_pretty=date_pretty)
+
+    print("Setting total_products_with_sales and total_shops_with_sales...", len(category_analytics))
 
     for category_an in category_analytics:
         category_an.set_total_products_with_sale()

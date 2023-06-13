@@ -10,7 +10,7 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["api.shortintroduce.com"])
 
-ALLOWED_HOSTS += ["api.alijonov.com", "localhost"]
+ALLOWED_HOSTS += ["api.alijonov.com", "localhost", "127.0.0.1"]
 
 # DATABASES
 # ------------------------------------------------------------------------------
@@ -176,7 +176,10 @@ LOGGING = {
 # -------------------------------------------------------------------------------
 # Tools that generate code samples can use SERVERS to point to the correct domain
 SPECTACULAR_SETTINGS["SERVERS"] = [  # noqa: F405
-    {"url": "https://shortintroduce.com", "description": "Production server"},
+    {"url": "https://api.alijonov.com", "description": "Production server"},
+    # {
+    #     "url": "http://localhost:8000",  # noqa: F405
+    # },
 ]
 # Your stuff...
 # ------------------------------------------------------------------------------
