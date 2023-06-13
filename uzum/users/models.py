@@ -1,4 +1,3 @@
-import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser
@@ -16,17 +15,19 @@ class User(AbstractUser):
     check forms.SignupForm and forms.SocialSignupForms accordingly.
     """
 
-    # First and last name do not cover name patterns around the globe
-    name = models.CharField(_("Name of User"), blank=True, max_length=255)
     first_name = models.CharField(_("First name"), max_length=30, blank=True)
     last_name = models.CharField(_("Last name"), max_length=150, blank=True)
-    phone_number = models.CharField(max_length=20, blank=True)
+
+    phone_number = models.CharField(max_length=20, blank=True, unique=True)
+    email = models.EmailField(_("Email address"), blank=True, unique=True)
     fingerprint = models.CharField(max_length=255, blank=True)  # unique fingerprint of the user's device
 
     referred_by = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL)
-    # referral_code = models.CharField(unique=True, default=uuid.uuid4().hex[:6].upper(), max_length=6)
+    referral_code = models.CharField(unique=True, max_length=6)
 
     shop = models.ForeignKey("shop.Shop", null=True, blank=True, on_delete=models.SET_NULL)
+
+    is_developer = models.BooleanField(default=False)
 
     def get_absolute_url(self) -> str:
         """Get URL for user's detail view.
@@ -56,5 +57,4 @@ class User(AbstractUser):
         else:
             # The user has no payments yet, calculate next date based on registration date
             next_payment_date = self.date_joined + timedelta(days=1)
-
         return next_payment_date

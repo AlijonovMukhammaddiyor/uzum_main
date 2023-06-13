@@ -324,8 +324,13 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
     ),
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_RATES": {"anon": "100/hour", "user": "1000/day"},
 }
 
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
@@ -334,10 +339,17 @@ CORS_URLS_REGEX = r"^/api/.*$"
 # By Default swagger ui is available only to admin user(s). You can change permission classes to change that
 # See more configuration options at https://drf-spectacular.readthedocs.io/en/latest/settings.html#settings
 SPECTACULAR_SETTINGS = {
-    "TITLE": "uzum API",
-    "DESCRIPTION": "Documentation of API endpoints of uzum",
+    "TITLE": "Uzum Analytics API",
+    "DESCRIPTION": "Documentation of API endpoints of Uzum Analytics",
     "VERSION": "1.0.0",
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
+    "SERVE_PERMISSIONS": ["config.permissions.IsAdminOrDeveloper"],
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        # Do not allow any operation which changes data in the database -> allow only GET requests
+        "supportedSubmitMethods": [
+            "get",
+        ],
+    },
 }
 
 # ------------------------------------------------------------------------------

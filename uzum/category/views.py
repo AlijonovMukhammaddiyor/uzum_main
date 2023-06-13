@@ -3,12 +3,11 @@ from rest_framework.request import Request
 from rest_framework import status, authentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
+from uzum.product.models import Product
 from django.db.models import Max, Count
 
-from uzum.product.models import Product
-
-from .serializers import CategorySerializer
 from .models import Category
+from .serializers import CategorySerializer
 
 
 @api_view(["GET"])
@@ -26,6 +25,7 @@ def get_categories_as_tree(request):
         Categories: nested dict of categories where each category has a list of its children
     """
     try:
+        # Intention: Get the root category and get its first level children.
 
         def category_dict(category: Category):
             return {
@@ -39,9 +39,9 @@ def get_categories_as_tree(request):
             }
 
         root_category = Category.objects.get(categoryId=1)
-        category_tree = category_dict(root_category)
+        children = root_category.children.all()
 
-        return Response(status=status.HTTP_200_OK, data=category_tree)
+        # return Response(status=status.HTTP_200_OK, data=category_tree)
 
     except Category.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
