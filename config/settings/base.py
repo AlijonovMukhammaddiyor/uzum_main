@@ -346,9 +346,9 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
         # Do not allow any operation which changes data in the database -> allow only GET requests
-        "supportedSubmitMethods": [
-            "get",
-        ],
+        # "supportedSubmitMethods": [
+        #     "get",
+        # ],
     },
 }
 
