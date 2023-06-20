@@ -47,7 +47,7 @@ def update_uzum_data(args=None, **kwargs):
     for i in range(0, len(product_ids), BATCH_SIZE):
         products_api: list[dict] = []
         print(f"{i}/{len(product_ids)}")
-        async_to_sync(get_product_details_via_ids)(product_ids[i: i + BATCH_SIZE], products_api)
+        async_to_sync(get_product_details_via_ids)(product_ids[i : i + BATCH_SIZE], products_api)
         create_products_from_api(products_api, product_campaigns, shop_analytics_done)
         time.sleep(30)
         del products_api
@@ -57,7 +57,7 @@ def update_uzum_data(args=None, **kwargs):
     for product_id, banners in product_associations.items():
         try:
             product = Product.objects.get(product_id=product_id)
-            product_analytics = ProductAnalytics.objects.filter(product=product, date_pretty=get_today_pretty())
+            product_analytics = ProductAnalytics.objects.get(product=product, date_pretty=get_today_pretty())
 
             if len(product_analytics) == 0:
                 continue
@@ -92,11 +92,11 @@ def update_uzum_data(args=None, **kwargs):
 
     print("Setting total_products_with_sales and total_shops_with_sales...", len(category_analytics))
 
-    for category_an in category_analytics:
-        category_an.set_total_products_with_sale()
-        category_an.set_total_shops()
-        category_an.set_total_orders()
-        category_an.set_total_reviews()
+    # for category_an in category_analytics:
+    #     category_an.set_total_products_with_sale()
+    #     category_an.set_total_shops()
+    #     category_an.set_total_orders()
+    #     category_an.set_total_reviews()
 
     Category.update_descendants()
 

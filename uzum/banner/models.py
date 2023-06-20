@@ -27,4 +27,4 @@ class Banner(models.Model):
     campaign = models.ForeignKey("campaign.Campaign", on_delete=models.DO_NOTHING, null=True, blank=True)
 
     def __str__(self) -> str:
-        return f"{self.id} - {self.typename} - {self.created_at} - {self.updated_at} - {self.description} - {self.link} - {self.image} - {self.category} - {self.product} - {self.campaign}"
+        return f"{self.id} - {self.created_at} - {self.link}"
