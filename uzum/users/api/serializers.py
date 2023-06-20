@@ -1,6 +1,8 @@
 import uuid
 
 from django.contrib.auth import get_user_model
+from phone_verify.serializers import SMSVerificationSerializer
+
 from rest_framework import serializers
 from uzum.referral.models import Referral
 

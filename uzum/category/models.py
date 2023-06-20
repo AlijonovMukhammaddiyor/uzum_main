@@ -1,10 +1,15 @@
+import traceback
 import uuid
 from datetime import datetime, timedelta
 
 from django.db import models
+import pytz
 
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.shop.models import Shop
+from uzum.sku.models import get_day_before_pretty
+from django.db.models import Sum, Count, Avg, F, Q, Subquery
+from django.db import transaction
 
 
 class Category(models.Model):
@@ -20,7 +25,7 @@ class Category(models.Model):
         null=True,
     )
     children = models.ManyToManyField("self", blank=True, symmetrical=False, related_name="parent_cats")
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
 
     descendants = models.TextField(null=True, blank=True)  # descendant categoryIds separated by comma
@@ -61,14 +66,12 @@ class Category(models.Model):
         return descendants
 
     def get_category_descendants(self, include_self=False):
-        descendant_ids = self.descendants.split(",")
-
-        # convert to int
-        descendant_ids = [int(descendant_id) for descendant_id in descendant_ids]
-        descendants = Category.objects.filter(id__in=descendant_ids)
+        descendant_ids = [int(descendant_id) for descendant_id in self.descendants.split(",")]
 
         if include_self:
-            descendants = descendants | Category.objects.filter(categoryId=self.categoryId)
+            descendant_ids.append(self.categoryId)
+
+        descendants = Category.objects.filter(categoryId__in=descendant_ids)
 
         return descendants
 
@@ -91,21 +94,24 @@ class CategoryAnalytics(models.Model):
         default=get_today_pretty,
     )
 
-    total_orders = models.IntegerField(default=0)  # total orders of campaign so far
-    total_orders_amount = models.IntegerField(default=0)  # total orders amount of campaign so far
+    total_orders = models.IntegerField(default=0, null=True, blank=True)  # total orders of campaign so far
+    total_orders_amount = models.IntegerField(
+        default=0, null=True, blank=True
+    )  # total orders amount of campaign so far
 
-    total_reviews = models.IntegerField(default=0)
-    average_rating = models.FloatField(default=0)
+    total_reviews = models.IntegerField(default=0, null=True, blank=True)  # so far
+    average_rating = models.FloatField(default=0, null=True, blank=True)  # so far
 
-    total_shops = models.IntegerField(default=0)
+    total_shops = models.IntegerField(default=0, null=True, blank=True)  # current
 
-    total_shops_with_sales = models.IntegerField(default=0)
-    total_products_with_sales = models.IntegerField(default=0)
+    total_shops_with_sales = models.IntegerField(default=0, null=True, blank=True)  # in a day
+    total_products_with_sales = models.IntegerField(default=0, null=True, blank=True)  # in a day
+    total_products_with_reviews = models.IntegerField(default=0, null=True, blank=True)  # in a day
 
     def __str__(self):
         return f"{self.category.categoryId}: {self.total_products}"
 
-    def get_last_category_analytics(self, date=None):
+    def get_yesterday_category_analytics(self):
         """
         Returns last category analytics for this category with date it created.
         Args:
@@ -115,61 +121,19 @@ class CategoryAnalytics(models.Model):
             _type_: _description_
         """
         try:
-            if not date:
-                date = datetime.now()
-
-            last_analytics = (
-                CategoryAnalytics.objects.filter(category=self.category, created_at__lt=date)
-                .order_by("-created_at")
-                .first()
-            )
+            yesterday_pretty = get_day_before_pretty(self.date_pretty)
+            last_analytics = CategoryAnalytics.objects.get(category=self.category, date_pretty=yesterday_pretty)
             return last_analytics
         except Exception as e:
-            print("Error in get_last_category_analytics: ", e)
-
-    def set_total_products_with_sale(self, date=None):
-        """
-        Sets total_products_with_sales for this category.
-        For efficience, set total_shops_with_sales as well.
-        Args:
-            date (_type_, optional): _description_. Defaults to None.
-        """
-        try:
-            if not date:
-                date = datetime.now()
-            date_pretty = date.strftime("%Y-%m-%d")
-
-            # get all product_analytics created at date_pretty for this category
-            product_analytics = ProductAnalytics.objects.filter(
-                product__category=self.category, date_pretty=date_pretty
-            )
-
-            # traverse all and if analytics.get_orders_amount_in_day(date) > 0, then increment count
-            count = 0
-            shops_counted = {}
-            shop_count = 0
-            for product_analytic in product_analytics:
-                if product_analytic.get_orders_amount_in_day(date) > 0:
-                    count += 1
-
-                    shop: Shop = product_analytic.product.shop
-                    if shop.seller_id not in shops_counted:
-                        shops_counted[shop.seller_id] = True
-                        shop_count += 1
-
-            self.total_products_with_sales = count
-            self.total_shops_with_sales = shop_count
-            self.save()
-
-        except Exception as e:
-            print("Error in set_total_products_with_sale: ", e)
+            return None
 
     def set_total_shops(self, date=None):
         try:
-            # get all shops which have product in this category
+            # 1. get all descendants of this category
+            descendants = Category.get_descendants(self.category, include_self=True)
 
-            # 1. get all products in this category
-            products = Product.objects.filter(category=self.category)
+            # 1. get all products in descendants
+            products = Product.objects.filter(category__in=descendants)
 
             # 2. traverse all products and increment count if shop is not already counted
             count = 0
@@ -187,66 +151,74 @@ class CategoryAnalytics(models.Model):
         except Exception as e:
             print("Error in set_total_shops: ", e)
 
-    def set_total_reviews(self, date=None):
-        """
-        Sets total_reviews for this category.
-        Args:
-            date (_type_, optional): _description_. Defaults to None.
-        """
-        try:
-            # get all product_analytics created at date_pretty for this category
-            # sum all reviews_amount
-            if not date:
-                date = datetime.now()
-            date_pretty = date.strftime("%Y-%m-%d")
+    @staticmethod
+    def update_all_categories(date_pretty=None):
+        if date_pretty is None:
+            date_pretty = datetime.now().strftime("%Y-%m-%d")
 
-            product_analytics = ProductAnalytics.objects.filter(
-                product__category=self.category, date_pretty=date_pretty
+        current_date = datetime.strptime(date_pretty, "%Y-%m-%d").astimezone(pytz.timezone("Asia/Tashkent"))
+
+        categories = Category.objects.all()
+
+        updated_categories_analytics = []
+
+        for category in categories:
+            descendants = Category.get_descendants(category, include_self=True)
+
+            products = Product.objects.filter(category__in=descendants)
+
+            total_orders = 0
+            total_reviews = 0
+            product_with_sale_count = 0
+            shop_with_sale_count = set()
+            products_with_reviews_count = 0
+            rating = 0
+            rated_products_count = 0
+
+            for product in products:
+                product_analytic = (
+                    ProductAnalytics.objects.filter(product=product, created_at__date__lte=current_date.date())
+                    .order_by("-created_at")
+                    .first()
+                )
+
+                if product_analytic is not None:
+                    total_orders += product_analytic.orders_amount
+                    total_reviews += product_analytic.reviews_amount
+
+                    if product_analytic.orders_amount > 0:
+                        product_with_sale_count += 1
+                        shop_with_sale_count.add(product.shop.seller_id)
+
+                    if product_analytic.reviews_amount > 0:
+                        products_with_reviews_count += 1
+
+                    if product_analytic.rating > 0:
+                        rating += product_analytic.rating
+                        rated_products_count += 1
+            print(category.title)
+            try:
+                category_analytics = CategoryAnalytics.objects.get(category=category, date_pretty=date_pretty)
+            except CategoryAnalytics.DoesNotExist:
+                continue
+            category_analytics.total_orders = total_orders
+            category_analytics.total_reviews = total_reviews
+            category_analytics.total_products_with_sales = product_with_sale_count
+            category_analytics.total_shops_with_sales = len(shop_with_sale_count)
+            category_analytics.total_products_with_reviews = products_with_reviews_count
+            category_analytics.average_rating = (rating / rated_products_count) if rated_products_count > 0 else 0
+
+            updated_categories_analytics.append(category_analytics)
+
+        with transaction.atomic():
+            CategoryAnalytics.objects.bulk_update(
+                updated_categories_analytics,
+                [
+                    "total_orders",
+                    "total_reviews",
+                    "total_products_with_sales",
+                    "total_shops_with_sales",
+                    "total_products_with_reviews",
+                    "average_rating",
+                ],
             )
-
-            reviews = 0
-            total_rating = 0
-            rating_count = 0
-
-            for product_analytic in product_analytics:
-                reviews += product_analytic.reviews_amount
-                total_rating += product_analytic.rating
-                if product_analytic.rating > 0:
-                    rating_count += 1
-
-            if rating_count > 0:
-                self.average_rating = total_rating / rating_count
-            self.total_reviews = reviews
-            self.save()
-
-        except Exception as e:
-            print("Error in set_total_reviews: ", e)
-
-    def set_total_orders(self, date=None):
-        """
-        Sets total_orders for this category.
-        Args:
-            date (_type_, optional): _description_. Defaults to None.
-        """
-        try:
-            # get all product_analytics created at date_pretty for this category
-            # sum all orders_amount
-            if not date:
-                date = datetime.now()
-            date_pretty = date.strftime("%Y-%m-%d")
-
-            product_analytics = ProductAnalytics.objects.filter(
-                product__category=self.category, date_pretty=date_pretty
-            )
-
-            orders = 0
-
-            for product_analytic in product_analytics:
-                orders += product_analytic.orders_amount
-
-            self.total_orders = orders
-            self.save()
-
-            return True
-        except Exception as e:
-            print("Error in set_total_orders: ", e)

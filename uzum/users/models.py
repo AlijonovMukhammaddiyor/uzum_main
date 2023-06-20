@@ -19,6 +19,7 @@ class User(AbstractUser):
     last_name = models.CharField(_("Last name"), max_length=150, blank=True)
 
     phone_number = models.CharField(max_length=20, blank=True, unique=True)
+    # is_verified = models.BooleanField(default=False)
     email = models.EmailField(_("Email address"), blank=True, unique=True)
     fingerprint = models.CharField(max_length=255, blank=True)  # unique fingerprint of the user's device
 

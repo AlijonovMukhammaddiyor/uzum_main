@@ -55,10 +55,10 @@ class Sku(models.Model):
 class SkuAnalytics(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sku = models.ForeignKey(Sku, on_delete=models.DO_NOTHING, related_name="analytics")
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     available_amount = models.IntegerField(default=0)
     orders_amount = models.IntegerField(default=0)
-    purchase_price = models.FloatField(default=0)
+    purchase_price = models.FloatField(default=0, db_index=True)
     full_price = models.FloatField(default=None, null=True, blank=True)
     date_pretty = models.CharField(
         max_length=255,
