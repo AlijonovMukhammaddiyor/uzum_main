@@ -108,3 +108,13 @@ def update_uzum_data(args=None, **kwargs):
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
     return True
+
+
+def fetch_failed_products(product_ids: list[int]):
+    products_api: list[dict] = []
+    shop_analytics_done = {
+        shop_an.shop.seller_id: True for shop_an in ShopAnalytics.objects.filter(date_pretty=get_today_pretty())
+    }
+    async_to_sync(get_product_details_via_ids)(product_ids, products_api)
+    create_products_from_api(products_api, {}, shop_analytics_done)
+    del products_api
