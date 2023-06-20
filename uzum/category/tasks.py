@@ -112,9 +112,38 @@ def update_uzum_data(args=None, **kwargs):
 
 def fetch_failed_products(product_ids: list[int]):
     products_api: list[dict] = []
+    print("Starting fetching failed products...")
     shop_analytics_done = {
-        shop_an.shop.seller_id: True for shop_an in ShopAnalytics.objects.filter(date_pretty=get_today_pretty())
+        seller_id: True
+        for seller_id in ShopAnalytics.objects.filter(date_pretty=get_today_pretty()).values_list(
+            "shop__seller_id", flat=True
+        )
     }
+    print("After shop_analytics_done...")
     async_to_sync(get_product_details_via_ids)(product_ids, products_api)
     create_products_from_api(products_api, {}, shop_analytics_done)
     del products_api
+
+
+# def fetch_products(url):
+#     headers = CaseInsensitiveDict()
+#     headers["Access-Control-Allow-Credentials"] = "true"
+#     headers["Origin"] = "https://uzum.uz"
+#     headers["Authority"] = "api.uzum.uz"
+#     headers[
+#         "User-Agent"
+#     ] = "Mozilla/5.0 (Windows NT 10.0; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+#     headers["Referrer"] = "https://uzum.uz/"
+#     headers["Access-Control-Allow-Origin"] = "https://uzum.uz"
+#     headers["Authorization"] = "Basic YjJjLWZyb250OmNsaWVudFNlY3JldA=="
+#     headers["x-lid"] = "25dc2cba-2d8e-4192-bac7-8f0df42cbdd5"
+#     headers["Sec-Ch-Ua"] = "'Not.A/Brand';v='8', 'Chromium';v='114', 'Google Chrome';v='114'"
+#     headers["Sec-Ch-Ua-Mobile"] = "?0"
+#     headers["Sec-Ch-Ua-Platform"] = "'macOS'"
+#     headers["Sec-Fetch-Dest"] = "empty"
+#     headers["Sec-Fetch-Mode"] = "cors"
+#     headers["Sec-Fetch-Site"] = "same-site"
+#     resp = requests.get(url, headers=headers)
+
+#     # print (resp.json())
+#     return resp.json()
