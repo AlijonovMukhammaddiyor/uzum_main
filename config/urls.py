@@ -47,7 +47,7 @@ urlpatterns += [
     path("api/shop/", include("uzum.shop.urls", namespace="shop")),
     path("api/product/", include("uzum.product.urls", namespace="product")),
     path("api/badge/", include("uzum.badge.urls", namespace="badge")),
-    path("api/banner/", include("uzum.banner.urls", namespace="badge")),
+    path("api/banner/", include("uzum.banner.urls", namespace="banner")),
 ]
 
 if settings.DEBUG:

@@ -51,8 +51,10 @@ class ProductAnalytics(models.Model):
     )
     product = models.ForeignKey(Product, on_delete=models.DO_NOTHING, related_name="analytics")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    banners = models.ForeignKey(
-        "banner.Banner", db_index=True, on_delete=models.DO_NOTHING, null=True, blank=True, related_name="products"
+    banners = models.ManyToManyField(
+        "banner.Banner",
+        db_index=True,
+        # on_delete=models.DO_NOTHING, null=True, blank=True, related_name="products"
     )
     badges = models.ManyToManyField(
         "badge.Badge",
