@@ -4,6 +4,7 @@ import math
 import time
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import traceback
 from requests.adapters import HTTPAdapter
 
 import requests
@@ -80,7 +81,7 @@ def prepare_banners_data(banners_api):
         return None
 
 
-def get_campaign_products_ids(offer_category_id: int, title: str):
+def get_campaign_products_ids(offer_category_id: int, title: str, retry: bool = False):
     try:
         # has to make parallel requests to get all products
         session = requests.Session()
@@ -102,7 +103,9 @@ def get_campaign_products_ids(offer_category_id: int, title: str):
             print(f"Error in get_campaign_products_ids: {response.status_code}")
             # give server some time to recover
             time.sleep(2)
-            return None
+            if not retry:
+                get_campaign_products_ids(offer_category_id, title, True)
+            return []
 
         return product_ids
 
@@ -168,7 +171,9 @@ def concurrent_requests_for_campaign_product_ids(offer_category_id: int, total: 
                             failed_ids.append(promise["offerCategoryId"])
 
                     except Exception as e:
+                        traceback.print_exc()
                         print(f"Error in concurrentRequestsForIds inner: {e} - {promise}")
+                        time.sleep(2)
                         failed_ids.append(promise)
 
             index += PRODUCTIDS_CONCURRENT_REQUESTS

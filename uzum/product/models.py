@@ -9,7 +9,7 @@ from uzum.sku.models import get_day_before_pretty
 
 class Product(models.Model):
     product_id = models.IntegerField(unique=True, primary_key=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
     title = models.TextField()
     description = models.TextField(default=None, null=True, blank=True)
@@ -69,6 +69,8 @@ class ProductAnalytics(models.Model):
         db_index=True,
     )
     date_pretty = models.CharField(max_length=255, null=True, blank=True, db_index=True, default=get_today_pretty)
+    position = models.IntegerField(default=0, null=True, blank=True)
+    score = models.FloatField(default=0, null=True, blank=True)
 
     def get_orders_amount_in_day(self, date=None):
         """
@@ -88,6 +90,25 @@ class ProductAnalytics(models.Model):
 
         except Exception as e:
             return self.orders_amount
+
+    def get_reviews_amount_in_day(self, date=None):
+        """
+        Get reviews amount in a day.
+        Get yesterday's analytics and subtract today's reviews_amount from it.
+        If there is no yesterday's analytics, return today's reviews_amount.
+        """
+        try:
+            # get the latest analytics of this product
+            yesterday_pretty = get_day_before_pretty(self.date_pretty)
+
+            yesterday_analytics = ProductAnalytics.objects.get(
+                product=self.product,
+                date_pretty=yesterday_pretty,
+            )
+            return self.reviews_amount - yesterday_analytics.reviews_amount
+
+        except Exception as e:
+            return self.reviews_amount
 
     # def set_orders_money(self):
     #     """

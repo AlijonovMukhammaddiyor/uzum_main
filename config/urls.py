@@ -5,9 +5,17 @@ from django.urls import include, path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from rest_framework.authtoken.views import obtain_auth_token
+
+# from phone_verify.api import VerificationViewSet
+# from rest_framework.authtoken.views import obtain_auth_token
+# from rest_framework.routers import DefaultRouter
 
 from uzum.users.views import CustomObtainAuthToken
+
+# default_router = DefaultRouter(trailing_slash=False)
+# default_router.register("phone", VerificationViewSet, basename="phone")
+
+# urlpatterns = default_router.urls
 
 urlpatterns = [
     path("", TemplateView.as_view(template_name="pages/home.html"), name="home"),
@@ -18,7 +26,6 @@ urlpatterns = [
     path("users/", include("uzum.users.urls", namespace="users")),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
-    # path("category/", include("uzum.category.urls", namespace="category")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # API URLS
@@ -36,6 +43,10 @@ urlpatterns += [
         ),
         name="api-docs",
     ),
+    path("api/category/", include("uzum.category.urls", namespace="category")),
+    path("api/shop/", include("uzum.shop.urls", namespace="shop")),
+    path("api/product/", include("uzum.product.urls", namespace="product")),
+    path("api/badge/", include("uzum.badge.urls", namespace="badge")),
 ]
 
 if settings.DEBUG:
