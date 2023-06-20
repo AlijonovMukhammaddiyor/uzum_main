@@ -1,3 +1,4 @@
+import traceback
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -6,11 +7,18 @@ from uzum.banner.models import Banner
 from rest_framework import status
 
 from uzum.banner.serializers import BannerSerializer
-from uzum.product.models import ProductAnalytics, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from uzum.product.serializers import ProductSerializer
+from uzum.shop.models import Shop, ShopAnalytics
+from uzum.shop.serializers import ShopSerializer
 from uzum.sku.models import get_day_before_pretty
 
 
 class BannersView(APIView):
+    """
+    Get all banners with product analytics
+    """
+
     permission_classes = [IsAuthenticated]
     authentication_classes = [TokenAuthentication]
     allowed_methods = ["GET"]
@@ -18,26 +26,35 @@ class BannersView(APIView):
 
     def get(self, request):
         try:
-            banners = Banner.objects.filter(link__icontains="product")
-            banner = Banner.objects.get(id="3b0d4f03-0dd2-4126-9e4d-1b656d0ce1fa")
-
-            print(banner.link)
-
-            analytics = banner.productanalytics_set.all()
-
-            for a in analytics:
-                print(a.product.title, a.date_pretty)
-
+            banners = Banner.objects.all()
             res = []
 
             for banner in banners:
-                if banner.link:
-                    res.append(BannerSerializer(banner).data)
+                data = BannerSerializer(banner).data
+                link = banner.link
+                if "/product/" in link:
+                    # append product details if link contains '/product/'
+                    product_analytics = ProductAnalytics.objects.filter(banners=banner)
+                    print("product_analytics: ", product_analytics, "link: ", link)
+                    if product_analytics.exists():
+                        product = product_analytics.first().product
+                        product_data = ProductSerializer(product).data
+                        print("product_data is added")
+                        data["product"] = product_data
 
-            # serializer = BannerSerializer(banners, many=True)
+                elif link and len(link.split("/")) == 4:
+                    shop_name = link.split("/")[3]
+                    shop = Shop.objects.filter(title=shop_name)
+                    if shop.exists():
+                        shop_data = ShopSerializer(shop.first()).data
+                        data["shop"] = shop_data
+
+                res.append(data)
+
             return Response(res, status=status.HTTP_200_OK)
 
         except Exception as e:
+            traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
