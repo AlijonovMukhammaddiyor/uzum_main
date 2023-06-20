@@ -8,11 +8,15 @@ def create_banners(banners, product_associations: dict, shop_associations: dict)
         result = {}
 
         for banner in banners:
-            try:
-                ban = Banner.objects.get(link=banner["link"])
-                result[ban.link] = ban
-            except Banner.DoesNotExist:
-                new_banners.append(banner)
+            # try:
+            #     ban = Banner.objects.get(link=banner["link"])
+            #     result[ban.link] = ban
+            #     new_banners.append(banner)
+            # except Banner.DoesNotExist:
+            #     new_banners.append(banner)
+
+            # I decided to create banners everyday repeatedly
+            new_banners.append(banner)
 
         banners_ = prepare_banners_data(new_banners)
 

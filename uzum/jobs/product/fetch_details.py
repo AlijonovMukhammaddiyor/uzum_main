@@ -43,8 +43,12 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
                         f"Failed failed Ids length: {len(failed_failed)}",
                     )
                     await concurrent_requests_product_details(failed_failed, final_failed, 0, products_api)
-                    print(f"Total number of failed product ids: {len(final_failed)}")
-                    print(f"Failed failed Ids: {final_failed}")
+
+                    if len(final_failed) > 0:
+                        ff_failed = []
+                        await concurrent_requests_product_details(final_failed, ff_failed, 0, products_api)
+                        print(f"Total number of failed product ids: {len(ff_failed)}")
+                        print(f"Failed failed Ids: {ff_failed}")
 
         print(f"Total number of products: {len(products_api)}")
         print(f"Total time taken by get_product_details_via_ids: {time.time() - start_time}")
@@ -78,7 +82,7 @@ async def concurrent_requests_product_details(
                         PRODUCT_URL + str(id),
                         client=client,
                     )
-                    for id in product_ids[index: index + PRODUCT_CONCURRENT_REQUESTS_LIMIT]
+                    for id in product_ids[index : index + PRODUCT_CONCURRENT_REQUESTS_LIMIT]
                 ]
 
                 results = await asyncio.gather(*tasks, return_exceptions=True)
