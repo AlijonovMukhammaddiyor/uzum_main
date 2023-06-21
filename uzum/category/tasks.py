@@ -1,5 +1,10 @@
+import asyncio
+from collections import Counter
+import json
 import time
 from datetime import datetime
+import traceback
+import httpx
 
 import pytz
 from asgiref.sync import async_to_sync
@@ -10,11 +15,14 @@ from uzum.jobs.campaign.main import update_or_create_campaigns
 from uzum.jobs.campaign.utils import associate_with_shop_or_product, get_product_and_aku_ids
 from uzum.jobs.category.main import create_and_update_categories
 from uzum.jobs.category.MultiEntry import get_categories_with_less_than_n_products
-from uzum.jobs.constants import MAX_OFFSET, PAGE_SIZE
+from uzum.jobs.constants import CATEGORIES_HEADER, MAX_OFFSET, PAGE_SIZE, POPULAR_SEARCHES_PAYLOAD
+from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.jobs.product.fetch_details import get_product_details_via_ids
 from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
 from uzum.jobs.product.MultiEntry import create_products_from_api
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from uzum.product.views import PopularWords
+from uzum.review.models import PopularSeaches
 from uzum.shop.models import Shop, ShopAnalytics
 from uzum.banner.models import Banner
 
@@ -86,6 +94,8 @@ def update_uzum_data(args=None, **kwargs):
             print("Error in setting shop banner(s): ", e)
 
     date_pretty = get_today_pretty()
+
+    create_todays_searches()
 
     Category.update_descendants()
 
@@ -187,3 +197,73 @@ def set_banners_for_product_analytics(date_pretty=get_today_pretty()):
 
     except Exception as e:
         print("Error in setting banner(s): ", e)
+
+
+async def make_request(client=None):
+    try:
+        return await client.post(
+            "https://graphql.uzum.uz/",
+            json=POPULAR_SEARCHES_PAYLOAD,
+            headers={
+                **CATEGORIES_HEADER,
+                "User-Agent": get_random_user_agent(),
+                "x-iid": generateUUID(),
+            },
+        )
+    except Exception as e:
+        print("Error in makeRequestProductIds: ", e)
+
+
+async def fetch_popular_seaches_from_uzum(words: list[str]):
+    try:
+        async with httpx.AsyncClient() as client:
+            tasks = [
+                make_request(
+                    client=client,
+                )
+                for _ in range(100)
+            ]
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for res in results:
+                if isinstance(res, Exception):
+                    print("Error in fetch_popular_seaches_from_uzum:", res)
+                else:
+                    if not res:
+                        continue
+                    if res.status_code != 200:
+                        continue
+                    res_data = res.json()
+                    if "errors" not in res_data:
+                        words_ = res_data["data"]["getSuggestions"]["blocks"][0]["popularSuggestions"]
+                        words.extend(words_)
+
+    except Exception as e:
+        traceback.print_exc()
+        return None
+
+
+def create_todays_searches():
+    try:
+        words = []
+        async_to_sync(fetch_popular_seaches_from_uzum)(words)
+        word_count = Counter(words)
+        if not word_count:
+            return None
+        if len(word_count) == 0:
+            return None
+
+        obj = PopularSeaches.objects.filter(date_pretty=get_today_pretty())
+
+        if obj.exists():
+            return None
+
+        PopularSeaches.objects.create(
+            words=json.dumps(word_count),
+            requests_count=100,
+            date_pretty=get_today_pretty(),
+        )
+    except Exception as e:
+        print("Error in create_todays_searches:", e)
+        return None

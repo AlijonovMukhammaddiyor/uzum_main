@@ -1,11 +1,14 @@
 import json
-import math
 import traceback
 from datetime import date, datetime, timedelta
 import pandas as pd
 import pytz
 from drf_spectacular.utils import extend_schema
 import requests
+import asyncio
+import httpx
+from collections import Counter
+from asgiref.sync import async_to_sync
 
 # from sklearn.feature_extraction.text import TfidfVectorizer
 # from sklearn.metrics.pairwise import linear_kernel
@@ -20,11 +23,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from uzum.category.models import Category
-from uzum.jobs.constants import PRODUCT_HEADER
+from uzum.jobs.constants import CATEGORIES_HEADER, POPULAR_SEARCHES_PAYLOAD, PRODUCT_HEADER
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.product.pagination import ExamplePagination
 from uzum.product.serializers import ExtendedProductAnalyticsSerializer, ExtendedProductSerializer, ProductSerializer
+from uzum.review.models import PopularSeaches
 from uzum.sku.models import Sku, SkuAnalytics, get_day_before_pretty
 
 
@@ -433,11 +437,125 @@ class ProductReviews(APIView):
     def get(self, request: Request, product_id: str):
         try:
             reviews = ProductReviews.fetch_reviews_from_uzum(product_id)
+            #         reviews = ProductReviews.fetch_reviews_from_uzum(product_id)
+
+            #         if not reviews:
+            #             return Response({"error": "No reviews found"}, status=status.HTTP_404_NOT_FOUND)
+
+            #         # extract reviews
+            #         reviews = [review["review"] for review in reviews]
+
+            #         # join all reviews
+            #         reviews = " ".join(reviews)
+
+            #         # remove punctuation
+            #         reviews = re.sub(r"[^\w\s]", "", reviews)
+
+            #         # remove numbers
+            #         reviews = re.sub(r"\d+", "", reviews)
+
+            #         # remove stop words
+            #         with open("uzum/product/uz_stopwords.json", "r") as f:
+            #             stopwords = json.load(f)
+
+            #         reviews = [word for word in reviews.split() if word not in stopwords]
+
+            #         # count words
+            #         word_count = Counter(reviews)
+
+            #         # get top 10 words
+            #         top_words = word_count.most_common(10)
 
             return Response(reviews, status=status.HTTP_200_OK)
 
         except Product.DoesNotExist:
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PopularWords(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+    allowed_methods = ["GET"]
+    pagination_class = PageNumberPagination
+    serializer_class = ExtendedProductSerializer
+
+    WORD_REQUESTS_COUNT = 50
+
+    @staticmethod
+    async def make_request(client=None):
+        try:
+            return await client.post(
+                "https://graphql.uzum.uz/",
+                json=POPULAR_SEARCHES_PAYLOAD,
+                headers={
+                    **CATEGORIES_HEADER,
+                    "User-Agent": get_random_user_agent(),
+                    "x-iid": generateUUID(),
+                },
+            )
+        except Exception as e:
+            print("Error in makeRequestProductIds: ", e)
+
+    @staticmethod
+    async def fetch_popular_seaches_from_uzum(words: list[str]):
+        try:
+            async with httpx.AsyncClient() as client:
+                tasks = [
+                    PopularWords.make_request(
+                        client=client,
+                    )
+                    for _ in range(PopularWords.WORD_REQUESTS_COUNT)
+                ]
+
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for res in results:
+                    if isinstance(res, Exception):
+                        print("Error in fetch_popular_seaches_from_uzum:", res)
+                    else:
+                        if not res:
+                            continue
+                        if res.status_code != 200:
+                            continue
+                        res_data = res.json()
+                        if "errors" not in res_data:
+                            words_ = res_data["data"]["getSuggestions"]["blocks"][0]["popularSuggestions"]
+                            words.extend(words_)
+
+        except Exception as e:
+            traceback.print_exc()
+            return None
+
+    @extend_schema(tags=["Product"])
+    def get(self, request: Request):
+        try:
+            words = PopularSeaches.objects.get(date_pretty=get_today_pretty()).words
+
+            words = json.loads(words)
+
+            return Response({"words": words, "count": len(words)}, status=status.HTTP_200_OK)
+        except PopularSeaches.DoesNotExist:
+            words = []
+            async_to_sync(PopularWords.fetch_popular_seaches_from_uzum)(words)
+
+            if len(words) == 0:
+                return Response({"error": "No words found"}, status=status.HTTP_404_NOT_FOUND)
+
+            # get frequency of words
+            word_count = Counter(words)
+
+            _ = PopularSeaches.objects.create(
+                date_pretty=get_today_pretty(),
+                words=json.dumps(word_count),
+                requests_count=PopularWords.WORD_REQUESTS_COUNT,
+            )
+
+            return Response({"words": word_count, "count": len(word_count)}, status=status.HTTP_200_OK)
+
         except Exception as e:
             print(e)
             traceback.print_exc()

@@ -5,12 +5,19 @@ from django.db import models
 from django.db.models import Avg, F
 from django.db.models.functions import TruncDay
 from django.db.models import Sum
-from django.utils.timezone import make_aware
+from django.utils import timezone
 
 from uzum.category.models import Category, CategoryAnalytics
 from uzum.product.models import Product, ProductAnalytics
 from uzum.shop.models import Shop, ShopAnalytics
 from uzum.sku.models import SkuAnalytics
+
+
+def seconds_until_midnight():
+    """Get the number of seconds until midnight."""
+    now = timezone.now()
+    midnight = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return (midnight - now).seconds
 
 
 def get_date_pretty(date: datetime.datetime):

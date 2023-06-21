@@ -1,6 +1,8 @@
 import uuid
 from django.db import models
 
+from uzum.product.models import get_today_pretty
+
 
 class Review(models.Model):
     reviewId = models.IntegerField(primary_key=True)
@@ -27,3 +29,10 @@ class Reply(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     photos = models.TextField(null=True, blank=True)
     shop = models.ForeignKey("shop.Shop", on_delete=models.DO_NOTHING)
+
+
+class PopularSeaches(models.Model):
+    words = models.TextField()
+    requests_count = models.IntegerField(default=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    date_pretty = models.CharField(max_length=1024, null=True, blank=True, default=get_today_pretty())

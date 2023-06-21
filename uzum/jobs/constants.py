@@ -84,3 +84,19 @@ CATEGORIES_PAYLOAD = {
         },
     },
 }
+
+
+POPULAR_SEARCHES_PAYLOAD = {
+    "operationName": "Suggestions",
+    "query": "query Suggestions($GetSuggestionsInput: GetSuggestionsInput!) {\n  getSuggestions(query: $GetSuggestionsInput) {\n    blocks {\n      ... on TextSuggestionsBlock {\n        values\n        __typename\n      }\n      ... on PopularSuggestionsBlock {\n        popularSuggestions\n        __typename\n      }\n      ... on CatalogCardSuggestionsBlock {\n        cards {\n          ... on ProductCard {\n            title\n            minFullPrice\n            minSellPrice\n            productId\n            photos {\n              original {\n                low\n                __typename\n              }\n              __typename\n            }\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      ... on CategorySuggestionsBlock {\n        categories {\n          title\n          id\n          icon\n          parent {\n            id\n            title\n            __typename\n          }\n          seo {\n            metaTag\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      ... on ShopSuggestionsBlock {\n        shops {\n          id\n          title\n          url\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}",
+    "variables": {
+        "GetSuggestionsInput": {
+            "catalogCardSuggestionsLimit": 20,
+            "categorySuggestionsLimit": 20,
+            "popularSuggestionsLimit": 20,
+            "shopSuggestionsLimit": 20,
+            "text": "",
+            "textSuggestionsLimit": 20,
+        }
+    },
+}

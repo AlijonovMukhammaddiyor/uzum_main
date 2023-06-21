@@ -52,6 +52,7 @@ class OngoingBadgesView(APIView):
     allowed_methods = ["GET"]
     serializer_class = BadgeSerializer
 
+    @extend_schema(tags=["Badges"])
     def get(self, request: Request):
         try:
             # only way to get ongoing badges is to filter by recent product analytics badges field
@@ -92,6 +93,7 @@ class BadgeProducts(APIView):
     serializer_class = ProductAnalyticsSerializer
     pagination_class = PageNumberPagination
 
+    @extend_schema(tags=["Badges"])
     def get(self, request: Request, badge_id: int):
         try:
             badge = Badge.objects.get(badge_id=badge_id)
@@ -123,6 +125,7 @@ class BadgeAnalytics(APIView):
     serializer_class = ProductAnalyticsSerializer
     pagination_class = PageNumberPagination
 
+    @extend_schema(tags=["Badges"])
     def get(self, request: Request, badge_id: int):
         try:
             badge = Badge.objects.get(badge_id=badge_id)

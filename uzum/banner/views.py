@@ -1,19 +1,28 @@
+import datetime
 import traceback
+import pytz
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from uzum.banner.models import Banner
 from rest_framework import status
+from drf_spectacular.utils import extend_schema
+
+# from django.views.decorators.cache import cache_page
+# from django.utils.decorators import method_decorator
 
 from uzum.banner.serializers import BannerSerializer
+
+# from uzum.category.utils import seconds_until_midnight
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
-from uzum.product.serializers import ProductSerializer
+from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
 from uzum.shop.models import Shop, ShopAnalytics
 from uzum.shop.serializers import ShopSerializer
 from uzum.sku.models import get_day_before_pretty
 
 
+# @method_decorator(cache_page(seconds_until_midnight()), name="get")
 class BannersView(APIView):
     """
     Get all banners with product analytics
@@ -24,46 +33,34 @@ class BannersView(APIView):
     allowed_methods = ["GET"]
     serializer_class = BannerSerializer
 
+    @extend_schema(tags=["Banner"])
     def get(self, request):
         try:
-            banners = Banner.objects.all()
-            res = []
+            banners = Banner.objects.all().order_by("link")
+            products = (
+                Product.objects.filter(analytics__banners__in=banners)
+                .distinct()
+                .values("product_id", "title", "description", "photos")
+            ).order_by("title")
 
-            for banner in banners:
-                data = BannerSerializer(banner).data
-                link = banner.link
-                if "/product/" in link:
-                    # append product details if link contains '/product/'
-                    product_analytics = ProductAnalytics.objects.filter(banners=banner)
-                    print("product_analytics: ", product_analytics, "link: ", link)
-                    if product_analytics.exists():
-                        product = product_analytics.first().product
-                        product_data = ProductSerializer(product).data
-                        print("product_data is added")
-                        data["product"] = product_data
-
-                elif link and len(link.split("/")) == 4:
-                    shop_name = link.split("/")[3]
-                    shop = Shop.objects.filter(title=shop_name)
-                    if shop.exists():
-                        shop_data = ShopSerializer(shop.first()).data
-                        data["shop"] = shop_data
-
-                res.append(data)
-
-            return Response(res, status=status.HTTP_200_OK)
+            return Response(
+                {"banners": BannerSerializer(banners, many=True).data, "products": products},
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# @method_decorator(cache_page(seconds_until_midnight()), name="get")
 class OngoingBannersView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [TokenAuthentication]
     allowed_methods = ["GET"]
     serializer_class = BannerSerializer
 
+    @extend_schema(tags=["Banner"])
     def get(self, request):
         try:
             banners = Banner.objects.all()
@@ -90,6 +87,53 @@ class OngoingBannersView(APIView):
                 response_data.append(combined_data)
 
             return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class BannerImpactView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Banner"])
+    def get(self, request, banner_id: str):
+        try:
+            banner = Banner.objects.get(id=banner_id)
+
+            analytics = banner.productanalytics_set.all()
+
+            if len(analytics) == 0:
+                return Response({"error": "No analytics found for this banner"}, status=status.HTTP_404_NOT_FOUND)
+
+            product = analytics[0].product
+
+            # get first day banner was used with productanalytics
+            first_date: datetime = analytics.order_by("created_at")[0].created_at
+
+            # now get week before in Asia/Tashkent timezone
+            week_before = (first_date - datetime.timedelta(days=7)).astimezone(pytz.timezone("Asia/Tashkent")).date()
+
+            # now get all productanalytics for that week
+            product_analytics_before = ProductAnalytics.objects.filter(
+                created_at__date__gte=week_before, created_at__date__lt=first_date, product=product
+            )
+
+            week_after = (first_date + datetime.timedelta(days=7)).astimezone(pytz.timezone("Asia/Tashkent")).date()
+
+            product_analytics_after = ProductAnalytics.objects.filter(
+                created_at__date__gte=first_date, created_at__date__lte=week_after, product=product
+            )
+
+            return Response(
+                {
+                    "banner": BannerSerializer(banner).data,
+                    "product_analytics_before": ProductAnalyticsSerializer(product_analytics_before, many=True).data,
+                    "product_analytics_after": ProductAnalyticsSerializer(product_analytics_after, many=True).data,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
