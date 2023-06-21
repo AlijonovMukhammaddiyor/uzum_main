@@ -63,12 +63,20 @@ async def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids
             failed_again_ids = []
             print(f"Failed Ids length: {len(failed_ids)}")
             await concurrent_requests_for_ids(failed_ids, 0, product_ids, failed_again_ids)
-
+            time.sleep(10)
             if len(failed_again_ids) > 0:
                 final_failed_ids = []
                 await concurrent_requests_for_ids(failed_again_ids, 0, product_ids, final_failed_ids)
+                time.sleep(10)
+                if len(final_failed_ids) > 0:
+                    ff_failed_ids = []
+                    await concurrent_requests_for_ids(final_failed_ids, 0, product_ids, ff_failed_ids)
+                    time.sleep(20)
+                    if len(ff_failed_ids) > 0:
+                        fff_failed_ids = []
+                        await concurrent_requests_for_ids(ff_failed_ids, 0, product_ids, fff_failed_ids)
 
-                print(f"Total number of failed product ids: { len(final_failed_ids)}")
+                print(f"Total number of failed product ids: { len(fff_failed_ids)}")
 
         print(f"Total number of product ids: {len(product_ids)}")
         print(f"Total number of unique product ids: {len(set(product_ids))}")
