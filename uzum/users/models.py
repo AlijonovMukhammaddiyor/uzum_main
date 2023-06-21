@@ -1,4 +1,5 @@
 from datetime import timedelta
+import uuid
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -29,6 +30,32 @@ class User(AbstractUser):
     shop = models.ForeignKey("shop.Shop", null=True, blank=True, on_delete=models.SET_NULL)
 
     is_developer = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        def get_random_string(length, first_name: str, phone_number: str):
+            """
+            Generate a random string of length characters.
+            """
+            random_string = str(uuid.uuid4()).replace("-", "")[:length]
+
+            i = 0
+            while User.objects.filter(referral_code=random_string).exists():
+                random_string = str(uuid.uuid4()).replace("-", "")[:length]
+                i += 1
+
+                if i > 10:
+                    print("Could not generate a unique referral code after 10 attempts.")
+                    # return phone number and 3 letters of name
+                    return first_name[:3] + phone_number[3:]
+
+            return random_string
+
+        if not self.referral_code:
+            self.referral_code = get_random_string(6, self.username, "guest")
+
+        if not self.phone_number:
+            self.phone_number = str(uuid.uuid4()).replace("-", "")[:6]
+        super().save(*args, **kwargs)  # Call the "real" save() method.
 
     def get_absolute_url(self) -> str:
         """Get URL for user's detail view.

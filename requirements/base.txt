@@ -25,3 +25,6 @@ drf-spectacular==0.26.2  # https://github.com/tfranzel/drf-spectacular
 numpy
 pandas
 twilio
+
+
+#payment

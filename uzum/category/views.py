@@ -781,3 +781,31 @@ class CategoryShopsView(APIView):
             print(e)
             traceback.print_exc()
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class NicheSlectionView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+    serializer_class = CategorySerializer
+    queryset = Category.objects.all()
+    allowed_methods = ["GET"]
+    pagination_class = PageNumberPagination
+
+    def get(self, request):
+        """
+        Based on category analytics, returns the list of categories that are suitable for the niche
+        Args:
+            request (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        try:
+            term = request.query_params.get("term")
+
+            categories = Category.objects.filter(title__icontains=term).values("categoryId", "title")
+
+            return Response(status=status.HTTP_200_OK, data=categories)
+        except Exception as e:
+            print("Error in NicheSlectionView: ", e)
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})

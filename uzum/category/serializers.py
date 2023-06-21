@@ -17,6 +17,12 @@ class CategorySerializer(ModelSerializer):
         fields = "__all__"
 
 
+class SimpleCategorySerializer(ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ["categoryId", "title"]
+
+
 class CategoryAnalyticsSeralizer(ModelSerializer):
     class Meta:
         model = CategoryAnalytics

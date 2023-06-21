@@ -34,4 +34,5 @@ urlpatterns = [
         cache_page(seconds_until_midnight())(views.CategoryShopsView.as_view()),
         name="category-products",
     ),
+    path("niches", views.NicheSlectionView.as_view(), name="niches"),
 ]
