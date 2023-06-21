@@ -125,25 +125,33 @@ def fetch_failed_products(product_ids: list[int]):
     del products_api
 
 
-# def fetch_products(url):
-#     headers = CaseInsensitiveDict()
-#     headers["Access-Control-Allow-Credentials"] = "true"
-#     headers["Origin"] = "https://uzum.uz"
-#     headers["Authority"] = "api.uzum.uz"
-#     headers[
-#         "User-Agent"
-#     ] = "Mozilla/5.0 (Windows NT 10.0; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-#     headers["Referrer"] = "https://uzum.uz/"
-#     headers["Access-Control-Allow-Origin"] = "https://uzum.uz"
-#     headers["Authorization"] = "Basic YjJjLWZyb250OmNsaWVudFNlY3JldA=="
-#     headers["x-lid"] = "25dc2cba-2d8e-4192-bac7-8f0df42cbdd5"
-#     headers["Sec-Ch-Ua"] = "'Not.A/Brand';v='8', 'Chromium';v='114', 'Google Chrome';v='114'"
-#     headers["Sec-Ch-Ua-Mobile"] = "?0"
-#     headers["Sec-Ch-Ua-Platform"] = "'macOS'"
-#     headers["Sec-Fetch-Dest"] = "empty"
-#     headers["Sec-Fetch-Mode"] = "cors"
-#     headers["Sec-Fetch-Site"] = "same-site"
-#     resp = requests.get(url, headers=headers)
+def fetch_product_ids(date_pretty: str = get_today_pretty()):
+    categories_filtered = get_categories_with_less_than_n_products(MAX_OFFSET + PAGE_SIZE)
+    product_ids: list[int] = []
+    async_to_sync(get_all_product_ids_from_uzum)(
+        categories_filtered,
+        product_ids,
+        page_size=PAGE_SIZE,
+    )
+    product_ids = list(set(product_ids))
 
-#     # print (resp.json())
-#     return resp.json()
+    unfetched_product_ids = []
+
+    aa = ProductAnalytics.objects.filter(date_pretty=date_pretty).values_list("product__product_id", flat=True)
+
+    # remove already fetched products from product_ids
+    for product_id in product_ids:
+        if product_id not in aa:
+            unfetched_product_ids.append(product_id)
+
+    shop_analytics_done = {}
+
+    BATCH_SIZE = 10_000
+
+    for i in range(0, len(unfetched_product_ids), BATCH_SIZE):
+        products_api: list[dict] = []
+        print(f"{i}/{len(unfetched_product_ids)}")
+        async_to_sync(get_product_details_via_ids)(unfetched_product_ids[i : i + BATCH_SIZE], products_api)
+        create_products_from_api(products_api, {}, shop_analytics_done)
+        time.sleep(30)
+        del products_api
