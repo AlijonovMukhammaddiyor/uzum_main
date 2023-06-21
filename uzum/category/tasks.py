@@ -7,6 +7,7 @@ from asgiref.sync import async_to_sync
 from config import celery_app
 from uzum.category.models import Category, CategoryAnalytics
 from uzum.jobs.campaign.main import update_or_create_campaigns
+from uzum.jobs.campaign.utils import associate_with_shop_or_product, get_product_and_aku_ids
 from uzum.jobs.category.main import create_and_update_categories
 from uzum.jobs.category.MultiEntry import get_categories_with_less_than_n_products
 from uzum.jobs.constants import MAX_OFFSET, PAGE_SIZE
@@ -15,6 +16,7 @@ from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
 from uzum.jobs.product.MultiEntry import create_products_from_api
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.shop.models import Shop, ShopAnalytics
+from uzum.banner.models import Banner
 
 
 @celery_app.task(
@@ -85,16 +87,6 @@ def update_uzum_data(args=None, **kwargs):
 
     date_pretty = get_today_pretty()
 
-    category_analytics = CategoryAnalytics.objects.filter(date_pretty=date_pretty)
-
-    print("Setting total_products_with_sales and total_shops_with_sales...", len(category_analytics))
-
-    # for category_an in category_analytics:
-    #     category_an.set_total_products_with_sale()
-    #     category_an.set_total_shops()
-    #     category_an.set_total_orders()
-    #     category_an.set_total_reviews()
-
     Category.update_descendants()
 
     shop_analytics = ShopAnalytics.objects.filter(date_pretty=date_pretty)
@@ -152,3 +144,46 @@ def fetch_product_ids(date_pretty: str = get_today_pretty()):
         create_products_from_api(products_api, {}, shop_analytics_done)
         time.sleep(30)
         del products_api
+
+
+def set_banners_for_product_analytics(date_pretty=get_today_pretty()):
+    try:
+        today_date_in_uz = datetime.now(tz=pytz.timezone("Asia/Tashkent")).date()
+        banners_today = Banner.objects.filter(created_at__date=today_date_in_uz)
+
+        for banner in banners_today:
+            assoc = associate_with_shop_or_product(banner.link)
+
+            if assoc is None:
+                continue
+
+            if "product_id" in assoc:
+                analytics_today = ProductAnalytics.objects.filter(
+                    product__product_id=assoc["product_id"], date_pretty=date_pretty
+                )
+                if len(analytics_today) == 0:
+                    continue
+
+                if len(analytics_today) > 1:
+                    print("More than one analytics for product", assoc["product_id"], len(analytics_today))
+
+                analytics_today = analytics_today.first()
+                analytics_today.banners.add(banner)
+                analytics_today.save()
+
+            elif "shop_id" in assoc:
+                shop_an = ShopAnalytics.objects.filter(
+                    shop=Shop.objects.get(link=assoc["shop_id"]), date_pretty=date_pretty
+                )
+
+                if len(shop_an) == 0:
+                    continue
+
+                if len(shop_an) > 1:
+                    print("More than one analytics for shop", assoc["shop_id"], len(shop_an))
+                target = shop_an.order_by("-created_at").first()  # get most recently created analytics
+                target.banners.add(banner)
+                target.save()
+
+    except Exception as e:
+        print("Error in setting banner(s): ", e)
