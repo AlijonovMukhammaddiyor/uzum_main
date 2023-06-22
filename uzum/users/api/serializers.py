@@ -144,26 +144,3 @@ class UserLoginSerializer(TokenObtainPairSerializer):
         token["shop"] = user.shop
 
         return token
-
-    def validate(self, attrs):
-        data = super().validate(attrs)
-        refresh = self.get_token(self.user)
-
-        data["refresh"] = str(refresh)
-        data["access"] = str(refresh.access_token)
-
-        # Add extra responses here
-        data["username"] = self.user.username
-        data["email"] = self.user.email
-        data["first_name"] = self.user.first_name
-        data["last_name"] = self.user.last_name
-        data["phone_number"] = self.user.phone_number
-        data["is_developer"] = self.user.is_developer
-        data["referral_code"] = self.user.referral_code
-        data["shop"] = self.user.shop
-
-        return data
-
-
-class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = UserLoginSerializer

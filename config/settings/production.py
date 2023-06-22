@@ -10,7 +10,7 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["api.shortintroduce.com"])
 
-ALLOWED_HOSTS += ["api.alijonov.com", "localhost", "127.0.0.1", "146.190.84.109"]
+ALLOWED_HOSTS += ["api.alijonov.com", "localhost", "127.0.0.1", "146.190.84.109", "localhost:3000"]
 
 # DATABASES
 # ------------------------------------------------------------------------------
@@ -183,13 +183,15 @@ SPECTACULAR_SETTINGS["SERVERS"] = [  # noqa: F405
 ]
 # Your stuff...
 # ------------------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = ["https://api.shortintroduce.com", "https://api.alijonov.com"]
+CORS_ALLOWED_ORIGINS = ["https://api.shortintroduce.com", "https://api.alijonov.com", "http://localhost:3000"]
 
 CORS_ORIGIN_WHITELIST = [
     "https://api.alijonov.com",
+    "http://localhost:3000"
     # Add other allowed origins if needed
 ]
 CSRF_TRUSTED_ORIGINS = [
     "https://api.alijonov.com",
+    "http://localhost:3000"
     # Add other allowed origins if needed
 ]
