@@ -1,15 +1,16 @@
 import asyncio
-from collections import Counter
 import json
 import time
-from datetime import datetime
 import traceback
-import httpx
+from collections import Counter
+from datetime import datetime
 
+import httpx
 import pytz
 from asgiref.sync import async_to_sync
 
 from config import celery_app
+from uzum.banner.models import Banner
 from uzum.category.models import Category, CategoryAnalytics
 from uzum.jobs.campaign.main import update_or_create_campaigns
 from uzum.jobs.campaign.utils import associate_with_shop_or_product, get_product_and_aku_ids
@@ -24,7 +25,6 @@ from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.product.views import PopularWords
 from uzum.review.models import PopularSeaches
 from uzum.shop.models import Shop, ShopAnalytics
-from uzum.banner.models import Banner
 
 
 @celery_app.task(

@@ -1,17 +1,15 @@
 import datetime
 import traceback
+
 import pytz
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from uzum.banner.models import Banner
-from rest_framework import status
 from drf_spectacular.utils import extend_schema
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-# from django.views.decorators.cache import cache_page
-# from django.utils.decorators import method_decorator
-
+from uzum.banner.models import Banner
 from uzum.banner.serializers import BannerSerializer
 
 # from uzum.category.utils import seconds_until_midnight
@@ -20,6 +18,11 @@ from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializ
 from uzum.shop.models import Shop, ShopAnalytics
 from uzum.shop.serializers import ShopSerializer
 from uzum.sku.models import get_day_before_pretty
+
+# from django.views.decorators.cache import cache_page
+# from django.utils.decorators import method_decorator
+
+
 
 
 # @method_decorator(cache_page(seconds_until_midnight()), name="get")

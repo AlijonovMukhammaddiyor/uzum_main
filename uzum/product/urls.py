@@ -1,5 +1,6 @@
 from django.urls import path
 from django.views.decorators.cache import cache_page
+
 from uzum.category.utils import seconds_until_midnight
 
 from . import views

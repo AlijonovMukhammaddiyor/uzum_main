@@ -1,5 +1,5 @@
-from datetime import timedelta
 import uuid
+from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models

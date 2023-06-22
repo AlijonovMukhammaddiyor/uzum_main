@@ -1,9 +1,9 @@
 from django.urls import path
-
-from uzum.category.utils import seconds_until_midnight
-from .views import BannerImpactView, BannersView, OngoingBannersView
 from django.views.decorators.cache import cache_page
 
+from uzum.category.utils import seconds_until_midnight
+
+from .views import BannerImpactView, BannersView, OngoingBannersView
 
 app_name = "banner"
 

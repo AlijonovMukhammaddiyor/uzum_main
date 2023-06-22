@@ -1,9 +1,9 @@
-import pytz
 import uuid
 from datetime import datetime, timedelta
 
+import pytz
 from django.db import models
-from django.db.models import F, Window, Max
+from django.db.models import F, Max, Window
 from django.db.models.functions import DenseRank
 
 from uzum.product.models import ProductAnalytics

@@ -1,11 +1,11 @@
 import uuid
 
 from django.contrib.auth import get_user_model
-
 from rest_framework import serializers
-from uzum.referral.models import Referral
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
+from uzum.referral.models import Referral
 from uzum.shop.models import Shop
 
 User = get_user_model()
@@ -137,10 +137,33 @@ class UserLoginSerializer(TokenObtainPairSerializer):
         token["last_name"] = user.last_name
         token["phone_number"] = user.phone_number
         token["email"] = user.email
-        token["is_staff"] = user.is_staff
+        token["is_developer"] = user.is_developer
         token["referral_code"] = user.referral_code
         token["referred_by"] = user.referred_by
         token["fingerprint"] = user.fingerprint
         token["shop"] = user.shop
 
         return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        refresh = self.get_token(self.user)
+
+        data["refresh"] = str(refresh)
+        data["access"] = str(refresh.access_token)
+
+        # Add extra responses here
+        data["username"] = self.user.username
+        data["email"] = self.user.email
+        data["first_name"] = self.user.first_name
+        data["last_name"] = self.user.last_name
+        data["phone_number"] = self.user.phone_number
+        data["is_developer"] = self.user.is_developer
+        data["referral_code"] = self.user.referral_code
+        data["shop"] = self.user.shop
+
+        return data
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = UserLoginSerializer

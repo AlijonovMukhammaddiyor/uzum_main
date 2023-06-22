@@ -1,8 +1,8 @@
 import traceback
 
-from uzum.category.models import Category, CategoryAnalytics
 from asgiref.sync import sync_to_async
 
+from uzum.category.models import Category, CategoryAnalytics
 from uzum.product.models import get_today_pretty
 
 

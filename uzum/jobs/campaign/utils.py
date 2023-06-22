@@ -1,13 +1,13 @@
 import asyncio
 import logging
 import math
-import time
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 import traceback
-from requests.adapters import HTTPAdapter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
+from requests.adapters import HTTPAdapter
 
 from uzum.banner.models import Banner
 from uzum.jobs.constants import (

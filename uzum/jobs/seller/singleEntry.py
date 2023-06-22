@@ -1,5 +1,6 @@
 from uzum.shop.models import Shop, ShopAnalytics
 
+
 def find_shop(shopId: int):
     try:
         result = Shop.objects.get(shopId=shopId)

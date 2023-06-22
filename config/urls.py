@@ -5,16 +5,15 @@ from django.urls import include, path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework_simplejwt.views import TokenRefreshView
+
+from uzum.users.api.serializers import CustomTokenObtainPairView
+from uzum.users.views import CustomObtainAuthToken
 
 # from phone_verify.api import VerificationViewSet
 # from rest_framework.authtoken.views import obtain_auth_token
 # from rest_framework.routers import DefaultRouter
 
-from uzum.users.views import CustomObtainAuthToken
 
 # default_router = DefaultRouter(trailing_slash=False)
 # default_router.register("phone", VerificationViewSet, basename="phone")
@@ -38,7 +37,7 @@ urlpatterns += [
     path("api/", include("config.api_router")),
     # DRF auth token
     # path("auth-token/", CustomObtainAuthToken.as_view()),
-    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/schema/", SpectacularAPIView.as_view(), name="api-schema"),
     path(

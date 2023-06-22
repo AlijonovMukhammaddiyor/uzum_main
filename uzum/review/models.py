@@ -1,4 +1,5 @@
 import uuid
+
 from django.db import models
 
 from uzum.product.models import get_today_pretty

@@ -11,11 +11,7 @@ from django.urls import reverse
 from uzum.users.forms import UserAdminChangeForm
 from uzum.users.models import User
 from uzum.users.tests.factories import UserFactory
-from uzum.users.views import (
-    UserRedirectView,
-    UserUpdateView,
-    user_detail_view,
-)
+from uzum.users.views import UserRedirectView, UserUpdateView, user_detail_view
 
 pytestmark = pytest.mark.django_db
 

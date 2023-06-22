@@ -2,14 +2,13 @@ import traceback
 import uuid
 from datetime import datetime, timedelta
 
-from django.db import models
 import pytz
+from django.db import models, transaction
+from django.db.models import Avg, Count, F, Q, Subquery, Sum
 
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.shop.models import Shop
 from uzum.sku.models import get_day_before_pretty
-from django.db.models import Sum, Count, Avg, F, Q, Subquery
-from django.db import transaction
 
 
 class Category(models.Model):

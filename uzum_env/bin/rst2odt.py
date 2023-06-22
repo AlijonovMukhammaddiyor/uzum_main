@@ -14,9 +14,8 @@ try:
 except:
     pass
 
-from docutils.core import publish_cmdline_to_binary, default_description
-from docutils.writers.odf_odt import Writer, Reader
-
+from docutils.core import default_description, publish_cmdline_to_binary
+from docutils.writers.odf_odt import Reader, Writer
 
 description = ('Generates OpenDocument/OpenOffice/ODF documents from '
                'standalone reStructuredText sources.  ' + default_description)

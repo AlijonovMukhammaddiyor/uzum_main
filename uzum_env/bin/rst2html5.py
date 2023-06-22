@@ -24,7 +24,7 @@ try:
 except locale.Error:
     pass
 
-from docutils.core import publish_cmdline, default_description
+from docutils.core import default_description, publish_cmdline
 
 description = ('Generates HTML5 documents from standalone '
                'reStructuredText sources.\n'

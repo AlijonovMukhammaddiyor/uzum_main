@@ -20,11 +20,13 @@ Examples::
 """
 
 import dill as pickle
-#pickle.debug.trace(True)
-#import pickle
 
 # get all objects for testing
 from dill import load_types
+
+#pickle.debug.trace(True)
+#import pickle
+
 load_types(pickleable=True,unpickleable=True)
 from dill import objects
 

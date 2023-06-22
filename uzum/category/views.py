@@ -10,20 +10,18 @@ from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Avg, Case, Count, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from drf_spectacular.utils import extend_schema
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from uzum.category.utils import calculate_shop_analytics_in_category, get_average_price_per_order
 from uzum.product.models import Product, ProductAnalytics
 from uzum.sku.models import Sku, SkuAnalytics
-
 
 from .models import Category, CategoryAnalytics
 from .serializers import CategorySerializer

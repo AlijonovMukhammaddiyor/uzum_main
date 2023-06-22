@@ -1,16 +1,17 @@
 import datetime
 import traceback
 
-from drf_spectacular.utils import extend_schema
 import pytz
+from drf_spectacular.utils import extend_schema
+from rest_framework import permissions
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.pagination import PageNumberPagination
-from rest_framework import permissions
-from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
 from rest_framework_simplejwt import authentication
-from uzum.product.models import ProductAnalytics, Product, get_today_pretty
+
+from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
 
 from .models import Badge
 from .serializers import BadgeSerializer

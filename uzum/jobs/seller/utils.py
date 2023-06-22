@@ -1,8 +1,6 @@
 import requests
-from uzum.jobs.constants import (
-    SELLER_HEADERS,
-    SELLER_URL,
-)
+
+from uzum.jobs.constants import SELLER_HEADERS, SELLER_URL
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 
 

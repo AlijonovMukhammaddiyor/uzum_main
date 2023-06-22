@@ -6,20 +6,18 @@ import pytz
 from django.db.models import Avg, Count, F, FloatField, Max, Min, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from drf_spectacular.utils import extend_schema
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from uzum.category.models import Category
 from uzum.product.models import Product, ProductAnalytics
 from uzum.product.serializers import ProductSerializer
-
 
 from .models import Shop, ShopAnalytics
 from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer

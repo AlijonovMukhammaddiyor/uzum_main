@@ -4,11 +4,7 @@ import time
 
 import httpx
 
-from uzum.jobs.constants import (
-    PRODUCT_CONCURRENT_REQUESTS_LIMIT,
-    PRODUCT_HEADER,
-    PRODUCT_URL,
-)
+from uzum.jobs.constants import PRODUCT_CONCURRENT_REQUESTS_LIMIT, PRODUCT_HEADER, PRODUCT_URL
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 
 # Set up a basic configuration for logging

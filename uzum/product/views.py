@@ -1,26 +1,27 @@
+import asyncio
 import json
 import traceback
+from collections import Counter
 from datetime import date, datetime, timedelta
+
+import httpx
 import pandas as pd
 import pytz
-from drf_spectacular.utils import extend_schema
 import requests
-import asyncio
-import httpx
-from collections import Counter
 from asgiref.sync import async_to_sync
 
 # from sklearn.feature_extraction.text import TfidfVectorizer
 # from sklearn.metrics.pairwise import linear_kernel
-from django.db.models import Avg, OuterRef, Subquery, Count, Prefetch
+from django.db.models import Avg, Count, OuterRef, Prefetch, Subquery
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from uzum.category.models import Category
 from uzum.jobs.constants import CATEGORIES_HEADER, POPULAR_SEARCHES_PAYLOAD, PRODUCT_HEADER

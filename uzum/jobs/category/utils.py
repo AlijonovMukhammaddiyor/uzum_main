@@ -1,16 +1,12 @@
-import requests
-import pytz
 import traceback
-from uzum.category.models import Category, CategoryAnalytics
-from uzum.jobs.category.MultiEntry import get_all_categories
 from datetime import datetime
 
+import pytz
+import requests
 
-from uzum.jobs.constants import (
-    CATEGORIES_HEADER,
-    CATEGORIES_PAYLOAD,
-    CATEGORIES_URL,
-)
+from uzum.category.models import Category, CategoryAnalytics
+from uzum.jobs.category.MultiEntry import get_all_categories
+from uzum.jobs.constants import CATEGORIES_HEADER, CATEGORIES_PAYLOAD, CATEGORIES_URL
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 
 

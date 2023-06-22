@@ -1,6 +1,7 @@
-from rest_framework.serializers import ModelSerializer
-from .models import Shop, ShopAnalytics
 from rest_framework import serializers
+from rest_framework.serializers import ModelSerializer
+
+from .models import Shop, ShopAnalytics
 
 
 class ShopSerializer(ModelSerializer):

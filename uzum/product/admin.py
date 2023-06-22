@@ -1,4 +1,5 @@
 from django.contrib import admin
+
 from uzum.product.models import Product, ProductAnalytics
 
 

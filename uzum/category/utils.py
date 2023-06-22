@@ -2,9 +2,8 @@ import datetime
 
 import pytz
 from django.db import models
-from django.db.models import Avg, F
+from django.db.models import Avg, F, Sum
 from django.db.models.functions import TruncDay
-from django.db.models import Sum
 from django.utils import timezone
 
 from uzum.category.models import Category, CategoryAnalytics
