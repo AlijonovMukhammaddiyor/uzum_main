@@ -27,4 +27,4 @@ pandas
 twilio
 
 
-#payment
+djangorestframework-simplejwt==5.2.2  # https://django-rest-framework-simplejwt.readthedocs.io/en/latest/getting_started.html

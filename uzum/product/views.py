@@ -15,7 +15,7 @@ from asgiref.sync import async_to_sync
 from django.db.models import Avg, OuterRef, Subquery, Count, Prefetch
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -34,7 +34,7 @@ from uzum.sku.models import Sku, SkuAnalytics, get_day_before_pretty
 
 class ProductsSegmentationView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
 
     @extend_schema(tags=["Product"])
@@ -124,7 +124,7 @@ class ProductsSegmentationView(APIView):
 
 class ProductsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
     pagination_class = ExamplePagination
     serializer_class = ExtendedProductSerializer
@@ -174,7 +174,7 @@ class ProductsView(APIView):
 
 class ProductAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
     # pagination_class = ExamplePagination
     # serializer_class = ExtendedProductSerializer
@@ -235,7 +235,7 @@ class ProductAnalyticsView(APIView):
 
 class SimilarProductsViewByUzum(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination
     serializer_class = ExtendedProductSerializer
@@ -405,7 +405,7 @@ class SimilarProductsViewByUzum(APIView):
 
 class ProductReviews(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination
     serializer_class = ExtendedProductSerializer
@@ -478,7 +478,7 @@ class ProductReviews(APIView):
 
 class PopularWords(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination
     serializer_class = ExtendedProductSerializer

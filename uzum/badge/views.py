@@ -7,9 +7,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
-from rest_framework import permissions, authentication
+from rest_framework import permissions
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
-
+from rest_framework_simplejwt import authentication
 from uzum.product.models import ProductAnalytics, Product, get_today_pretty
 
 from .models import Badge
@@ -22,7 +22,7 @@ class AllBadgesView(APIView):
     """
 
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.JWTAuthentication]
     allowed_methods = ["GET"]
     serializer_class = BadgeSerializer
 
@@ -48,7 +48,7 @@ class OngoingBadgesView(APIView):
     """
 
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.JWTAuthentication]
     allowed_methods = ["GET"]
     serializer_class = BadgeSerializer
 
@@ -88,7 +88,7 @@ class BadgeProducts(APIView):
     """
 
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.JWTAuthentication]
     allowed_methods = ["GET"]
     serializer_class = ProductAnalyticsSerializer
     pagination_class = PageNumberPagination
@@ -120,7 +120,7 @@ class BadgeAnalytics(APIView):
     """
 
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [authentication.TokenAuthentication]
+    authentication_classes = [authentication.JWTAuthentication]
     allowed_methods = ["GET"]
     serializer_class = ProductAnalyticsSerializer
     pagination_class = PageNumberPagination

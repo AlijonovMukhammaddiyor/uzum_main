@@ -8,10 +8,10 @@ import pandas as pd
 import pytz
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Avg, Case, Count, IntegerField, Max, Min, OuterRef, Prefetch, Q, Subquery, Sum, When
+from django.db.models import Avg, Case, Count, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -31,7 +31,7 @@ from .serializers import CategorySerializer
 
 class CategoryTreeView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]
@@ -73,7 +73,7 @@ class CategoryTreeView(APIView):
 
 class CategoryProductsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]
@@ -169,7 +169,7 @@ class CategoryProductsView(APIView):
 
 class CategoryProductsPeriodComparisonView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]
@@ -337,7 +337,7 @@ class CategoryProductsPeriodComparisonView(APIView):
 
 class CategoryDailyAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]
@@ -452,7 +452,7 @@ class SubcategoriesView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]
@@ -555,7 +555,7 @@ class SubcategoriesView(APIView):
 
 class CategoryPriceSegmentationView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]
@@ -718,7 +718,7 @@ class CategoryPriceSegmentationView(APIView):
 
 class CategoryShopsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]
@@ -785,7 +785,7 @@ class CategoryShopsView(APIView):
 
 class NicheSlectionView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]

@@ -7,7 +7,7 @@ from django.db.models import Avg, Count, F, FloatField, Max, Min, OuterRef, Q, S
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -27,7 +27,7 @@ from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCo
 
 class ShopsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = ShopSerializer
     queryset = Shop.objects.all()
     allowed_methods = ["GET"]
@@ -64,7 +64,7 @@ class ShopsView(APIView):
 
 class ShopsOrdersSegmentationView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = ShopSerializer
     queryset = Shop.objects.all()
     allowed_methods = ["GET"]
@@ -148,7 +148,7 @@ class ShopsOrdersSegmentationView(APIView):
 
 class ShopsProductsSegmentation(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = ShopSerializer
     queryset = Shop.objects.all()
     allowed_methods = ["GET"]
@@ -222,7 +222,7 @@ class ShopsProductsSegmentation(APIView):
 
 class ShopAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = ShopAnalyticsSerializer
     queryset = Shop.objects.all()
     allowed_methods = ["GET"]
@@ -258,7 +258,7 @@ class ShopAnalyticsView(APIView):
 
 class ShopCompetitorsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = ShopCompetitorsSerializer
     queryset = Shop.objects.all()
     allowed_methods = ["GET"]
@@ -305,7 +305,7 @@ class ShopCompetitorsView(APIView):
 
 class ShopProductsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = ProductSerializer
     queryset = Shop.objects.all()
     allowed_methods = ["GET"]
@@ -342,7 +342,7 @@ class ShopProductsView(APIView):
 
 class ShopCategoryAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = ShopAnalyticsSerializer
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination
@@ -410,7 +410,7 @@ class ShopCategoryAnalyticsView(APIView):
 
 class ShopProductsByCategoryView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     serializer_class = ProductSerializer
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination

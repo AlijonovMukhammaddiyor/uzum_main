@@ -4,7 +4,7 @@ import pytz
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from uzum.banner.models import Banner
 from rest_framework import status
 from drf_spectacular.utils import extend_schema
@@ -29,7 +29,7 @@ class BannersView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
     serializer_class = BannerSerializer
 
@@ -56,7 +56,7 @@ class BannersView(APIView):
 # @method_decorator(cache_page(seconds_until_midnight()), name="get")
 class OngoingBannersView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
     serializer_class = BannerSerializer
 
@@ -94,7 +94,7 @@ class OngoingBannersView(APIView):
 
 class BannerImpactView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
 
     @extend_schema(tags=["Banner"])

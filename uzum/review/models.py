@@ -35,4 +35,4 @@ class PopularSeaches(models.Model):
     words = models.TextField()
     requests_count = models.IntegerField(default=100)
     created_at = models.DateTimeField(auto_now_add=True)
-    date_pretty = models.CharField(max_length=1024, null=True, blank=True, default=get_today_pretty())
+    date_pretty = models.CharField(max_length=1024, null=True, blank=True, default=get_today_pretty)
