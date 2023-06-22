@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 
 from rest_framework import serializers
 from uzum.referral.models import Referral
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from uzum.shop.models import Shop
 
@@ -119,3 +120,27 @@ class UserSerializer(serializers.ModelSerializer):
         create_referral(referred_by, user)
 
         return user
+
+
+class UserLoginSerializer(TokenObtainPairSerializer):
+    """
+    Serializer for User Login
+    """
+
+    @classmethod
+    def get_token(cls, user: User):
+        token = super(UserLoginSerializer, cls).get_token(user)
+
+        # Add custom claims
+        token["username"] = user.username
+        token["first_name"] = user.first_name
+        token["last_name"] = user.last_name
+        token["phone_number"] = user.phone_number
+        token["email"] = user.email
+        token["is_staff"] = user.is_staff
+        token["referral_code"] = user.referral_code
+        token["referred_by"] = user.referred_by
+        token["fingerprint"] = user.fingerprint
+        token["shop"] = user.shop
+
+        return token
