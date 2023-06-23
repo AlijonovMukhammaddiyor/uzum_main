@@ -1,3 +1,5 @@
+from datetime import timedelta
+import datetime
 import logging
 
 from django.contrib.auth import get_user_model
@@ -17,6 +19,8 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from config.settings.base import env
 from uzum.users.api.serializers import UserLoginSerializer
+from django.utils import timezone
+
 
 User = get_user_model()
 
@@ -37,7 +41,14 @@ class VerificationSendView(APIView):
             phone_number = data.get("phone_number")
             if not phone_number:
                 return Response(status=400, data={"message": "Phone number is required"})
-            verify.verifications.create(to=phone_number, channel="sms")
+
+            # Calculate the expiration time (e.g., 5 minutes from now)
+            expiration_time = timezone.now() + timedelta(minutes=5)
+
+            verify.verifications.create(
+                to=phone_number,
+                channel="sms",
+            )
 
             return Response(status=200, data={"message": "Verification code sent successfully"})
         except Exception as e:
@@ -63,7 +74,13 @@ class CodeVerificationView(APIView):
                 # user = User.objects.get(phone_number=phone_number)
                 # token, _ = Token.objects.get_or_create(user=user)
                 # return Response(status=200, data={"token": token.key})
-                return Response(status=200, data={"message": "Code verified successfully"})
+                response = Response(status=200, data={"message": "Code verified successfully"})
+                response.set_cookie(
+                    "verification_token",
+                    env("VERIFICATION_TOKEN"),
+                    expires=datetime.datetime.now() + timedelta(minutes=10),
+                )  # Replace 'token_value' with an actual token
+                return response
 
         except TwilioRestException as e:
             print("Error in check: ", e)
@@ -84,7 +101,7 @@ user_detail_view = UserDetailView.as_view()
 
 class UserUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = User
-    fields = ["first_name", "last_name", "phone_number", "email", "username", "shop"]
+    fields = ["phone_number", "email", "username", "shop"]
     success_message = _("Information successfully updated")
 
     def get_success_url(self):

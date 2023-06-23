@@ -16,8 +16,8 @@ class User(AbstractUser):
     check forms.SignupForm and forms.SocialSignupForms accordingly.
     """
 
-    first_name = models.CharField(_("First name"), max_length=30, blank=True)
-    last_name = models.CharField(_("Last name"), max_length=150, blank=True)
+    # first_name = models.CharField(_("First name"), max_length=30, blank=True)
+    # last_name = models.CharField(_("Last name"), max_length=150, blank=True)
 
     phone_number = models.CharField(max_length=20, blank=True, unique=True)
     # is_verified = models.BooleanField(default=False)

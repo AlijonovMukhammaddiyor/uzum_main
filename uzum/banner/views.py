@@ -23,8 +23,6 @@ from uzum.sku.models import get_day_before_pretty
 # from django.utils.decorators import method_decorator
 
 
-
-
 # @method_decorator(cache_page(seconds_until_midnight()), name="get")
 class BannersView(APIView):
     """
@@ -99,6 +97,7 @@ class BannerImpactView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
+    serializer_class = BannerSerializer
 
     @extend_schema(tags=["Banner"])
     def get(self, request, banner_id: str):

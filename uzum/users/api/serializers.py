@@ -11,7 +11,7 @@ from uzum.shop.models import Shop
 User = get_user_model()
 
 
-def get_random_string(length, first_name: str, phone_number: str):
+def get_random_string(length, username: str, phone_number: str):
     """
     Generate a random string of length characters.
     """
@@ -25,7 +25,7 @@ def get_random_string(length, first_name: str, phone_number: str):
         if i > 10:
             print("Could not generate a unique referral code after 10 attempts.")
             # return phone number and 3 letters of name
-            return first_name[:3] + phone_number[3:]
+            return username[:3] + phone_number[3:]
 
     return random_string
 
@@ -65,8 +65,6 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "username",
-            "first_name",
-            "last_name",
             "phone_number",
             "fingerprint",
             "referred_by",
@@ -81,12 +79,11 @@ class UserSerializer(serializers.ModelSerializer):
             "url": {"view_name": "api:user-detail", "lookup_field": "username"},
             # state that referral_code is not required when receiving data
             "referral_code": {"required": False},
+            "username": {"required": True, "max_length": 255},
             # required fields
-            "first_name": {"required": True},
-            "last_name": {"required": True},
             "phone_number": {"required": True, "max_length": 20},
             "fingerprint": {"required": True},
-            "email": {"required": True, "max_length": 255},
+            "email": {"required": False, "max_length": 255},
             "password": {"required": True},
             # "shop": {"required": False},
             "referred_by": {"required": False},
@@ -101,7 +98,7 @@ class UserSerializer(serializers.ModelSerializer):
             raise ValueError("Password is required.")
 
         # Generate a unique referral code. This will generate a random string of length 6.
-        referral_code = get_random_string(6, validated_data["first_name"], validated_data["phone_number"])
+        referral_code = get_random_string(6, validated_data["username"], validated_data["phone_number"])
         referred_by = get_referred_by(validated_data.get("referral_code"))
 
         # Add the generated referral code to the user data.
@@ -118,8 +115,14 @@ class UserSerializer(serializers.ModelSerializer):
         user.save()
 
         create_referral(referred_by, user)
+        # before returning the user, we need to remove the password from the validated data
 
-        return user
+        return {
+            "id": user.id,
+            "username": user.username,
+            "phone_number": user.phone_number,
+            "email": user.email,
+        }
 
 
 class UserLoginSerializer(TokenObtainPairSerializer):
@@ -133,8 +136,6 @@ class UserLoginSerializer(TokenObtainPairSerializer):
 
         # Add custom claims
         token["username"] = user.username
-        token["first_name"] = user.first_name
-        token["last_name"] = user.last_name
         token["phone_number"] = user.phone_number
         token["email"] = user.email
         token["is_developer"] = user.is_developer

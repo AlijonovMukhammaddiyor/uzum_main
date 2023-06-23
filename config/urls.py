@@ -5,7 +5,6 @@ from django.urls import include, path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from rest_framework_simplejwt.views import TokenRefreshView
 
 from uzum.users.views import CookieTokenObtainPairView, CookieTokenRefreshView
 
@@ -25,7 +24,6 @@ urlpatterns = [
     # Django Admin, use {% url 'admin:index' %}
     path(settings.ADMIN_URL, admin.site.urls),
     # User management
-    path("users/", include("uzum.users.urls", namespace="users")),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
@@ -47,6 +45,7 @@ urlpatterns += [
         ),
         name="api-docs",
     ),
+    path("api/users/", include("uzum.users.urls", namespace="users")),
     path("api/category/", include("uzum.category.urls", namespace="category")),
     path("api/shop/", include("uzum.shop.urls", namespace="shop")),
     path("api/product/", include("uzum.product.urls", namespace="product")),

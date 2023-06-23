@@ -1,3 +1,5 @@
+from corsheaders.defaults import default_headers
+
 from .base import *  # noqa
 from .base import env
 
@@ -183,7 +185,7 @@ SPECTACULAR_SETTINGS["SERVERS"] = [  # noqa: F405
 ]
 # Your stuff...
 # ------------------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = ["https://api.shortintroduce.com", "https://api.alijonov.com", "http://localhost:3000"]
+CORS_ALLOWED_ORIGINS = ["https://api.alijonov.com", "http://localhost:3000"]
 
 CORS_ORIGIN_WHITELIST = [
     "https://api.alijonov.com",
@@ -195,3 +197,21 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000"
     # Add other allowed origins if needed
 ]
+
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
+CORS_ALLOW_HEADERS = list(default_headers) + ["Set-Cookie"]
+# SESSION_COOKIE_SECURE = False
+# SESSION_COOKIE_DOMAIN = "localhost"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
+CORS_ALLOW_CREDENTIALS = True
