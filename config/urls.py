@@ -6,17 +6,16 @@ from django.views import defaults as default_views
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-from uzum.users.views import CookieTokenObtainPairView, CookieTokenRefreshView
-
-# from phone_verify.api import VerificationViewSet
-# from rest_framework.authtoken.views import obtain_auth_token
-# from rest_framework.routers import DefaultRouter
-
-
-# default_router = DefaultRouter(trailing_slash=False)
-# default_router.register("phone", VerificationViewSet, basename="phone")
-
-# urlpatterns = default_router.urls
+from uzum.users.views import (
+    CheckUserNameAndPhone,
+    CodeVerificationView,
+    CookieTokenObtainPairView,
+    CookieTokenRefreshView,
+    LogoutView,
+    PasswordRenewView,
+    UserAuthCheckView,
+    VerificationSendView,
+)
 
 urlpatterns = [
     path("", TemplateView.as_view(template_name="pages/home.html"), name="home"),
@@ -35,6 +34,7 @@ urlpatterns += [
     # DRF auth token
     # path("auth-token/", CustomObtainAuthToken.as_view()),
     path("api/token/", CookieTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/logout/", LogoutView.as_view(), name="token_logout"),
     path("api/token/refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
     path("api/schema/", SpectacularAPIView.as_view(), name="api-schema"),
     path(
@@ -51,6 +51,11 @@ urlpatterns += [
     path("api/product/", include("uzum.product.urls", namespace="product")),
     path("api/badge/", include("uzum.badge.urls", namespace="badge")),
     path("api/banner/", include("uzum.banner.urls", namespace="banner")),
+    path("api/username_phone_match", CheckUserNameAndPhone.as_view(), name="check_username"),
+    path("api/auth", UserAuthCheckView.as_view(), name="check_username"),
+    path("api/newpassword/", view=PasswordRenewView.as_view(), name="check_username"),
+    path("api/code/", view=VerificationSendView.as_view(), name="check_username"),
+    path("api/verify/", view=CodeVerificationView.as_view(), name="check_username"),
 ]
 
 if settings.DEBUG:

@@ -18,11 +18,19 @@ class UserAdminCreationForm(admin_forms.UserCreationForm):
     To change user signup, see UserSignupForm and UserSocialSignupForm.
     """
 
-    class Meta(admin_forms.UserCreationForm.Meta):
+    class Meta:
         model = User
-        error_messages = {
-            "username": {"unique": _("This username has already been taken.")},
-        }
+        fields = [
+            "username",
+            "email",
+            "phone_number",
+            "password",
+            "shop",
+            "is_superuser",
+            "is_staff",
+        ]
+
+        error_messages = {"username": {"unique": _("This username has already been taken.")}}
 
 
 class UserSignupForm(SignupForm):

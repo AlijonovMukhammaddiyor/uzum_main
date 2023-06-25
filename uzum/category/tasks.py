@@ -62,6 +62,12 @@ def update_uzum_data(args=None, **kwargs):
         time.sleep(30)
         del products_api
 
+    time.sleep(300)
+
+    fetch_product_ids()
+
+    time.sleep(30)
+
     print("Setting banners...", product_associations, shop_association)
     print(product_associations, shop_association)
     for product_id, banners in product_associations.items():
@@ -129,16 +135,15 @@ def fetch_product_ids(date_pretty: str = get_today_pretty()):
         product_ids,
         page_size=PAGE_SIZE,
     )
-    product_ids = list(set(product_ids))
-
-    unfetched_product_ids = []
+    product_ids = set(product_ids)
 
     aa = ProductAnalytics.objects.filter(date_pretty=date_pretty).values_list("product__product_id", flat=True)
 
+    unfetched_product_ids = list(product_ids - set(aa))
     # remove already fetched products from product_ids
-    for product_id in product_ids:
-        if product_id not in aa:
-            unfetched_product_ids.append(product_id)
+    # for product_id in product_ids:
+    #     if product_id not in aa:
+    #         unfetched_product_ids.append(product_id)
 
     shop_analytics_done = {}
 

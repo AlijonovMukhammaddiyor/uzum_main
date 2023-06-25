@@ -23,14 +23,17 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
         """
         Override this method to set custom permissions for different actions
         """
-        if self.action == "create":
+        if self.action == "create" or self.action == "check_username_phone_match":
             # Allow any user (authenticated or not) to create a new user
             return [AllowAny()]
         return super().get_permissions()
 
     def get_queryset(self, *args, **kwargs):
-        assert isinstance(self.request.user.id, int)  # for mypy to know that the user is authenticated
-        return self.queryset.filter(id=self.request.user.id)
+        try:
+            assert isinstance(self.request.user.id, int)  # for mypy to know that the user is authenticated
+            return self.queryset.filter(id=self.request.user.id)
+        except AssertionError:
+            return self.queryset.none()
 
     def create(self, request, *args, **kwargs):
         # Check if the verification token cookie is present

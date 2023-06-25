@@ -9,7 +9,8 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import DetailView, RedirectView, UpdateView
 from drf_spectacular.utils import extend_schema
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt import authentication
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,8 +19,17 @@ from twilio.rest import Client
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from config.settings.base import env
-from uzum.users.api.serializers import UserLoginSerializer
+from uzum.users.api.serializers import (
+    CheckUserNameAndPhoneSerializer,
+    LogOutSerializer,
+    PasswordRenewSerializer,
+    UserLoginSerializer,
+)
 from django.utils import timezone
+
+# disable twilio info logs
+twilio_logger = logging.getLogger("twilio.http_client")
+twilio_logger.setLevel(logging.WARNING)
 
 
 User = get_user_model()
@@ -33,14 +43,23 @@ logging.getLogger("twilio").setLevel(logging.INFO)
 
 class VerificationSendView(APIView):
     permission_classes = [AllowAny]
-    allowed_methods = ["POST"]
+    allowed_methods = ["GET"]
 
+    @extend_schema(tags=["auth"])
     def post(self, request: Request):
         try:
             data = request.data
             phone_number = data.get("phone_number")
+            is_register = data.get("is_register", False)
+
             if not phone_number:
                 return Response(status=400, data={"message": "Phone number is required"})
+
+            if is_register:
+                users = User.objects.filter(phone_number=phone_number)
+
+                if users.exists():
+                    return Response(status=400, data={"message": "Phone number already exists"})
 
             # Calculate the expiration time (e.g., 5 minutes from now)
             expiration_time = timezone.now() + timedelta(minutes=5)
@@ -81,6 +100,8 @@ class CodeVerificationView(APIView):
                     expires=datetime.datetime.now() + timedelta(minutes=10),
                 )  # Replace 'token_value' with an actual token
                 return response
+
+            return Response(status=400, data={"message": "Invalid verification code"})
 
         except TwilioRestException as e:
             print("Error in check: ", e)
@@ -128,7 +149,7 @@ user_redirect_view = UserRedirectView.as_view()
 class CookieTokenObtainPairView(TokenObtainPairView):
     serializer_class = UserLoginSerializer
 
-    @extend_schema(tags=["auth"], operation_id="login")
+    @extend_schema(tags=["token"], operation_id="login")
     def finalize_response(self, request, response, *args, **kwargs):
         if response.status_code == 200:
             response = super().finalize_response(request, response, *args, **kwargs)
@@ -139,9 +160,95 @@ class CookieTokenObtainPairView(TokenObtainPairView):
 
 
 class CookieTokenRefreshView(TokenRefreshView):
-    @extend_schema(tags=["auth"], operation_id="refresh_token")
+    @extend_schema(tags=["token"], operation_id="refresh_token")
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         response.set_cookie("refresh_token", response.data["refresh"], httponly=True)
         response.set_cookie("access_token", response.data["access"], httponly=True)
         return response
+
+
+class UserAuthCheckView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [authentication.JWTAuthentication]
+
+    @extend_schema(tags=["auth"], operation_id="auth_check")
+    def get(self, request, *args, **kwargs):
+        return Response({"detail": "Authorized"}, status=200)
+
+
+class LogoutView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = [authentication.JWTAuthentication]
+    serializer_class = LogOutSerializer
+
+    @extend_schema(tags=["auth"], operation_id="logout")
+    def post(self, request, *args, **kwargs):
+        # Logic to invalidate the tokens or clear session-related data
+        # For example, you can use Django's built-in logout function:
+        from django.contrib.auth import logout
+
+        logout(request)
+
+        # Clear the cookies
+        response = Response({"detail": "Logged out"})
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
+
+        return response
+
+
+class CheckUserNameAndPhone(APIView):
+    permission_classes = [AllowAny]
+    allowed_methods = ["GET"]
+    serializer_class = CheckUserNameAndPhoneSerializer
+
+    @extend_schema(tags=["auth"], operation_id="check_username_and_phone")
+    def get(self, request, *args, **kwargs):
+        try:
+            data = request.query_params
+            phone_number = data.get("phone_number")
+            username = data.get("username")
+            if not phone_number or not username:
+                return Response(status=400, data={"message": "Phone number and username are required"})
+            user = User.objects.filter(phone_number=phone_number, username=username).first()
+            if user:
+                return Response(status=200, data={"message": "User exists"})
+            return Response(status=400, data={"message": "User does not exist"})
+        except Exception as e:
+            print("Error in CheckUserNameAndPhone: ", e)
+            return Response(status=500, data={"message": "Internal server error"})
+
+
+class PasswordRenewView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    serializer_class = PasswordRenewSerializer
+
+    @extend_schema(tags=["auth"], operation_id="password_renew")
+    def post(self, request, *args, **kwargs):
+        try:
+            data = request.data
+            phone_number = data.get("phone_number")
+            username = data.get("username")
+            password = data.get("password")
+
+            if not phone_number or not username or not password:
+                return Response(status=400, data={"message": "Phone number and username are required"})
+
+            if len(password) < 8:
+                return Response(status=400, data={"message": "Password must be at least 8 characters long"})
+
+            user = User.objects.filter(phone_number=phone_number, username=username).first()
+            if not user:
+                return Response(status=400, data={"message": "User does not exist"})
+
+            # Update the user's password
+            user.set_password(password)
+            user.save()
+
+            return Response(status=200, data={"message": "New password set successfully"})
+
+        except Exception as e:
+            print("Error in PasswordRenewView: ", e)
+            return Response(status=500, data={"message": "Internal server error"})

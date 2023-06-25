@@ -9,7 +9,7 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -19,8 +19,30 @@ from uzum.category.models import Category
 from uzum.product.models import Product, ProductAnalytics
 from uzum.product.serializers import ProductSerializer
 
-from .models import Shop, ShopAnalytics
+from .models import Shop, ShopAnalytics, get_today_pretty
 from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer
+
+
+class Top5ShopsView(APIView):
+    permission_classes = [AllowAny]
+    serializer_class = ShopSerializer
+    queryset = Shop.objects.all()
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Shop"])
+    def get(self, request: Request):
+        try:
+            shops = (
+                ShopAnalytics.objects.filter(date_pretty=get_today_pretty())
+                .order_by("-total_orders")[:5]
+                .values("shop__title", "total_orders")
+            )
+
+            return Response(shops, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ShopsView(APIView):

@@ -21,7 +21,7 @@ class User(AbstractUser):
 
     phone_number = models.CharField(max_length=20, blank=True, unique=True)
     # is_verified = models.BooleanField(default=False)
-    email = models.EmailField(_("Email address"), blank=True, unique=True)
+    email = models.EmailField(_("Email address"), blank=True, unique=False)
     fingerprint = models.CharField(max_length=255, blank=True)  # unique fingerprint of the user's device
 
     referred_by = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL)

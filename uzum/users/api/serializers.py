@@ -32,6 +32,11 @@ def get_random_string(length, username: str, phone_number: str):
 
 def get_referred_by(referral_code: str):
     try:
+        print("code: ", referral_code)
+        users = User.objects.all()
+        for user in users:
+            print("user: ", user.referral_code)
+
         if referral_code:
             return User.objects.get(referral_code=referral_code)
         return None
@@ -82,9 +87,9 @@ class UserSerializer(serializers.ModelSerializer):
             "username": {"required": True, "max_length": 255},
             # required fields
             "phone_number": {"required": True, "max_length": 20},
-            "fingerprint": {"required": True},
+            "fingerprint": {"required": False},
             "email": {"required": False, "max_length": 255},
-            "password": {"required": True},
+            "password": {"required": False},
             # "shop": {"required": False},
             "referred_by": {"required": False},
             "is_staff": {"required": False},
@@ -97,9 +102,18 @@ class UserSerializer(serializers.ModelSerializer):
         if not password:
             raise ValueError("Password is required.")
 
+        if not password:
+            raise ValueError("Password is required.")
+
         # Generate a unique referral code. This will generate a random string of length 6.
         referral_code = get_random_string(6, validated_data["username"], validated_data["phone_number"])
-        referred_by = get_referred_by(validated_data.get("referral_code"))
+
+        context = self.context["request"].data
+        referred_by_code = context.get("referred_by_code")
+
+        referred_by = get_referred_by(referred_by_code)
+
+        print("referred_by", referred_by)
 
         # Add the generated referral code to the user data.
         validated_data["referral_code"] = referral_code
@@ -107,7 +121,7 @@ class UserSerializer(serializers.ModelSerializer):
         shop_id = self.context["request"].data.get("shop")
         validated_data["shop"] = get_shop(shop_id)
         validated_data["is_staff"] = validated_data.get("is_staff", False)
-
+        validated_data["fingerprint"] = validated_data.get("fingerprint", "")
         # Create the user instance.
         user = User.objects.create(**validated_data)
 
@@ -122,6 +136,7 @@ class UserSerializer(serializers.ModelSerializer):
             "username": user.username,
             "phone_number": user.phone_number,
             "email": user.email,
+            "referral_code": user.referral_code,
         }
 
 
@@ -145,3 +160,30 @@ class UserLoginSerializer(TokenObtainPairSerializer):
         token["shop"] = user.shop
 
         return token
+
+
+class CheckUserNameAndPhoneSerializer(serializers.Serializer):
+    """
+    Serializer for checking username and phone number
+    """
+
+    username = serializers.CharField(max_length=255)
+    phone_number = serializers.CharField(max_length=20)
+
+
+class PasswordRenewSerializer(serializers.Serializer):
+    """
+    Serializer for password renew
+    """
+
+    username = serializers.CharField(max_length=255)
+    phone_number = serializers.CharField(max_length=20)
+    password = serializers.CharField(max_length=255)
+
+
+class LogOutSerializer(serializers.Serializer):
+    """
+    Serializer for logging out
+    """
+
+    pass

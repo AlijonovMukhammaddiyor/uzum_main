@@ -4,30 +4,20 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from uzum.users.forms import UserAdminChangeForm, UserAdminCreationForm
-
-User = get_user_model()
+from uzum.users.models import User
 
 
 @admin.register(User)
-class UserAdmin(auth_admin.UserAdmin):
-    form = UserAdminChangeForm
+class CustomUserAdmin(auth_admin.UserAdmin):
     add_form = UserAdminCreationForm
+    form = UserAdminChangeForm
+    model = User
+    list_display = ("username", "phone_number", "email", "is_staff", "is_developer")
+
     fieldsets = (
         (None, {"fields": ("username", "password")}),
-        (_("Personal info"), {"fields": ("phone_number", "email")}),
-        (
-            _("Permissions"),
-            {
-                "fields": (
-                    "is_active",
-                    "is_staff",
-                    "is_superuser",
-                    "groups",
-                    "user_permissions",
-                ),
-            },
-        ),
-        (_("Important dates"), {"fields": ("last_login", "date_joined")}),
+        ("Personal Info", {"fields": ("first_name", "last_name", "phone_number", "email")}),
+        ("Additional Info", {"fields": ("fingerprint", "referred_by", "referral_code", "shop", "is_developer")}),
+        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        ("Important dates", {"fields": ("last_login", "date_joined")}),
     )
-    list_display = ["username", "is_superuser", "phone_number"]
-    search_fields = ["username"]

@@ -322,8 +322,8 @@ SOCIALACCOUNT_FORMS = {"signup": "uzum.users.forms.UserSocialSignupForm"}
 # django-rest-framework - https://www.django-rest-framework.org/api-guide/settings/
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
+        # "rest_framework.authentication.SessionAuthentication",
+        # "rest_framework.authentication.TokenAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_THROTTLE_CLASSES": [
@@ -366,3 +366,4 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 SESSION_CACHE_ALIAS = "default"
+DEBUG = True

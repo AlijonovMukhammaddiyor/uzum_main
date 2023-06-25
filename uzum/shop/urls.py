@@ -28,4 +28,9 @@ urlpatterns = [
     ),
     path("products/<int:seller_id>", views.ShopProductsView.as_view(), name="shop-products"),
     path("categories/<int:seller_id>", views.ShopCategoryAnalyticsView.as_view(), name="shop-products"),
+    path(
+        "top",
+        views.Top5ShopsView.as_view(),
+        name="top-shops",
+    ),
 ]
