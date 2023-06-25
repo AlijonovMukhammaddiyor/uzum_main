@@ -62,7 +62,7 @@ def update_uzum_data(args=None, **kwargs):
         time.sleep(30)
         del products_api
 
-    time.sleep(300)
+    time.sleep(600)
 
     fetch_product_ids()
 
@@ -128,6 +128,8 @@ def fetch_failed_products(product_ids: list[int]):
 
 
 def fetch_product_ids(date_pretty: str = get_today_pretty()):
+    # create_and_update_categories()
+
     categories_filtered = get_categories_with_less_than_n_products(MAX_OFFSET + PAGE_SIZE)
     product_ids: list[int] = []
     async_to_sync(get_all_product_ids_from_uzum)(

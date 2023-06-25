@@ -12,7 +12,7 @@ from asgiref.sync import async_to_sync
 
 # from sklearn.feature_extraction.text import TfidfVectorizer
 # from sklearn.metrics.pairwise import linear_kernel
-from django.db.models import Avg, Count, OuterRef, Prefetch, Subquery, F, Max
+from django.db.models import Avg, Count, OuterRef, Prefetch, Subquery
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -22,7 +22,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.db.models.functions import Coalesce
 
 from uzum.category.models import Category
 from uzum.jobs.constants import CATEGORIES_HEADER, POPULAR_SEARCHES_PAYLOAD, PRODUCT_HEADER
@@ -42,50 +41,13 @@ class Top5ProductsView(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request):
         try:
-            # date_pretty = request.query_params.get("date", get_today_pretty())
-            # res = []
-            # top_products = Product.objects.annotate(max_orders=Coalesce(Max("analytics__orders_amount"), 0)).order_by(
-            #     "-max_orders"
-            # )[:5]
-            # # Iterate over the top products and retrieve the associated single ProductAnalytics instance
-            # for product in top_products:
-            #     product_analytics = product.analytics.order_by("-orders_amount").first()
-            #     # Access the desired attributes of product and product_analytics
-            #     product_id = product.product_id
-            #     title = product.title
-            #     orders_amount = product_analytics.orders_amount
-            #     res.append(
-            #         {
-            #             "product_id": product_id,
-            #             "title": title,
-            #             "orders_amount": orders_amount,
-            #         }
-            #     )
-            top_products = (
-                ProductAnalytics.objects.values("product__product_id", "product__title")
-                .annotate(max_orders_amount=Max("orders_amount"))
-                .order_by("-max_orders_amount")
-                .distinct("product__product_id")[:5]
+            date_pretty = request.query_params.get("date", get_today_pretty())
+            products = (
+                ProductAnalytics.objects.filter(date_pretty=date_pretty)
+                .order_by("-orders_amount")[:5]
+                .values("product__title", "orders_amount")
             )
-
-            # product_ids = [product["product"] for product in top_products]
-            # products = Product.objects.filter(product_id__in=product_ids).values("title")
-            # res = []
-            # # Access the product title and max orders amount
-            # for product in products:
-            #     max_orders_amount = next(
-            #         item["max_orders_amount"] for item in top_products if item["product"] == product["product_id"]
-            #     )
-            #     print(f"Product: {product['title']}, Max Orders Amount: {max_orders_amount}")
-            #     res.append(
-            #         {
-            #             "product_id": product["product_id"],
-            #             "title": product["title"],
-            #             "orders_amount": max_orders_amount,
-            #         }
-            #     )
-
-            return Response(top_products, status=status.HTTP_200_OK)
+            return Response(products, status=status.HTTP_200_OK)
         except Exception as e:
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
