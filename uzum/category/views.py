@@ -177,6 +177,7 @@ class CategoryProductsPeriodComparisonView(APIView):
     pagination_class = PageNumberPagination
 
     @staticmethod
+    @extend_schema(tags=["Category"])
     def get_category_products_comparison(category: Category):
         try:
             one_week_ago_date = timezone.now() - timedelta(weeks=1)

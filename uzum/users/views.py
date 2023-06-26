@@ -163,22 +163,23 @@ class CookieTokenObtainPairView(TokenObtainPairView):
 
 
 class CookieTokenRefreshView(TokenRefreshView):
-    # @extend_schema(tags=["token"], operation_id="refresh_token")
-    # def post(self, request, *args, **kwargs):
-    #     response = super().post(request, *args, **kwargs)
-    #     cookie_max_age = 3600 * 24 * 14  # 2 weeks
-    #     response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
-    #     response.set_cookie("access_token", response.data["access"], httponly=True)
-    #     # print("access", response.data["access"])
-    #     return response
-    def finalize_response(self, request, response, *args, **kwargs):
-        if response.data.get("refresh"):
-            print("refresh", response.data["refresh"])
-            cookie_max_age = 3600 * 24 * 14  # 14 days
-            response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
-            response.set_cookie("access_token", response.data["access"], httponly=True)
-            del response.data["refresh"]
-        return super().finalize_response(request, response, *args, **kwargs)
+    @extend_schema(tags=["token"], operation_id="refresh_token")
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        cookie_max_age = 3600 * 24 * 14  # 2 weeks
+        response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
+        response.set_cookie("access_token", response.data["access"], httponly=True)
+        # print("access", response.data["access"])
+        return response
+
+    # def finalize_response(self, request, response, *args, **kwargs):
+    #     if response.data.get("refresh"):
+    #         cookie_max_age = 3600 * 24 * 14  # 14 days
+    #         print("New access token generated -> ", response.data["access"])
+    #         response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
+    #         response.set_cookie("access_token", response.data["access"], httponly=True)
+    #         del response.data["refresh"]
+    #     return super().finalize_response(request, response, *args, **kwargs)
 
     # serializer_class = CookieTokenRefreshSerializer
 
@@ -186,6 +187,7 @@ class CookieTokenRefreshView(TokenRefreshView):
 class UserAuthCheckView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [authentication.JWTAuthentication]
+    allowed_methods = ["GET"]
 
     @extend_schema(tags=["auth"], operation_id="auth_check")
     def get(self, request, *args, **kwargs):

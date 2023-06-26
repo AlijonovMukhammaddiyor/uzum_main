@@ -11,7 +11,7 @@ urlpatterns = [
     path("", views.CategoryTreeView.as_view(), name="all-categories"),
     path(
         "products/<int:category_id>",
-        cache_page(seconds_until_midnight())(views.CategoryProductsView.as_view()),
+        views.CategoryProductsView.as_view(),
         name="category-products",
     ),
     path(
