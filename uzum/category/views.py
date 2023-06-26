@@ -2,13 +2,15 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from django.shortcuts import get_object_or_404
 
 import numpy as np
 import pandas as pd
 import pytz
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Avg, Case, Count, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
+from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum, Prefetch
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -18,13 +20,15 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.generics import ListAPIView
+from uzum.category.pagination import CategoryProductsPagination
 
-from uzum.category.utils import calculate_shop_analytics_in_category, get_average_price_per_order
-from uzum.product.models import Product, ProductAnalytics
+from uzum.category.utils import calculate_shop_analytics_in_category
+from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.sku.models import Sku, SkuAnalytics
 
 from .models import Category, CategoryAnalytics
-from .serializers import CategorySerializer
+from .serializers import CategoryProductsSerializer, CategorySerializer
 
 
 class CategoryTreeView(APIView):
@@ -72,100 +76,37 @@ class CategoryTreeView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class CategoryProductsView(APIView):
+class CategoryProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    serializer_class = CategorySerializer
-    queryset = Category.objects.all()
-    allowed_methods = ["GET"]
-    pagination_class = PageNumberPagination  # new line
+    serializer_class = CategoryProductsSerializer
+    pagination_class = CategoryProductsPagination
 
-    @staticmethod
-    def get_category_products(category: Category):
-        try:
-            latest_analytics = ProductAnalytics.objects.filter(product=OuterRef("pk")).order_by("-created_at")
-            latest_sku_analytics = SkuAnalytics.objects.filter(sku__product_id=OuterRef("product_id")).order_by(
-                "-created_at"
-            )
-
-            categories = category.get_category_descendants(include_self=True)
-
-            category_products = (
-                Product.objects.filter(category__in=categories)
-                .annotate(
-                    latest_orders_amount=Subquery(latest_analytics.values("orders_amount")[:1]),
-                    latest_reviews_amount=Subquery(latest_analytics.values("reviews_amount")[:1]),
-                    latest_available_amount=Subquery(latest_analytics.values("available_amount")[:1]),
-                    sku_count=Count("skus"),
-                    latest_purchase_price=Subquery(latest_sku_analytics.values("purchase_price")[:1]),
-                    latest_full_price=Subquery(latest_sku_analytics.values("full_price")[:1]),
-                )
-                .values(
-                    "title",
-                    "description",
-                    "shop__title",
-                    "characteristics",
-                    "photos",
-                    "latest_orders_amount",
-                    "latest_reviews_amount",
-                    "latest_available_amount",
-                    "sku_count",
-                    "product_id",
-                    "latest_purchase_price",
-                    "latest_full_price",
-                    "created_at",
-                )
-                .order_by("-latest_orders_amount")
-            )
-
-            return category_products
-
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return []
-
-    @extend_schema(tags=["Category"])
-    def get(self, request: Request, category_id):
+    def get_queryset(self):
         """
-        Get products of a category.
-        Args:
-            request (Request): request should contain limit and offset query parameters.
-            category_id (_type_): category id
-            limit -> number of products to return
-            offset -> offset of products to return
-        Returns:
-            _type_: _description_
+        This view should return a list of all the products for
+        the category as determined by the category portion of the URL.
         """
-        try:
-            start_time = time.time()
+        category_id = self.kwargs["category_id"]
+        category = get_object_or_404(Category, categoryId=category_id)
+        today_pretty = get_today_pretty()
 
-            category = Category.objects.get(categoryId=category_id)
-            category_products = self.get_category_products(category)
+        categories = Category.get_category_descendants(category, include_self=True)
 
-            paginator = self.pagination_class()  # new lines
+        # Get products and their analytics
+        return (
+            ProductAnalytics.objects.select_related("product__shop")
+            .only("orders_amount", "reviews_amount", "available_amount", "product__title", "product__shop__title")
+            .filter(date_pretty=today_pretty, product__category__in=categories)
+            .order_by("created_at")
+        )
 
-            page = paginator.paginate_queryset(category_products, request)
-            print(f"CATEGORY PRODUCTS: {time.time() - start_time} seconds")
-            if page is not None:
-                return paginator.get_paginated_response(page)
-
-            print("Page is None")
-            return Response(
-                status=status.HTTP_200_OK,
-                data={
-                    "data": category_products,
-                    "total": len(category_products),
-                },
-            )
-
-        except Category.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={"message": "Category not found"})
-
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    def list(self, request, *args, **kwargs):
+        start_time = time.time()
+        print("CATEGORY PRODUCTS")
+        response = super().list(request, *args, **kwargs)
+        print(f"CATEGORY PRODUCTS: {time.time() - start_time} seconds")
+        return response
 
 
 class CategoryProductsPeriodComparisonView(APIView):
