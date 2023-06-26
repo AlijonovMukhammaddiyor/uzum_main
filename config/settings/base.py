@@ -346,7 +346,10 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Uzum Analytics API",
     "DESCRIPTION": "Documentation of API endpoints of Uzum Analytics",
     "VERSION": "1.0.0",
-    "SERVE_PERMISSIONS": ["config.permissions.IsAdminOrDeveloper"],
+    "AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
         # Do not allow any operation which changes data in the database -> allow only GET requests
