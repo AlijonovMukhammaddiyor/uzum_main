@@ -44,7 +44,7 @@ logging.getLogger("twilio").setLevel(logging.INFO)
 
 class VerificationSendView(APIView):
     permission_classes = [AllowAny]
-    allowed_methods = ["GET"]
+    allowed_methods = ["POST"]
 
     @extend_schema(tags=["auth"])
     def post(self, request: Request):
@@ -180,7 +180,7 @@ class CookieTokenRefreshView(TokenRefreshView):
             del response.data["refresh"]
         return super().finalize_response(request, response, *args, **kwargs)
 
-    serializer_class = CookieTokenRefreshSerializer
+    # serializer_class = CookieTokenRefreshSerializer
 
 
 class UserAuthCheckView(APIView):

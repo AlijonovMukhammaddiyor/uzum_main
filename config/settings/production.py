@@ -186,11 +186,12 @@ SPECTACULAR_SETTINGS["SERVERS"] = [  # noqa: F405
 ]
 # Your stuff...
 # ------------------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = ["https://api.alijonov.com", "http://localhost:3000"]
+CORS_ALLOWED_ORIGINS = ["https://api.alijonov.com", "http://localhost:3000", "http://localhost:8000"]
 
 CORS_ORIGIN_WHITELIST = [
     "https://api.alijonov.com",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://localhost:8000",
     # Add other allowed origins if needed
 ]
 
