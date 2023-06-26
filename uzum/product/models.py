@@ -9,11 +9,11 @@ from uzum.sku.models import get_day_before_pretty
 
 class Product(models.Model):
     product_id = models.IntegerField(unique=True, primary_key=True)
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    updated_at = models.DateTimeField(auto_now=True, db_index=True)
-    title = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    title = models.TextField(db_index=True)
     description = models.TextField(default=None, null=True, blank=True)
-    adult = models.BooleanField(default=False, db_index=True)
+    adult = models.BooleanField(default=False)
     bonus_product = models.BooleanField(default=False)
     is_eco = models.BooleanField(default=False)
     is_perishable = models.BooleanField(default=False)
@@ -49,16 +49,14 @@ class ProductAnalytics(models.Model):
         unique=True,
         primary_key=True,
     )
-    product = models.ForeignKey(Product, on_delete=models.DO_NOTHING, related_name="analytics")
+    product = models.ForeignKey(Product, on_delete=models.DO_NOTHING, related_name="analytics", db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     banners = models.ManyToManyField(
         "banner.Banner",
-        db_index=True,
         # on_delete=models.DO_NOTHING, null=True, blank=True, related_name="products"
     )
     badges = models.ManyToManyField(
         "badge.Badge",
-        db_index=True,
         related_name="products",
     )
 
@@ -70,7 +68,6 @@ class ProductAnalytics(models.Model):
 
     campaigns = models.ManyToManyField(
         "campaign.Campaign",
-        db_index=True,
     )
     date_pretty = models.CharField(max_length=255, null=True, blank=True, db_index=True, default=get_today_pretty)
     position = models.IntegerField(default=0, null=True, blank=True)
