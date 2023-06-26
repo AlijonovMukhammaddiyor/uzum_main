@@ -52,14 +52,17 @@ class CategoryTreeView(APIView):
         try:
             # cache key: category_tree
             # expires in 1 day
+            print("category tree")
             redis_key = "category_tree"
+            # return Response(status=status.HTTP_200_OK, data={"message": "Category tree not found"})
 
             if cache.get(redis_key):
                 return Response(status=status.HTTP_200_OK, data=cache.get("category_tree"))
-
+            print("category tree not found")
             root_category = Category.objects.get(categoryId=1)
             category_tree = self.get_category_tree(root_category)
             cache.set(redis_key, category_tree, timeout=60 * 60 * 24)
+            print("category tree done")
             return Response(status=status.HTTP_200_OK, data=category_tree)
 
         except Category.DoesNotExist:

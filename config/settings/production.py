@@ -1,3 +1,4 @@
+from datetime import timedelta
 from corsheaders.defaults import default_headers
 
 from .base import *  # noqa
@@ -216,3 +217,9 @@ SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "None"
 # CSRF_COOKIE_SAMESITE = "None"
 CORS_ALLOW_CREDENTIALS = True
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=3),
+    "ROTATE_REFRESH_TOKENS": True,
+}

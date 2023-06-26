@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken
 
 from uzum.referral.models import Referral
 from uzum.shop.models import Shop
@@ -160,6 +162,17 @@ class UserLoginSerializer(TokenObtainPairSerializer):
         token["shop"] = user.shop
 
         return token
+
+
+class CookieTokenRefreshSerializer(TokenRefreshSerializer):
+    refresh = None
+
+    def validate(self, attrs):
+        attrs["refresh"] = self.context["request"].COOKIES.get("refresh_token")
+        if attrs["refresh"]:
+            return super().validate(attrs)
+        else:
+            raise InvalidToken("No valid token found in cookie 'refresh_token'")
 
 
 class CheckUserNameAndPhoneSerializer(serializers.Serializer):

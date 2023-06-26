@@ -21,6 +21,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from config.settings.base import env
 from uzum.users.api.serializers import (
     CheckUserNameAndPhoneSerializer,
+    CookieTokenRefreshSerializer,
     LogOutSerializer,
     PasswordRenewSerializer,
     UserLoginSerializer,
@@ -153,19 +154,33 @@ class CookieTokenObtainPairView(TokenObtainPairView):
     def finalize_response(self, request, response, *args, **kwargs):
         if response.status_code == 200:
             response = super().finalize_response(request, response, *args, **kwargs)
+            cookie_max_age = 3600 * 24 * 14  # 2 weeks
             response.set_cookie("access_token", response.data["access"], httponly=True)
-            response.set_cookie("refresh_token", response.data["refresh"], httponly=True)
+            response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
+
             response.data = {"detail": "Cookies Set"}
         return response
 
 
 class CookieTokenRefreshView(TokenRefreshView):
-    @extend_schema(tags=["token"], operation_id="refresh_token")
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        response.set_cookie("refresh_token", response.data["refresh"], httponly=True)
-        response.set_cookie("access_token", response.data["access"], httponly=True)
-        return response
+    # @extend_schema(tags=["token"], operation_id="refresh_token")
+    # def post(self, request, *args, **kwargs):
+    #     response = super().post(request, *args, **kwargs)
+    #     cookie_max_age = 3600 * 24 * 14  # 2 weeks
+    #     response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
+    #     response.set_cookie("access_token", response.data["access"], httponly=True)
+    #     # print("access", response.data["access"])
+    #     return response
+    def finalize_response(self, request, response, *args, **kwargs):
+        if response.data.get("refresh"):
+            print("refresh", response.data["refresh"])
+            cookie_max_age = 3600 * 24 * 14  # 14 days
+            response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
+            response.set_cookie("access_token", response.data["access"], httponly=True)
+            del response.data["refresh"]
+        return super().finalize_response(request, response, *args, **kwargs)
+
+    serializer_class = CookieTokenRefreshSerializer
 
 
 class UserAuthCheckView(APIView):
