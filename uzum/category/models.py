@@ -65,6 +65,11 @@ class Category(models.Model):
         return descendants
 
     def get_category_descendants(self, include_self=False):
+        if self.descendants is None:
+            if include_self:
+                return [self]
+            else:
+                return []
         descendant_ids = [int(descendant_id) for descendant_id in self.descendants.split(",")]
 
         if include_self:
