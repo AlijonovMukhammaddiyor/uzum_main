@@ -322,13 +322,13 @@ def create_product_analytics_view(date_pretty):
                 b.textColor AS badge_textColor,
                 sa.purchase_price,
                 sa.full_price
-            FROM myapp_productanalytics AS pa
-            JOIN myapp_product AS p ON p.product_id = pa.product_id
-            JOIN myapp_shop AS s ON s.seller_id = p.shop_id
-            LEFT JOIN myapp_productanalytics_badges AS pb ON pb.productanalytics_id = pa.id
-            LEFT JOIN myapp_badge AS b ON b.badge_id = pb.badge_id
-            LEFT JOIN myapp_sku AS sk ON sk.product_id = p.product_id
-            LEFT JOIN myapp_skuanalytics AS sa ON sa.sku_id = sk.sku_id AND sa.date_pretty = pa.date_pretty
+            FROM product_productanalytics AS pa
+            JOIN product_product AS p ON p.product_id = pa.product_id
+            JOIN shop_shop AS s ON s.seller_id = p.shop_id
+            LEFT JOIN product_productanalytics AS pb ON pb.productanalytics_id = pa.id
+            LEFT JOIN badge_badge AS b ON b.badge_id = pb.badge_id
+            LEFT JOIN sku_sku AS sk ON sk.product_id = p.product_id
+            LEFT JOIN sku_skuanalytics AS sa ON sa.sku_id = sk.sku_id AND sa.date_pretty = pa.date_pretty
             WHERE pa.date_pretty = '{date_pretty}';
         """
         )
