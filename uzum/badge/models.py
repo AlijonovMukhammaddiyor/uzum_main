@@ -12,8 +12,8 @@ class Badge(models.Model):
     text = models.TextField(null=True, blank=True)
     type = models.CharField(max_length=255, null=True, blank=True)
     link = models.TextField(null=True, blank=True)
-    textColor = models.CharField(max_length=255, null=True, blank=True)
-    backgroundColor = models.CharField(max_length=255, null=True, blank=True)
+    text_color = models.CharField(max_length=255, null=True, blank=True)
+    background_color = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
 
     def __str__(self):

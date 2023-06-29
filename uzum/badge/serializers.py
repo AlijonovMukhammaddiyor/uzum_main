@@ -16,4 +16,4 @@ class BadgeSerializer(serializers.ModelSerializer):
 class ProductBadgeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Badge
-        fields = ["backgroundColor", "text", "textColor"]
+        fields = ["background_color", "text", "text_color"]

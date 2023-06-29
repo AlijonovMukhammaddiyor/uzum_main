@@ -24,11 +24,11 @@ from rest_framework.generics import ListAPIView
 from uzum.category.pagination import CategoryProductsPagination
 
 from uzum.category.utils import calculate_shop_analytics_in_category
-from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
 from uzum.sku.models import Sku, SkuAnalytics
 
 from .models import Category, CategoryAnalytics
-from .serializers import CategoryProductsSerializer, CategorySerializer
+from .serializers import CategoryProductsSerializer, CategoryProductsViewSerializer, CategorySerializer
 
 
 class CategoryTreeView(APIView):
@@ -91,7 +91,7 @@ class CategoryTreeView(APIView):
 class CategoryProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    serializer_class = CategoryProductsSerializer
+    serializer_class = CategoryProductsViewSerializer
     pagination_class = CategoryProductsPagination
 
     def get_queryset(self):
@@ -100,32 +100,45 @@ class CategoryProductsView(ListAPIView):
         the category as determined by the category portion of the URL.
         """
         category_id = self.kwargs["category_id"]
-        category = get_object_or_404(Category, categoryId=category_id)
-        today_pretty = get_today_pretty()
+        # category = get_object_or_404(Category, categoryId=category_id)
+        # today_pretty = get_today_pretty()
 
-        categories = Category.get_category_descendants(category, include_self=True)
+        # categories = Category.get_category_descendants(category, include_self=True)
 
-        # Get products and their analytics
-        return (
-            ProductAnalytics.objects.select_related("product__shop")
-            .prefetch_related(
-                Prefetch(
-                    "product__skus__analytics",
-                    queryset=SkuAnalytics.objects.filter(date_pretty=today_pretty),
-                    to_attr="todays_analytics",
-                )
-            )
-            .only(
-                "orders_amount",
-                "reviews_amount",
-                "available_amount",
-                "product__title",
-                "product__shop__title",
-                "position_in_category",
-            )
-            .filter(date_pretty=today_pretty, product__category__in=categories)
-            .order_by("-orders_amount")
-        )
+        # # Get products and their analytics
+        # return (
+        #     ProductAnalytics.objects.select_related("product__shop")
+        #     .prefetch_related(
+        #         Prefetch(
+        #             "product__skus__analytics",
+        #             queryset=SkuAnalytics.objects.filter(date_pretty=today_pretty),
+        #             to_attr="todays_analytics",
+        #         )
+        #     )
+        #     .only(
+        #         "orders_amount",
+        #         "reviews_amount",
+        #         "available_amount",
+        #         "product__title",
+        #         "product__shop__title",
+        #         "position_in_category",
+        #     )
+        #     .filter(date_pretty=today_pretty, product__category__in=categories)
+        #     .order_by("-orders_amount")
+        # )
+        # Get the category
+        category = Category.objects.get(pk=category_id)
+
+        # Get the descendant category IDs as a list of integers
+        descendant_ids = list(map(int, category.descendants.split(",")))
+
+        # Add the parent category ID to the list
+        descendant_ids.append(category_id)
+
+        # Get the products for the category and its descendants from the view
+        products = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by("-orders_amount")
+        print(products.count())
+        return products
 
     def list(self, request, *args, **kwargs):
         start_time = time.time()

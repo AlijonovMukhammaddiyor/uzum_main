@@ -1,7 +1,7 @@
 from rest_framework.serializers import ModelSerializer
 from rest_framework import serializers
 from uzum.badge.serializers import ProductBadgeSerializer
-from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
 from uzum.sku.models import Sku, SkuAnalytics
 from django.db.models import Prefetch
 from .models import Category, CategoryAnalytics
@@ -81,6 +81,27 @@ class CategoryProductsSerializer(ModelSerializer):
 
     def get_sku_count(self, obj):
         return obj.product.skus.count()
+
+
+class CategoryProductsViewSerializer(ModelSerializer):
+    class Meta:
+        model = ProductAnalyticsView
+        fields = [
+            "product_id",
+            "product_title",
+            "orders_amount",
+            "available_amount",
+            "reviews_amount",
+            "shop_title",
+            "shop_link",
+            "badge_text",
+            "badge_background_color",
+            "badge_text_color",
+            "purchase_price",
+            "full_price",
+            "category_id",
+            "photos",
+        ]
 
 
 class CategorySkuAnalyticsSerializer(serializers.ModelSerializer):
