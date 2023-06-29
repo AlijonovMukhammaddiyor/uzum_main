@@ -11,3 +11,9 @@ class BadgeSerializer(serializers.ModelSerializer):
             "badge_id",
             "created_at",
         )
+
+
+class ProductBadgeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Badge
+        fields = ["backgroundColor", "text", "textColor"]

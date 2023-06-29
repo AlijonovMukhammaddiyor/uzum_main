@@ -1,5 +1,6 @@
 from rest_framework.serializers import ModelSerializer
 from rest_framework import serializers
+from uzum.badge.serializers import ProductBadgeSerializer
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.sku.models import Sku, SkuAnalytics
 from django.db.models import Prefetch
@@ -46,12 +47,13 @@ class CategoryProductsSerializer(ModelSerializer):
     photos = serializers.CharField(source="product.photos")
     skus = serializers.SerializerMethodField()
     sku_count = serializers.SerializerMethodField()
+    badges = ProductBadgeSerializer(source="badges.all", read_only=True, many=True)  # new line
 
     class Meta:
         model = ProductAnalytics
         fields = [
             "orders_amount",
-            "position",
+            "position_in_category",
             "product_id",
             "reviews_amount",
             "available_amount",
@@ -60,6 +62,7 @@ class CategoryProductsSerializer(ModelSerializer):
             "skus",
             "sku_count",
             "photos",
+            "badges",
         ]
 
     def get_skus(self, obj):

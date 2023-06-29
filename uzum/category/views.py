@@ -121,7 +121,7 @@ class CategoryProductsView(ListAPIView):
                 "available_amount",
                 "product__title",
                 "product__shop__title",
-                "position",
+                "position_in_category",
             )
             .filter(date_pretty=today_pretty, product__category__in=categories)
             .order_by("-orders_amount")
