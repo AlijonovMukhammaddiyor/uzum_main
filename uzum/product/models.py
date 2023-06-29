@@ -143,3 +143,22 @@ class ProductAnalytics(models.Model):
 
         except Exception as e:
             return self.reviews_amount
+
+
+class ProductAnalyticsView(models.Model):
+    product_id = models.IntegerField()
+    product_title = models.CharField(max_length=255)
+    orders_amount = models.IntegerField()
+    available_amount = models.IntegerField()
+    reviews_amount = models.IntegerField()
+    shop_title = models.CharField(max_length=255)
+    shop_link = models.TextField()
+    badge_text = models.TextField(blank=True, null=True)
+    badge_backgroundColor = models.CharField(max_length=255, blank=True, null=True)
+    badge_textColor = models.CharField(max_length=255, blank=True, null=True)
+    purchase_price = models.FloatField()
+    full_price = models.FloatField()
+
+    class Meta:
+        managed = False
+        db_table = "uzum_product_analytics_view"

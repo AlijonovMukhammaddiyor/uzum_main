@@ -7,7 +7,8 @@ from django.db import models, transaction
 from django.db.models import Avg, Subquery, Sum, OuterRef
 
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
-from uzum.sku.models import get_day_before_pretty
+from uzum.shop.models import Shop
+from uzum.sku.models import SkuAnalytics, get_day_before_pretty
 
 
 class Category(models.Model):
@@ -136,7 +137,7 @@ class CategoryAnalytics(models.Model):
             return None
 
     @staticmethod
-    def set_analytics(date_pretty=get_today_pretty()):
+    def set_all_analytics(date_pretty=get_today_pretty()):
         try:
             # Fetch CategoryAnalytics objects for the specific date
             category_analytics_on_date = CategoryAnalytics.objects.filter(date_pretty=date_pretty)
@@ -156,30 +157,69 @@ class CategoryAnalytics(models.Model):
                         ),
                     )
 
+                    # Get the latest SkuAnalytics for each product in the category
+                    latest_sku_analytics = SkuAnalytics.objects.filter(
+                        sku__product__category__in=descendants,
+                        created_at=Subquery(
+                            SkuAnalytics.objects.filter(sku=OuterRef("sku"))
+                            .order_by("-created_at")
+                            .values("created_at")[:1]
+                        ),
+                    )
+
                     # Calculate totals and averages
                     total_orders = latest_product_analytics.aggregate(sum=Sum("orders_amount"))["sum"] or 0
                     total_reviews = latest_product_analytics.aggregate(sum=Sum("reviews_amount"))["sum"] or 0
                     average_product_rating = latest_product_analytics.aggregate(avg=Avg("rating"))["avg"] or 0
 
+                    # Calculate total_shops
+                    total_shops = Shop.objects.filter(products__category__in=descendants).distinct().count()
+
+                    # Get yesterday's analytics for comparison
+                    last_analytics = category_analytics.get_yesterday_category_analytics()
+
+                    if last_analytics:
+                        # Calculate total_shops_with_sales
+                        total_shops_with_sales = (
+                            Shop.objects.filter(
+                                products__category__in=descendants,
+                                products__productanalytics__orders_amount__gt=last_analytics.total_orders,
+                            )
+                            .distinct()
+                            .count()
+                        )
+
+                        # Calculate total_products_with_sales
+                        total_products_with_sales = (
+                            Product.objects.filter(
+                                category__in=descendants,
+                                productanalytics__orders_amount__gt=last_analytics.total_orders,
+                            )
+                            .distinct()
+                            .count()
+                        )
+                    else:
+                        total_shops_with_sales = total_shops
+                        total_products_with_sales = category_analytics.total_products
+
                     # Calculate average_purchase_price
-                    total_price_of_products = (
-                        Product.objects.filter(category__in=descendants).aggregate(sum=Sum("price"))["sum"] or 0
-                    )
-                    total_number_of_products = Product.objects.filter(category__in=descendants).count()
-                    average_purchase_price = (
-                        total_price_of_products / total_number_of_products if total_number_of_products else 0
-                    )
+                    total_purchase_price = latest_sku_analytics.aggregate(sum=Sum("purchase_price"))["sum"] or 0
+                    total_number_of_skus = latest_sku_analytics.count()
+                    average_purchase_price = total_purchase_price / total_number_of_skus if total_number_of_skus else 0
 
                     # Update CategoryAnalytics
                     category_analytics.total_orders = total_orders
                     category_analytics.total_reviews = total_reviews
                     category_analytics.average_product_rating = average_product_rating
+                    category_analytics.total_shops = total_shops
+                    category_analytics.total_shops_with_sales = total_shops_with_sales
+                    category_analytics.total_products_with_sales = total_products_with_sales
                     category_analytics.average_purchase_price = average_purchase_price
                     category_analytics.save()
 
         except Exception as e:
             traceback.print_exc()
-            print("Error in set_analytics: ", e)
+            print("Error in set_all_analytics: ", e)
 
     @staticmethod
     def update_total_shops_for_date(date_pretty=get_today_pretty()):

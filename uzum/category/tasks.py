@@ -9,6 +9,7 @@ import httpx
 import pytz
 from asgiref.sync import async_to_sync
 from django.core.cache import cache
+from django.db import connection
 
 from config import celery_app
 from uzum.banner.models import Banner
@@ -100,13 +101,14 @@ def update_uzum_data(args=None, **kwargs):
     date_pretty = get_today_pretty()
 
     create_todays_searches()
-
     Category.update_descendants()
 
     shop_analytics = ShopAnalytics.objects.filter(date_pretty=date_pretty)
 
     for shop_an in shop_analytics:
         shop_an.set_total_products()
+
+    create_product_analytics_view(date_pretty)
 
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
@@ -300,3 +302,33 @@ def update_category_tree():
     # store in cache
     cache.set("category_tree", category_tree, timeout=60 * 60 * 48)  # 48 hours
     return category_tree
+
+
+def create_product_analytics_view(date_pretty):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            CREATE OR REPLACE VIEW uzum_product_analytics_view AS
+            SELECT
+                p.product_id,
+                p.title AS product_title,
+                pa.orders_amount,
+                pa.available_amount,
+                pa.reviews_amount,
+                s.title AS shop_title,
+                s.link AS shop_link,
+                b.text AS badge_text,
+                b.backgroundColor AS badge_backgroundColor,
+                b.textColor AS badge_textColor,
+                sa.purchase_price,
+                sa.full_price
+            FROM myapp_productanalytics AS pa
+            JOIN myapp_product AS p ON p.product_id = pa.product_id
+            JOIN myapp_shop AS s ON s.seller_id = p.shop_id
+            LEFT JOIN myapp_productanalytics_badges AS pb ON pb.productanalytics_id = pa.id
+            LEFT JOIN myapp_badge AS b ON b.badge_id = pb.badge_id
+            LEFT JOIN myapp_sku AS sk ON sk.product_id = p.product_id
+            LEFT JOIN myapp_skuanalytics AS sa ON sa.sku_id = sk.sku_id AND sa.date_pretty = pa.date_pretty
+            WHERE pa.date_pretty = '{date_pretty}';
+        """
+        )
