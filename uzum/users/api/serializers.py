@@ -152,14 +152,14 @@ class UserLoginSerializer(TokenObtainPairSerializer):
         token = super(UserLoginSerializer, cls).get_token(user)
 
         # Add custom claims
-        token["username"] = user.username
-        token["phone_number"] = user.phone_number
-        token["email"] = user.email
-        token["is_developer"] = user.is_developer
-        token["referral_code"] = user.referral_code
-        token["referred_by"] = user.referred_by
-        token["fingerprint"] = user.fingerprint
-        token["shop"] = user.shop
+        # token["user"] = {
+        #     "username": user.username,
+        #     "phone_number": user.phone_number,
+        #     "email": user.email,
+        #     "is_staff": user.is_staff,
+        #     "referral_code": user.referral_code,
+        #     "shop": user.shop,
+        # }
 
         return token
 

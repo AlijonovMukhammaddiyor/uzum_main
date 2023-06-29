@@ -8,6 +8,7 @@ from datetime import datetime
 import httpx
 import pytz
 from asgiref.sync import async_to_sync
+from django.core.cache import cache
 
 from config import celery_app
 from uzum.banner.models import Banner
@@ -271,3 +272,31 @@ def create_todays_searches():
     except Exception as e:
         print("Error in create_todays_searches:", e)
         return None
+
+
+def update_category_tree():
+    categories = Category.objects.values("categoryId", "title", "parent_id")
+
+    # first create a dictionary mapping ids to category data
+    category_dict = {category["categoryId"]: category for category in categories}
+
+    # then build a mapping from parent_id to a list of its children
+    children_map = {}
+    for category in categories:
+        children_map.setdefault(category["parent_id"], []).append(category)
+
+    # recursive function to build the tree
+    def build_tree(category_id):
+        category = category_dict[category_id]
+        children = children_map.get(category_id, [])
+        return {
+            "categoryId": category_id,
+            "title": category["title"],
+            "children": [build_tree(child["categoryId"]) for child in children],
+        }
+
+    # build the tree starting from the root
+    category_tree = build_tree(1)
+    # store in cache
+    cache.set("category_tree", category_tree, timeout=60 * 60 * 48)  # 48 hours
+    return category_tree

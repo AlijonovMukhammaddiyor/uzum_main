@@ -4,10 +4,9 @@ from datetime import datetime, timedelta
 
 import pytz
 from django.db import models, transaction
-from django.db.models import Avg, Count, F, Q, Subquery, Sum
+from django.db.models import Avg, Subquery, Sum, OuterRef
 
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
-from uzum.shop.models import Shop
 from uzum.sku.models import get_day_before_pretty
 
 
@@ -98,26 +97,28 @@ class CategoryAnalytics(models.Model):
         default=get_today_pretty,
     )
 
-    total_orders = models.IntegerField(default=0, null=True, blank=True)  # total orders of campaign so far
-    total_orders_amount = models.IntegerField(
-        default=0, null=True, blank=True
-    )  # total orders amount of campaign so far
+    total_orders = models.IntegerField(null=True, blank=True)  # total orders of category so far
+    total_orders_amount = models.IntegerField(null=True, blank=True)  # total orders amount of category so far
 
-    total_reviews = models.IntegerField(default=0, null=True, blank=True)  # so far
-    average_rating = models.FloatField(default=0, null=True, blank=True)  # so far
+    total_reviews = models.IntegerField(null=True, blank=True)  # so far
+    average_product_rating = models.FloatField(null=True, blank=True)  # so far
 
-    total_shops = models.IntegerField(default=0, null=True, blank=True)  # current
+    total_shops = models.IntegerField(null=True, blank=True)  # current
 
-    total_shops_with_sales = models.IntegerField(default=0, null=True, blank=True)  # in a day
-    total_products_with_sales = models.IntegerField(default=0, null=True, blank=True)  # in a day
-    total_products_with_reviews = models.IntegerField(default=0, null=True, blank=True)  # in a day
+    total_shops_with_sales = models.IntegerField(null=True, blank=True)  # between yesterday and today
+    total_products_with_sales = models.IntegerField(null=True, blank=True)  # between yesterday and today
+
+    average_purchase_price = models.FloatField(null=True, blank=True)  # average price of all products in category
+    average_order_price = models.FloatField(
+        null=True, blank=True
+    )  # average price of all orders in category between yesterday and today
 
     def __str__(self):
         return f"{self.category.categoryId}: {self.total_products}"
 
     def get_yesterday_category_analytics(self):
         """
-        Returns last category analytics for this category with date it created.
+        Returns yesterday's category analytics if exists, else None
         Args:
             date_prety (_type_, optional): _description_. Defaults to None.
 
@@ -128,101 +129,73 @@ class CategoryAnalytics(models.Model):
             yesterday_pretty = get_day_before_pretty(self.date_pretty)
             last_analytics = CategoryAnalytics.objects.get(category=self.category, date_pretty=yesterday_pretty)
             return last_analytics
+        except CategoryAnalytics.DoesNotExist:
+            return None
         except Exception as e:
+            print("Error in get_yesterday_category_analytics: ", e)
             return None
 
-    def set_total_shops(self, date=None):
+    @staticmethod
+    def set_analytics(date_pretty=get_today_pretty()):
         try:
-            # 1. get all descendants of this category
-            descendants = Category.get_descendants(self.category, include_self=True)
+            # Fetch CategoryAnalytics objects for the specific date
+            category_analytics_on_date = CategoryAnalytics.objects.filter(date_pretty=date_pretty)
 
-            # 1. get all products in descendants
-            products = Product.objects.filter(category__in=descendants)
+            with transaction.atomic():
+                for category_analytics in category_analytics_on_date:
+                    category = category_analytics.category
+                    descendants = Category.get_descendants(category, include_self=True)
 
-            # 2. traverse all products and increment count if shop is not already counted
-            count = 0
-            counted = {}
+                    # Get the latest ProductAnalytics for each product in the category
+                    latest_product_analytics = ProductAnalytics.objects.filter(
+                        product__category__in=descendants,
+                        created_at=Subquery(
+                            ProductAnalytics.objects.filter(product=OuterRef("product"))
+                            .order_by("-created_at")
+                            .values("created_at")[:1]
+                        ),
+                    )
 
-            for product in products:
-                shop: Shop = product.shop
-                if shop.seller_id not in counted:
-                    count += 1
-                    counted[shop.seller_id] = True
+                    # Calculate totals and averages
+                    total_orders = latest_product_analytics.aggregate(sum=Sum("orders_amount"))["sum"] or 0
+                    total_reviews = latest_product_analytics.aggregate(sum=Sum("reviews_amount"))["sum"] or 0
+                    average_product_rating = latest_product_analytics.aggregate(avg=Avg("rating"))["avg"] or 0
 
-            self.total_shops = count
-            self.save()
+                    # Calculate average_purchase_price
+                    total_price_of_products = (
+                        Product.objects.filter(category__in=descendants).aggregate(sum=Sum("price"))["sum"] or 0
+                    )
+                    total_number_of_products = Product.objects.filter(category__in=descendants).count()
+                    average_purchase_price = (
+                        total_price_of_products / total_number_of_products if total_number_of_products else 0
+                    )
+
+                    # Update CategoryAnalytics
+                    category_analytics.total_orders = total_orders
+                    category_analytics.total_reviews = total_reviews
+                    category_analytics.average_product_rating = average_product_rating
+                    category_analytics.average_purchase_price = average_purchase_price
+                    category_analytics.save()
 
         except Exception as e:
-            print("Error in set_total_shops: ", e)
+            traceback.print_exc()
+            print("Error in set_analytics: ", e)
 
     @staticmethod
-    def update_all_categories(date_pretty=None):
-        if date_pretty is None:
-            date_pretty = datetime.now().strftime("%Y-%m-%d")
+    def update_total_shops_for_date(date_pretty=get_today_pretty()):
+        try:
+            categories = Category.objects.all()
 
-        current_date = datetime.strptime(date_pretty, "%Y-%m-%d").astimezone(pytz.timezone("Asia/Tashkent"))
+            with transaction.atomic():
+                for category in categories:
+                    descendants = Category.get_descendants(category, include_self=True)
 
-        categories = Category.objects.all()
+                    shop_count = Product.objects.filter(category__in=descendants).values("shop").distinct().count()
 
-        updated_categories_analytics = []
+                    CategoryAnalytics.objects.filter(category=category, date_pretty=date_pretty).update(
+                        total_shops=shop_count
+                    )
 
-        for category in categories:
-            descendants = Category.get_descendants(category, include_self=True)
-
-            products = Product.objects.filter(category__in=descendants)
-
-            total_orders = 0
-            total_reviews = 0
-            product_with_sale_count = 0
-            shop_with_sale_count = set()
-            products_with_reviews_count = 0
-            rating = 0
-            rated_products_count = 0
-
-            for product in products:
-                product_analytic = (
-                    ProductAnalytics.objects.filter(product=product, created_at__date__lte=current_date.date())
-                    .order_by("-created_at")
-                    .first()
-                )
-
-                if product_analytic is not None:
-                    total_orders += product_analytic.orders_amount
-                    total_reviews += product_analytic.reviews_amount
-
-                    if product_analytic.orders_amount > 0:
-                        product_with_sale_count += 1
-                        shop_with_sale_count.add(product.shop.seller_id)
-
-                    if product_analytic.reviews_amount > 0:
-                        products_with_reviews_count += 1
-
-                    if product_analytic.rating > 0:
-                        rating += product_analytic.rating
-                        rated_products_count += 1
-            print(category.title)
-            try:
-                category_analytics = CategoryAnalytics.objects.get(category=category, date_pretty=date_pretty)
-            except CategoryAnalytics.DoesNotExist:
-                continue
-            category_analytics.total_orders = total_orders
-            category_analytics.total_reviews = total_reviews
-            category_analytics.total_products_with_sales = product_with_sale_count
-            category_analytics.total_shops_with_sales = len(shop_with_sale_count)
-            category_analytics.total_products_with_reviews = products_with_reviews_count
-            category_analytics.average_rating = (rating / rated_products_count) if rated_products_count > 0 else 0
-
-            updated_categories_analytics.append(category_analytics)
-
-        with transaction.atomic():
-            CategoryAnalytics.objects.bulk_update(
-                updated_categories_analytics,
-                [
-                    "total_orders",
-                    "total_reviews",
-                    "total_products_with_sales",
-                    "total_shops_with_sales",
-                    "total_products_with_reviews",
-                    "average_rating",
-                ],
-            )
+        except Exception as e:
+            traceback.print_exc()
+            print("Error in set_total_shops: ", e)

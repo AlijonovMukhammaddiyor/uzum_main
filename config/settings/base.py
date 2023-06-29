@@ -1,6 +1,7 @@
 """
 Base settings to build other settings files upon.
 """
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -322,8 +323,8 @@ SOCIALACCOUNT_FORMS = {"signup": "uzum.users.forms.UserSocialSignupForm"}
 # django-rest-framework - https://www.django-rest-framework.org/api-guide/settings/
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        # "rest_framework.authentication.SessionAuthentication",
-        # "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_THROTTLE_CLASSES": [
@@ -332,7 +333,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_THROTTLE_RATES": {"anon": "100/hour", "user": "1000/day"},
+    # "DEFAULT_THROTTLE_RATES": {"anon": "100/hour", "user": "1000/day"},
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
@@ -369,4 +370,11 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 SESSION_CACHE_ALIAS = "default"
-DEBUG = True
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+REST_USE_JWT = True
