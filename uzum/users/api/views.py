@@ -7,7 +7,7 @@ from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveMode
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from config.settings.base import env
 from .serializers import UserSerializer
 
@@ -16,6 +16,7 @@ User = get_user_model()
 
 class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     serializer_class = UserSerializer
+    authentication_classes = [JWTAuthentication]
     queryset = User.objects.all()
     lookup_field = "username"
 

@@ -1,4 +1,11 @@
 from rest_framework import permissions
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
+class CookieJSONWebTokenAuthentication(JWTAuthentication):
+    def get_raw_token(self, request):
+        print("getting raw token")
+        return request.COOKIES.get("access_token")
 
 
 class IsAdminOrDeveloper(permissions.BasePermission):

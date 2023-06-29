@@ -5,15 +5,13 @@ from django.urls import include, path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-
+from rest_framework_simplejwt.views import TokenVerifyView, TokenRefreshView, TokenObtainPairView
 from uzum.users.views import (
     CheckUserNameAndPhone,
     CodeVerificationView,
-    CookieTokenObtainPairView,
-    CookieTokenRefreshView,
+    CustomTokenObtainPairView,
     LogoutView,
     PasswordRenewView,
-    UserAuthCheckView,
     VerificationSendView,
 )
 
@@ -33,9 +31,10 @@ urlpatterns += [
     path("api/", include("config.api_router")),
     # DRF auth token
     # path("auth-token/", CustomObtainAuthToken.as_view()),
-    path("api/token/", CookieTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/logout/", LogoutView.as_view(), name="token_logout"),
-    path("api/token/refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
+    path("api/token/civuiaubcyvsdcibhsvus/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     path("api/schema/", SpectacularAPIView.as_view(), name="api-schema"),
     path(
         "api/docs/",
@@ -52,7 +51,6 @@ urlpatterns += [
     path("api/badge/", include("uzum.badge.urls", namespace="badge")),
     path("api/banner/", include("uzum.banner.urls", namespace="banner")),
     path("api/username_phone_match", CheckUserNameAndPhone.as_view(), name="check_username"),
-    path("api/auth", UserAuthCheckView.as_view(), name="check_username"),
     path("api/newpassword/", view=PasswordRenewView.as_view(), name="check_username"),
     path("api/code/", view=VerificationSendView.as_view(), name="check_username"),
     path("api/verify/", view=CodeVerificationView.as_view(), name="check_username"),

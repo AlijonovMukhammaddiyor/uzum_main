@@ -3,6 +3,8 @@ from datetime import datetime
 
 import pytz
 from django.db import models
+from django.db.models import F, Window
+from django.db.models.functions import Rank
 
 from uzum.sku.models import get_day_before_pretty
 
@@ -63,15 +65,46 @@ class ProductAnalytics(models.Model):
     available_amount = models.IntegerField(default=0)
     reviews_amount = models.IntegerField(default=0)
     rating = models.FloatField(default=0)
-    orders_amount = models.IntegerField(default=0)
+    orders_amount = models.IntegerField(default=0, db_index=True)
     orders_money = models.IntegerField(default=0)
 
     campaigns = models.ManyToManyField(
         "campaign.Campaign",
     )
     date_pretty = models.CharField(max_length=255, null=True, blank=True, db_index=True, default=get_today_pretty)
-    position = models.IntegerField(default=0, null=True, blank=True)
-    score = models.FloatField(default=0, null=True, blank=True)
+    position_in_shop = models.IntegerField(default=0, null=True, blank=True)
+    position_in_category = models.IntegerField(default=0, null=True, blank=True)
+
+    @staticmethod
+    def set_position_in_shop(date_pretty=get_today_pretty()):
+        try:
+            # Use a window function to rank products within their shop by orders_amount
+            product_analytics_to_update = ProductAnalytics.objects.filter(date_pretty=date_pretty).annotate(
+                position_in_shop=Window(
+                    expression=Rank(),
+                    order_by=F("orders_amount").desc(),
+                    partition_by=F("product__shop"),
+                )
+            )
+
+            # Iterate over the queryset to actually perform the updates
+            for pa in product_analytics_to_update:
+                pa.save(update_fields=["position_in_shop"])
+
+            # Now, do the same for position_in_category
+            product_analytics_to_update = ProductAnalytics.objects.filter(date_pretty=date_pretty).annotate(
+                position_in_category=Window(
+                    expression=Rank(),
+                    order_by=F("orders_amount").desc(),
+                    partition_by=F("product__category"),
+                )
+            )
+
+            # Iterate over the queryset to actually perform the updates
+            for pa in product_analytics_to_update:
+                pa.save(update_fields=["position_in_category"])
+        except Exception as e:
+            print(e, "error in set_position_in_shop")
 
     def get_orders_amount_in_day(self, date=None):
         """
@@ -110,24 +143,3 @@ class ProductAnalytics(models.Model):
 
         except Exception as e:
             return self.reviews_amount
-
-    # def set_orders_money(self):
-    #     """
-    #     Set orders money.
-    #     Get all corresponding skuAnalytics and sum their purchase_price.
-    #     """
-    #     try:
-    #         sku_analytics = SkuAnalytics.objects.filter(sku__product=self.product, date_pretty=self.date_pretty)
-    #         orders_money = 0
-
-    #         # check if every sku has 0 orders_amount
-
-    #         for sku_analytic in sku_analytics:
-    #             orders_money += sku_analytic.purchase_price * sku_analytic.orders_amount
-
-    #         self.orders_money = orders_money
-    #         self.save()
-    #         return True
-    #     except Exception as e:
-    #         print("Error in set_orders_money: ", e)
-    #         return None

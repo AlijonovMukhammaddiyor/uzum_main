@@ -40,25 +40,37 @@ class CategoryTreeView(APIView):
 
     @staticmethod
     def get_category_tree(category: Category):
-        category_dict = {
-            "categoryId": category.categoryId,
-            "title": category.title,
-        }
+        categories = Category.objects.values("categoryId", "title", "parent_id")
 
-        children = category.children.all()
-        if children:
-            category_dict["children"] = [CategoryTreeView.get_category_tree(child) for child in children]
+        # first create a dictionary mapping ids to category data
+        category_dict = {category["categoryId"]: category for category in categories}
 
-        return category_dict
+        # then build a mapping from parent_id to a list of its children
+        children_map = {}
+        for category in categories:
+            children_map.setdefault(category["parent_id"], []).append(category)
+
+        # recursive function to build the tree
+        def build_tree(category_id):
+            category = category_dict[category_id]
+            children = children_map.get(category_id, [])
+            return {
+                "categoryId": category_id,
+                "title": category["title"],
+                "children": [build_tree(child["categoryId"]) for child in children],
+            }
+
+        # build the tree starting from the root
+        category_tree = build_tree(1)
+        # store in cache
+        cache.set("category_tree", category_tree, timeout=60 * 60 * 48)  # 48 hours
+        return category_tree
 
     @extend_schema(tags=["Category"])
     def get(self, request: Request):
         try:
-            # cache key: category_tree
-            # expires in 1 day
             print("category tree")
             redis_key = "category_tree"
-            # return Response(status=status.HTTP_200_OK, data={"message": "Category tree not found"})
 
             if cache.get(redis_key):
                 return Response(status=status.HTTP_200_OK, data=cache.get("category_tree"))
@@ -96,9 +108,23 @@ class CategoryProductsView(ListAPIView):
         # Get products and their analytics
         return (
             ProductAnalytics.objects.select_related("product__shop")
-            .only("orders_amount", "reviews_amount", "available_amount", "product__title", "product__shop__title")
+            .prefetch_related(
+                Prefetch(
+                    "product__skus__analytics",
+                    queryset=SkuAnalytics.objects.filter(date_pretty=today_pretty),
+                    to_attr="todays_analytics",
+                )
+            )
+            .only(
+                "orders_amount",
+                "reviews_amount",
+                "available_amount",
+                "product__title",
+                "product__shop__title",
+                "position",
+            )
             .filter(date_pretty=today_pretty, product__category__in=categories)
-            .order_by("created_at")
+            .order_by("-orders_amount")
         )
 
     def list(self, request, *args, **kwargs):

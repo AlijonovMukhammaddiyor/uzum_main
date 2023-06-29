@@ -21,7 +21,6 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from config.settings.base import env
 from uzum.users.api.serializers import (
     CheckUserNameAndPhoneSerializer,
-    CookieTokenRefreshSerializer,
     LogOutSerializer,
     PasswordRenewSerializer,
     UserLoginSerializer,
@@ -147,55 +146,38 @@ class UserRedirectView(LoginRequiredMixin, RedirectView):
 user_redirect_view = UserRedirectView.as_view()
 
 
-class CookieTokenObtainPairView(TokenObtainPairView):
+class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = UserLoginSerializer
 
     @extend_schema(tags=["token"], operation_id="login")
-    def finalize_response(self, request, response, *args, **kwargs):
-        if response.status_code == 200:
-            response = super().finalize_response(request, response, *args, **kwargs)
-            cookie_max_age = 3600 * 24 * 14  # 2 weeks
-            response.set_cookie("access_token", response.data["access"], httponly=True)
-            response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
-
-            response.data = {"detail": "Cookies Set"}
-        return response
-
-
-class CookieTokenRefreshView(TokenRefreshView):
-    @extend_schema(tags=["token"], operation_id="refresh_token")
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        cookie_max_age = 3600 * 24 * 14  # 2 weeks
-        response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
-        response.set_cookie("access_token", response.data["access"], httponly=True)
-        # print("access", response.data["access"])
-        return response
+        serializer = self.get_serializer(data=request.data)
 
-    # def finalize_response(self, request, response, *args, **kwargs):
-    #     if response.data.get("refresh"):
-    #         cookie_max_age = 3600 * 24 * 14  # 14 days
-    #         print("New access token generated -> ", response.data["access"])
-    #         response.set_cookie("refresh_token", response.data["refresh"], httponly=True, max_age=cookie_max_age)
-    #         response.set_cookie("access_token", response.data["access"], httponly=True)
-    #         del response.data["refresh"]
-    #     return super().finalize_response(request, response, *args, **kwargs)
+        serializer.is_valid(raise_exception=True)
 
-    # serializer_class = CookieTokenRefreshSerializer
+        data = {
+            "refresh": str(serializer.validated_data["refresh"]),
+            "access": str(serializer.validated_data["access"]),
+        }
+        return Response(data)
 
 
-class UserAuthCheckView(APIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [authentication.JWTAuthentication]
-    allowed_methods = ["GET"]
-
-    @extend_schema(tags=["auth"], operation_id="auth_check")
-    def get(self, request, *args, **kwargs):
-        return Response({"detail": "Authorized"}, status=200)
+class CustomTokenRefreshView(TokenRefreshView):
+    @extend_schema(tags=["token"], operation_id="refresh_token")
+    def finalize_response(self, request, response, *args, **kwargs):
+        if response.data.get("refresh"):
+            response.set_cookie(
+                "refresh_token",
+                response.data["refresh"],
+                httponly=True,
+            )
+            response.set_cookie("access_token", response.data["access"], httponly=False)
+            del response.data["refresh"]
+        return super().finalize_response(request, response, *args, **kwargs)
 
 
 class LogoutView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     authentication_classes = [authentication.JWTAuthentication]
     serializer_class = LogOutSerializer
 
@@ -208,6 +190,7 @@ class LogoutView(APIView):
         logout(request)
 
         # Clear the cookies
+        print("Cookies cleared")
         response = Response({"detail": "Logged out"})
         response.delete_cookie("access_token")
         response.delete_cookie("refresh_token")
