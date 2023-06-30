@@ -83,7 +83,15 @@ class CategoryProductsSerializer(ModelSerializer):
         return obj.product.skus.count()
 
 
+class CategoryProductBadgeSerializer(serializers.Serializer):
+    badge_text = serializers.CharField()
+    badge_background_color = serializers.CharField()
+    badge_text_color = serializers.CharField()
+
+
 class CategoryProductsViewSerializer(ModelSerializer):
+    badge = CategoryProductBadgeSerializer(source="*")
+
     class Meta:
         model = ProductAnalyticsView
         fields = [
@@ -94,9 +102,7 @@ class CategoryProductsViewSerializer(ModelSerializer):
             "reviews_amount",
             "shop_title",
             "shop_link",
-            "badge_text",
-            "badge_background_color",
-            "badge_text_color",
+            "badge",
             "purchase_price",
             "full_price",
             "category_id",

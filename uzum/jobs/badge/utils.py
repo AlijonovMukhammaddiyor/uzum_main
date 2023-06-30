@@ -9,8 +9,8 @@ def create_badge_instance(badge_api):
                 "text": badge_api["text"],
                 "type": badge_api["type"],
                 "link": badge_api["link"],
-                "textColor": badge_api["textColor"],
-                "backgroundColor": badge_api["backgroundColor"],
+                "text_color": badge_api["textColor"],
+                "background_color": badge_api["backgroundColor"],
                 "description": badge_api["description"],
             }
         )
