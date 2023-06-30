@@ -2,15 +2,14 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from django.shortcuts import get_object_or_404
 
 import numpy as np
 import pandas as pd
 import pytz
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum, Prefetch
-from django.db.models.functions import Coalesce
+from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -92,7 +91,7 @@ class CategoryProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     serializer_class = CategoryProductsViewSerializer
-    pagination_class = CategoryProductsPagination
+    # pagination_class = CategoryProductsPagination
 
     def get_queryset(self):
         """
@@ -110,8 +109,29 @@ class CategoryProductsView(ListAPIView):
         descendant_ids.append(category_id)
 
         # Get the products for the category and its descendants from the view
-        products = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by("-orders_amount")
-        # print(products.count())
+        products = (
+            ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
+            .values(
+                "product_id",
+                "product_title",
+                "orders_amount",
+                "available_amount",
+                "reviews_amount",
+                "shop_title",
+                "shop_link",
+                "category_id",
+                "photos",
+            )
+            .annotate(
+                badge_text_list=ArrayAgg("badge_text"),
+                badge_background_color_list=ArrayAgg("badge_background_color"),
+                badge_text_color_list=ArrayAgg("badge_text_color"),
+                purchase_price_list=ArrayAgg("purchase_price"),
+                full_price_list=ArrayAgg("full_price"),
+            )
+            .order_by("-orders_amount")
+        )
+
         return products
 
     def list(self, request, *args, **kwargs):
@@ -120,6 +140,12 @@ class CategoryProductsView(ListAPIView):
         response = super().list(request, *args, **kwargs)
         print(f"CATEGORY PRODUCTS: {time.time() - start_time} seconds")
         return response
+
+    @staticmethod
+    def dictfetchall(cursor):
+        """Return all rows from a cursor as a dict"""
+        columns = [col[0] for col in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
 class CategoryProductsPeriodComparisonView(APIView):
@@ -326,7 +352,7 @@ class CategoryDailyAnalyticsView(APIView):
                     "total_shops",
                     "total_shops_with_sales",
                     "total_products_with_sales",
-                    "average_rating",
+                    "average_product_rating",
                 )
             )
 
@@ -445,7 +471,7 @@ class SubcategoriesView(APIView):
                     "total_shops_with_sales",
                     "total_products_with_sales",
                     "total_products_with_reviews",
-                    "average_rating",
+                    "average_product_rating",
                 )
             )
 
