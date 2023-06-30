@@ -84,13 +84,17 @@ class CategoryProductsSerializer(ModelSerializer):
 
 
 class CategoryProductBadgeSerializer(serializers.Serializer):
-    badge_text = serializers.CharField()
-    badge_background_color = serializers.CharField()
-    badge_text_color = serializers.CharField()
+    badge_text_list = serializers.ListField(child=serializers.CharField(), source="badge_text")
+    badge_background_color_list = serializers.ListField(child=serializers.CharField(), source="badge_background_color")
+    badge_text_color_list = serializers.ListField(child=serializers.CharField(), source="badge_text_color")
 
 
-class CategoryProductsViewSerializer(ModelSerializer):
-    badge = CategoryProductBadgeSerializer(source="*")
+class CategoryProductsViewSerializer(serializers.ModelSerializer):
+    purchase_price_list = serializers.ListField(child=serializers.FloatField())
+    full_price_list = serializers.ListField(child=serializers.FloatField())
+    badge_text_list = serializers.ListField(child=serializers.CharField())
+    badge_background_color_list = serializers.ListField(child=serializers.CharField())
+    badge_text_color_list = serializers.ListField(child=serializers.CharField())
 
     class Meta:
         model = ProductAnalyticsView
@@ -102,9 +106,11 @@ class CategoryProductsViewSerializer(ModelSerializer):
             "reviews_amount",
             "shop_title",
             "shop_link",
-            "badge",
-            "purchase_price",
-            "full_price",
+            "badge_text_list",
+            "badge_background_color_list",
+            "badge_text_color_list",
+            "purchase_price_list",
+            "full_price_list",
             "category_id",
             "photos",
         ]

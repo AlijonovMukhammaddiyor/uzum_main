@@ -325,15 +325,15 @@ def create_product_analytics_view(date_pretty):
                 sa.full_price,
                 p.category_id,
                 p.photos
-            FROM product_productanalytics AS pa
+            FROM
+            (SELECT * FROM product_productanalytics WHERE date_pretty = '{date_pretty}') AS pa
             JOIN product_product AS p ON p.product_id = pa.product_id
             JOIN shop_shop AS s ON s.seller_id = p.shop_id
             LEFT JOIN product_productanalytics_badges AS pb ON pb.productanalytics_id = pa.id
             LEFT JOIN badge_badge AS b ON b.badge_id = pb.badge_id
-            LEFT JOIN sku_sku AS sk ON sk.product_id = p.product_id
-            LEFT JOIN sku_skuanalytics AS sa ON sa.sku_id = sk.sku AND sa.date_pretty = pa.date_pretty
-            WHERE pa.date_pretty = '{date_pretty}';
-        """
+            LEFT JOIN (SELECT * FROM sku_sku WHERE date_pretty = '{date_pretty}') AS sk ON sk.product_id = p.product_id
+            LEFT JOIN sku_skuanalytics AS sa ON sa.sku_id = sk.sku AND sa.date_pretty = pa.date_pretty;
+            """
         )
         cursor.execute("REFRESH MATERIALIZED VIEW uzum_product_analytics_view")
 
