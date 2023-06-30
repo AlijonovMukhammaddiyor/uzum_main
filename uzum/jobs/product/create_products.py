@@ -88,8 +88,8 @@ def prepareProductData(
                         "text": badge_api["text"],
                         "type": badge_api["type"],
                         "link": badge_api["link"],
-                        "textColor": badge_api["textColor"],
-                        "backgroundColor": badge_api["backgroundColor"],
+                        "text_color": badge_api["textColor"],
+                        "background_color": badge_api["backgroundColor"],
                         "description": badge_api["description"],
                     }
                 )
@@ -297,8 +297,8 @@ def prepareSku(sku_api: dict, product_id: int, characteristics: list[dict]):
                             "text": sku_api["discountBadge"].get("text", None),
                             "type": sku_api["discountBadge"].get("type", None),
                             "link": sku_api["discountBadge"].get("link", None),
-                            "backgroundColor": sku_api["discountBadge"].get("backgroundColor", None),
-                            "textColor": sku_api["discountBadge"].get("textColor", None),
+                            "background_color": sku_api["discountBadge"].get("backgroundColor", None),
+                            "text_color": sku_api["discountBadge"].get("textColor", None),
                         }
                     )
 

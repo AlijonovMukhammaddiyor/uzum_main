@@ -24,11 +24,11 @@ from rest_framework.generics import ListAPIView
 from uzum.category.pagination import CategoryProductsPagination
 
 from uzum.category.utils import calculate_shop_analytics_in_category
-from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
 from uzum.sku.models import Sku, SkuAnalytics
 
 from .models import Category, CategoryAnalytics
-from .serializers import CategoryProductsSerializer, CategorySerializer
+from .serializers import CategoryProductsSerializer, CategoryProductsViewSerializer, CategorySerializer
 
 
 class CategoryTreeView(APIView):
@@ -91,7 +91,7 @@ class CategoryTreeView(APIView):
 class CategoryProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    serializer_class = CategoryProductsSerializer
+    serializer_class = CategoryProductsViewSerializer
     pagination_class = CategoryProductsPagination
 
     def get_queryset(self):
@@ -100,32 +100,19 @@ class CategoryProductsView(ListAPIView):
         the category as determined by the category portion of the URL.
         """
         category_id = self.kwargs["category_id"]
-        category = get_object_or_404(Category, categoryId=category_id)
-        today_pretty = get_today_pretty()
+        # Get the category
+        category = Category.objects.get(pk=category_id)
 
-        categories = Category.get_category_descendants(category, include_self=True)
+        # Get the descendant category IDs as a list of integers
+        descendant_ids = list(map(int, category.descendants.split(",")))
 
-        # Get products and their analytics
-        return (
-            ProductAnalytics.objects.select_related("product__shop")
-            .prefetch_related(
-                Prefetch(
-                    "product__skus__analytics",
-                    queryset=SkuAnalytics.objects.filter(date_pretty=today_pretty),
-                    to_attr="todays_analytics",
-                )
-            )
-            .only(
-                "orders_amount",
-                "reviews_amount",
-                "available_amount",
-                "product__title",
-                "product__shop__title",
-                "position_in_category",
-            )
-            .filter(date_pretty=today_pretty, product__category__in=categories)
-            .order_by("-orders_amount")
-        )
+        # Add the parent category ID to the list
+        descendant_ids.append(category_id)
+
+        # Get the products for the category and its descendants from the view
+        products = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by("-orders_amount")
+        # print(products.count())
+        return products
 
     def list(self, request, *args, **kwargs):
         start_time = time.time()
@@ -313,23 +300,22 @@ class CategoryDailyAnalyticsView(APIView):
     pagination_class = PageNumberPagination
 
     @staticmethod
-    def analytics(categories: list[Category], start_date: datetime, end_date: datetime):
+    def analytics(categories: list[Category], start_date: datetime):
         try:
             products_in_category = Product.objects.filter(category__in=categories)
 
             sku_analytics = SkuAnalytics.objects.filter(
                 sku__product__in=products_in_category,
-                created_at__range=(start_date, end_date),
+                created_at__lte=start_date,
             ).aggregate(
                 avg_purchase_price=Avg("purchase_price"),
                 avg_full_price=Avg("full_price"),
-                # zero_available_count=Count("id", filter=Q(available_amount=0)),
             )
 
             category_analytics = (
                 CategoryAnalytics.objects.filter(
                     category__in=categories,
-                    created_at__range=(start_date, end_date),
+                    created_at__lte=start_date,
                 )
                 .order_by("created_at")
                 .values(
@@ -340,7 +326,6 @@ class CategoryDailyAnalyticsView(APIView):
                     "total_shops",
                     "total_shops_with_sales",
                     "total_products_with_sales",
-                    "total_products_with_reviews",
                     "average_rating",
                 )
             )
@@ -381,20 +366,23 @@ class CategoryDailyAnalyticsView(APIView):
             }]
         """
         try:
-            start_date_str = request.query_params.get("start_date")
-            end_date_str = request.query_params.get("end_date")
-
+            range = request.query_params.get("range", 15)
+            # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
-                datetime.strptime(start_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            )
-            end_date = timezone.make_aware(
-                datetime.strptime(end_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            )
+                datetime.now() - timedelta(days=int(range)), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # start_date = timezone.make_aware(
+            #     datetime.strptime(start_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            # )
+            # end_date = timezone.make_aware(
+            #     datetime.strptime(end_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            # )
 
             category = Category.objects.get(categoryId=category_id)
             categories = category.get_category_descendants(include_self=True)
 
-            category_analytics = self.analytics(categories, start_date, end_date)
+            category_analytics = self.analytics(categories, start_date)
 
             return Response(
                 status=status.HTTP_200_OK,

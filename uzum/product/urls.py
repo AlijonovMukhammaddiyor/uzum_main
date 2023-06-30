@@ -26,5 +26,5 @@ urlpatterns = [
     # path("similar/content/<int:product_id>", views.ProductReviews.as_view(), name="all-products"),
     path("reviews/<int:product_id>", views.ProductReviews.as_view(), name="product-reviews"),
     path("seaches", views.PopularWords.as_view(), name="popular-searches"),
-    path("top", views.Top5ProductsView.as_view(), name="top-products"),
+    path("top/", views.Top5ProductsView.as_view(), name="top-products"),
 ]

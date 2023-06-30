@@ -146,6 +146,7 @@ class ProductAnalytics(models.Model):
 
 
 class ProductAnalyticsView(models.Model):
+    id = models.AutoField(primary_key=True)
     product_id = models.IntegerField()
     product_title = models.CharField(max_length=255)
     orders_amount = models.IntegerField()
@@ -154,10 +155,12 @@ class ProductAnalyticsView(models.Model):
     shop_title = models.CharField(max_length=255)
     shop_link = models.TextField()
     badge_text = models.TextField(blank=True, null=True)
-    badge_backgroundColor = models.CharField(max_length=255, blank=True, null=True)
-    badge_textColor = models.CharField(max_length=255, blank=True, null=True)
+    badge_background_color = models.CharField(max_length=255, blank=True, null=True)
+    badge_text_color = models.CharField(max_length=255, blank=True, null=True)
     purchase_price = models.FloatField()
     full_price = models.FloatField()
+    category_id = models.IntegerField()
+    photos = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
