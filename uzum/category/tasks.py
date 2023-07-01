@@ -108,8 +108,6 @@ def update_uzum_data(args=None, **kwargs):
     for shop_an in shop_analytics:
         shop_an.set_total_products()
 
-    create_product_analytics_view(date_pretty)
-
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
     return True
@@ -304,40 +302,93 @@ def update_category_tree():
     return category_tree
 
 
-def create_product_analytics_view(date_pretty):
+# psql -h db-postgresql-blr1-80747-do-user-14120836-0.b.db.ondigitalocean.com -d defaultdb -U doadmin -p 25060
+def create_materialized_view(date_pretty_str):
     with connection.cursor() as cursor:
         cursor.execute(
             f"""
-            CREATE MATERIALIZED VIEW IF NOT EXISTS uzum_product_analytics_view AS
+        CREATE MATERIALIZED VIEW product_sku_analytics AS
+        SELECT
+            pa.date_pretty,
+            pa.product_id,
+            p.title AS product_title,
+            p.category_id,
+            p.characteristics AS product_characteristics,
+            p.photos,
+            sh.title AS shop_title,
+            sh.link AS shop_link,
+            pa.available_amount AS product_available_amount,
+            pa.orders_amount,
+            pa.reviews_amount,
+            pa.rating,
+            pa.position_in_category,
+            jsonb_agg(
+                json_build_object(
+                    'badge_text', b.text,
+                    'badge_bg_color', b.background_color,
+                    'badge_text_color', b.text_color
+                )
+            )::text AS badges,
+            COALESCE(sa.sku_analytics, '[]') AS sku_analytics  -- Added sku_analytics here
+        FROM
+            product_productanalytics pa
+            JOIN product_product p ON pa.product_id = p.product_id
+            JOIN shop_shop sh ON p.shop_id = sh.seller_id
+            LEFT JOIN product_productanalytics_badges pb ON pa.id = pb.productanalytics_id
+            LEFT JOIN badge_badge b ON pb.badge_id = b.badge_id
+            LEFT JOIN sku_analytics_view sa ON pa.product_id = sa.product_id
+        WHERE
+            pa.date_pretty = '{date_pretty_str}'
+        GROUP BY
+            pa.date_pretty,
+            pa.product_id,
+            p.title,
+            p.category_id,
+            p.characteristics,
+            p.photos,
+            sh.title,
+            sh.link,
+            pa.available_amount,
+            pa.orders_amount,
+            pa.reviews_amount,
+            pa.rating,
+            pa.position_in_category,
+            sa.sku_analytics;
+        """
+        )
+
+
+def create_sku_analytics_materialized_view(date_pretty_str):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            CREATE MATERIALIZED VIEW sku_analytics_view AS
             SELECT
-                ROW_NUMBER() OVER (ORDER BY p.product_id) AS id,
-                p.product_id,
-                p.title AS product_title,
-                pa.orders_amount,
-                pa.available_amount,
-                pa.reviews_amount,
-                s.title AS shop_title,
-                s.link AS shop_link,
-                b.text AS badge_text,
-                b.background_color AS badge_background_color,
-                b.text_color AS badge_text_color,
-                sa.purchase_price,
-                sa.full_price,
-                p.category_id,
-                p.photos
+                s.product_id,
+                json_agg(
+                    json_build_object(
+                        'sku_id', sa.sku_id,
+                        'available_amount', sa.available_amount,
+                        'orders_amount', sa.orders_amount,
+                        'purchase_price', sa.purchase_price,
+                        'full_price', sa.full_price
+                    )
+                )::text AS sku_analytics
             FROM
-            (SELECT * FROM product_productanalytics WHERE date_pretty = '{date_pretty}') AS pa
-            JOIN product_product AS p ON p.product_id = pa.product_id
-            JOIN shop_shop AS s ON s.seller_id = p.shop_id
-            LEFT JOIN product_productanalytics_badges AS pb ON pb.productanalytics_id = pa.id
-            LEFT JOIN badge_badge AS b ON b.badge_id = pb.badge_id
-            LEFT JOIN (SELECT * FROM sku_sku WHERE date_pretty = '{date_pretty}') AS sk ON sk.product_id = p.product_id
-            LEFT JOIN sku_skuanalytics AS sa ON sa.sku_id = sk.sku AND sa.date_pretty = pa.date_pretty;
+                sku_skuanalytics sa
+                JOIN sku_sku s ON sa.sku_id = s.sku
+            WHERE
+                sa.date_pretty = '{date_pretty_str}'
+            GROUP BY
+                s.product_id
             """
         )
-        cursor.execute("REFRESH MATERIALIZED VIEW uzum_product_analytics_view")
 
 
-def delete_product_analytics_view():
+def drop_materialized_view():
     with connection.cursor() as cursor:
-        cursor.execute("DROP MATERIALIZED VIEW IF EXISTS uzum_product_analytics_view;")
+        cursor.execute(
+            """
+        DROP MATERIALIZED VIEW IF EXISTS product_sku_analytics;
+        """
+        )

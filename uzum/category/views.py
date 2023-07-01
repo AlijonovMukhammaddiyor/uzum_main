@@ -1,3 +1,4 @@
+import json
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -8,7 +9,7 @@ import pandas as pd
 import pytz
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum
+from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum, Value, F, Func, JSONField
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -21,13 +22,15 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.generics import ListAPIView
 from uzum.category.pagination import CategoryProductsPagination
+from django.shortcuts import get_object_or_404
+from django.db.models.functions import Cast
 
 from uzum.category.utils import calculate_shop_analytics_in_category
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
 from uzum.sku.models import Sku, SkuAnalytics
 
 from .models import Category, CategoryAnalytics
-from .serializers import CategoryProductsSerializer, CategoryProductsViewSerializer, CategorySerializer
+from .serializers import CategoryProductsSerializer, ProductAnalyticsViewSerializer, CategorySerializer
 
 
 class CategoryTreeView(APIView):
@@ -90,8 +93,8 @@ class CategoryTreeView(APIView):
 class CategoryProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    serializer_class = CategoryProductsViewSerializer
-    # pagination_class = CategoryProductsPagination
+    serializer_class = ProductAnalyticsViewSerializer
+    pagination_class = CategoryProductsPagination
 
     def get_queryset(self):
         """
@@ -100,39 +103,15 @@ class CategoryProductsView(ListAPIView):
         """
         category_id = self.kwargs["category_id"]
         # Get the category
-        category = Category.objects.get(pk=category_id)
-
+        category = get_object_or_404(Category, pk=category_id)
+        date_pretty = get_today_pretty()
         # Get the descendant category IDs as a list of integers
         descendant_ids = list(map(int, category.descendants.split(",")))
 
         # Add the parent category ID to the list
         descendant_ids.append(category_id)
 
-        # Get the products for the category and its descendants from the view
-        products = (
-            ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
-            .values(
-                "product_id",
-                "product_title",
-                "orders_amount",
-                "available_amount",
-                "reviews_amount",
-                "shop_title",
-                "shop_link",
-                "category_id",
-                "photos",
-            )
-            .annotate(
-                badge_text_list=ArrayAgg("badge_text"),
-                badge_background_color_list=ArrayAgg("badge_background_color"),
-                badge_text_color_list=ArrayAgg("badge_text_color"),
-                purchase_price_list=ArrayAgg("purchase_price"),
-                full_price_list=ArrayAgg("full_price"),
-            )
-            .order_by("-orders_amount")
-        )
-
-        return products
+        return ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by("-orders_amount")
 
     def list(self, request, *args, **kwargs):
         start_time = time.time()
@@ -140,12 +119,6 @@ class CategoryProductsView(ListAPIView):
         response = super().list(request, *args, **kwargs)
         print(f"CATEGORY PRODUCTS: {time.time() - start_time} seconds")
         return response
-
-    @staticmethod
-    def dictfetchall(cursor):
-        """Return all rows from a cursor as a dict"""
-        columns = [col[0] for col in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
 class CategoryProductsPeriodComparisonView(APIView):

@@ -1,10 +1,12 @@
 from rest_framework.serializers import ModelSerializer
 from rest_framework import serializers
+from uzum.badge.models import Badge
 from uzum.badge.serializers import ProductBadgeSerializer
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
 from uzum.sku.models import Sku, SkuAnalytics
 from django.db.models import Prefetch
 from .models import Category, CategoryAnalytics
+from django.contrib.postgres.fields import JSONField
 
 
 class CategoryChildSerializer(ModelSerializer):
@@ -83,36 +85,32 @@ class CategoryProductsSerializer(ModelSerializer):
         return obj.product.skus.count()
 
 
-class CategoryProductBadgeSerializer(serializers.Serializer):
-    badge_text_list = serializers.ListField(child=serializers.CharField(), source="badge_text")
-    badge_background_color_list = serializers.ListField(child=serializers.CharField(), source="badge_background_color")
-    badge_text_color_list = serializers.ListField(child=serializers.CharField(), source="badge_text_color")
+class CategoryProductsSkusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SkuAnalytics
+        fields = ["purchase_price", "full_price", "available_amount"]
 
 
-class CategoryProductsViewSerializer(serializers.ModelSerializer):
-    purchase_price_list = serializers.ListField(child=serializers.FloatField())
-    full_price_list = serializers.ListField(child=serializers.FloatField())
-    badge_text_list = serializers.ListField(child=serializers.CharField())
-    badge_background_color_list = serializers.ListField(child=serializers.CharField())
-    badge_text_color_list = serializers.ListField(child=serializers.CharField())
+class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
+    sku_analytics = JSONField()
 
     class Meta:
         model = ProductAnalyticsView
         fields = [
             "product_id",
             "product_title",
-            "orders_amount",
-            "available_amount",
-            "reviews_amount",
+            "product_characteristics",
             "shop_title",
             "shop_link",
-            "badge_text_list",
-            "badge_background_color_list",
-            "badge_text_color_list",
-            "purchase_price_list",
-            "full_price_list",
-            "category_id",
-            "photos",
+            "product_available_amount",
+            "orders_amount",
+            "reviews_amount",
+            "rating",
+            "position_in_category",
+            "sku_analytics",
+            "badges",
+            "date_pretty",
+            "sku_analytics",
         ]
 
 

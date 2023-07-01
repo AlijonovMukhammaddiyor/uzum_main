@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytz
 from django.db import models
-from django.db.models import F, Window
+from django.db.models import F, Window, JSONField
 from django.db.models.functions import Rank
 
 from uzum.sku.models import get_day_before_pretty
@@ -78,31 +78,25 @@ class ProductAnalytics(models.Model):
     @staticmethod
     def set_position_in_shop(date_pretty=get_today_pretty()):
         try:
-            # Use a window function to rank products within their shop by orders_amount
+            # Use a window function to rank products within their shop and category by orders_amount
             product_analytics_to_update = ProductAnalytics.objects.filter(date_pretty=date_pretty).annotate(
-                position_in_shop=Window(
+                new_position_in_shop=Window(
                     expression=Rank(),
                     order_by=F("orders_amount").desc(),
                     partition_by=F("product__shop"),
-                )
-            )
-
-            # Iterate over the queryset to actually perform the updates
-            for pa in product_analytics_to_update:
-                pa.save(update_fields=["position_in_shop"])
-
-            # Now, do the same for position_in_category
-            product_analytics_to_update = ProductAnalytics.objects.filter(date_pretty=date_pretty).annotate(
-                position_in_category=Window(
+                ),
+                new_position_in_category=Window(
                     expression=Rank(),
                     order_by=F("orders_amount").desc(),
                     partition_by=F("product__category"),
-                )
+                ),
             )
 
             # Iterate over the queryset to actually perform the updates
             for pa in product_analytics_to_update:
-                pa.save(update_fields=["position_in_category"])
+                pa.position_in_shop = pa.new_position_in_shop
+                pa.position_in_category = pa.new_position_in_category
+                pa.save(update_fields=["position_in_shop", "position_in_category"])
         except Exception as e:
             print(e, "error in set_position_in_shop")
 
@@ -146,22 +140,22 @@ class ProductAnalytics(models.Model):
 
 
 class ProductAnalyticsView(models.Model):
-    id = models.AutoField(primary_key=True)
-    product_id = models.IntegerField()
+    product_id = models.IntegerField(primary_key=True)
     product_title = models.CharField(max_length=255)
+    product_characteristics = models.TextField(blank=True, null=True)
     orders_amount = models.IntegerField()
-    available_amount = models.IntegerField()
+    product_available_amount = models.IntegerField()
     reviews_amount = models.IntegerField()
+    rating = models.FloatField()
     shop_title = models.CharField(max_length=255)
     shop_link = models.TextField()
-    badge_text = models.TextField(blank=True, null=True)
-    badge_background_color = models.CharField(max_length=255, blank=True, null=True)
-    badge_text_color = models.CharField(max_length=255, blank=True, null=True)
-    purchase_price = models.FloatField()
-    full_price = models.FloatField()
     category_id = models.IntegerField()
     photos = models.TextField(blank=True, null=True)
+    date_pretty = models.CharField(max_length=255)
+    position_in_category = models.IntegerField(blank=True, null=True)
+    badges = models.TextField(blank=True, null=True)
+    sku_analytics = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = "uzum_product_analytics_view"
+        db_table = "product_sku_analytics"
