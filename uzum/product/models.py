@@ -93,7 +93,11 @@ class ProductAnalytics(models.Model):
             )
 
             # Iterate over the queryset to actually perform the updates
+            i = 0
             for pa in product_analytics_to_update:
+                if i % 1000 == 0:
+                    print("i", i)
+                i += 1
                 pa.position_in_shop = pa.new_position_in_shop
                 pa.position_in_category = pa.new_position_in_category
                 pa.save(update_fields=["position_in_shop", "position_in_category"])
