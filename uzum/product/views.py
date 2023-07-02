@@ -173,8 +173,6 @@ class ProductsView(APIView):
                 reviews_amount=Subquery(latest_analytics.values("reviews_amount")[:1]),
                 rating=Subquery(latest_analytics.values("rating")[:1]),
                 available_amount=Subquery(latest_analytics.values("available_amount")[:1]),
-                position=Subquery(latest_analytics.values("position")[:1]),
-                score=Subquery(latest_analytics.values("score")[:1]),
                 min_price=Subquery(min_price),
                 max_price=Subquery(max_price),
             ).order_by("-created_at")
@@ -312,8 +310,6 @@ class SimilarProductsViewByUzum(APIView):
                 reviews_amount=Subquery(latest_analytics.values("reviews_amount")[:1]),
                 rating=Subquery(latest_analytics.values("rating")[:1]),
                 available_amount=Subquery(latest_analytics.values("available_amount")[:1]),
-                position=Subquery(latest_analytics.values("position")[:1]),
-                score=Subquery(latest_analytics.values("score")[:1]),
                 min_price=Subquery(min_price),
                 max_price=Subquery(max_price),
             ).order_by("-created_at")
