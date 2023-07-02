@@ -35,8 +35,6 @@ class ShopAnalyticsSerializer(ModelSerializer):
             "total_reviews",
             "rating",
             "date_pretty",
-            "score",
-            "daily_position",
         ]
 
 
@@ -72,6 +70,4 @@ class ShopCompetitorsSerializer(ShopAnalyticsSerializer):
             "total_orders",
             "total_reviews",
             "rating",
-            "score",
-            "daily_position",
         ] + ["title", "description", "seller_id"]
