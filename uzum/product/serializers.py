@@ -22,8 +22,6 @@ class ExtendedProductSerializer(serializers.ModelSerializer):
     min_price = serializers.FloatField(read_only=True, default=-1)
     max_price = serializers.FloatField(read_only=True, default=-1)
     available_amount = serializers.IntegerField(read_only=True)
-    position = serializers.IntegerField(read_only=True)
-    score = serializers.FloatField(read_only=True)
     min_price = serializers.FloatField(read_only=True)
     max_price = serializers.FloatField(read_only=True)
     skus_count = serializers.IntegerField(read_only=True)

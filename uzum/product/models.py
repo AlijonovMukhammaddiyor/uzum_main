@@ -78,29 +78,43 @@ class ProductAnalytics(models.Model):
     @staticmethod
     def set_position_in_shop(date_pretty=get_today_pretty()):
         try:
-            # Use a window function to rank products within their shop and category by orders_amount
-            product_analytics_to_update = ProductAnalytics.objects.filter(date_pretty=date_pretty).annotate(
-                new_position_in_shop=Window(
-                    expression=Rank(),
-                    order_by=F("orders_amount").desc(),
-                    partition_by=F("product__shop"),
-                ),
-                new_position_in_category=Window(
-                    expression=Rank(),
-                    order_by=F("orders_amount").desc(),
-                    partition_by=F("product__category"),
-                ),
+            # Sort product analytics by orders_amount for each shop and category separately
+            sorted_product_analytics_in_shop = list(
+                ProductAnalytics.objects.filter(date_pretty=date_pretty).order_by("product__shop", "-orders_amount")
+            )
+            sorted_product_analytics_in_category = list(
+                ProductAnalytics.objects.filter(date_pretty=date_pretty).order_by(
+                    "product__category", "-orders_amount"
+                )
             )
 
-            # Iterate over the queryset to actually perform the updates
+            to_update = []  # List of objects to update
+
+            # Rank products within their shop by orders_amount
+            current_shop = None
+            current_rank = 1
             i = 0
-            for pa in product_analytics_to_update:
+            for pa in sorted_product_analytics_in_shop:
                 if i % 1000 == 0:
-                    print("i", i)
-                i += 1
-                pa.position_in_shop = pa.new_position_in_shop
-                pa.position_in_category = pa.new_position_in_category
-                pa.save(update_fields=["position_in_shop", "position_in_category"])
+                    print(i)
+                if current_shop != pa.product.shop:
+                    current_shop = pa.product.shop
+                    current_rank = 1  # Reset rank for the new shop
+                pa.position_in_shop = current_rank
+                current_rank += 1
+                to_update.append(pa)
+
+            # Rank products within their category by orders_amount
+            current_category = None
+            current_rank = 1
+            for pa in sorted_product_analytics_in_category:
+                if current_category != pa.product.category:
+                    current_category = pa.product.category
+                    current_rank = 1  # Reset rank for the new category
+                pa.position_in_category = current_rank
+                current_rank += 1
+                to_update.append(pa)
+
         except Exception as e:
             print(e, "error in set_position_in_shop")
 
