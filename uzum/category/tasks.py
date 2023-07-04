@@ -9,8 +9,7 @@ import httpx
 import pytz
 from asgiref.sync import async_to_sync
 from django.core.cache import cache
-from django.db import connection
-from django.db.models import Count
+from django.db import connection, transaction
 
 from config import celery_app
 from uzum.banner.models import Banner
@@ -144,22 +143,18 @@ def fetch_product_ids(date_pretty: str = get_today_pretty()):
 
     categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
     product_ids: list[int] = []
-    async_to_sync(get_all_product_ids_from_uzum)(
-        categories_filtered,
-        product_ids,
-        page_size=PAGE_SIZE,
+    async_to_sync(get_all_product_ids_from_uzum)(categories_filtered, product_ids, page_size=PAGE_SIZE)
+    product_ids = set(int(id) for id in product_ids)
+
+    existing_product_ids = set(
+        ProductAnalytics.objects.filter(date_pretty=date_pretty).values_list("product__product_id", flat=True)
     )
-    product_ids = set(product_ids)
+    existing_product_ids = set(int(id) for id in existing_product_ids)
 
-    aa = ProductAnalytics.objects.filter(date_pretty=date_pretty).values_list("product__product_id", flat=True)
+    print(f"Existing products: {len(existing_product_ids)}")
 
-    print("aa: ", len(aa))
-    print(len(list(aa)))
-    unfetched_product_ids = list(product_ids - set(aa))
-    # remove already fetched products from product_ids
-    # for product_id in product_ids:
-    #     if product_id not in aa:
-    #         unfetched_product_ids.append(product_id)
+    unfetched_product_ids = list(product_ids - existing_product_ids)
+    print(f"Unfetched products: {len(unfetched_product_ids)}")
 
     shop_analytics_done = {}
 
@@ -167,9 +162,15 @@ def fetch_product_ids(date_pretty: str = get_today_pretty()):
 
     for i in range(0, len(unfetched_product_ids), BATCH_SIZE):
         products_api: list[dict] = []
-        print(f"{i}/{len(unfetched_product_ids)}")
+        print(
+            f"Processing batch {i // BATCH_SIZE + 1}/{(len(unfetched_product_ids) + BATCH_SIZE - 1) // BATCH_SIZE}..."
+        )
         async_to_sync(get_product_details_via_ids)(unfetched_product_ids[i : i + BATCH_SIZE], products_api)
-        create_products_from_api(products_api, {}, shop_analytics_done)
+
+        # Wrap database interaction in a transaction
+        with transaction.atomic():
+            create_products_from_api(products_api, {}, shop_analytics_done)
+
         time.sleep(30)
         del products_api
 
