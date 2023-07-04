@@ -67,13 +67,13 @@ def update_uzum_data(args=None, **kwargs):
 
     time.sleep(600)
 
-    fetch_product_ids(product_ids)
+    fetch_product_ids()
 
     time.sleep(30)
 
     print("Setting banners...", product_associations, shop_association)
     print(product_associations, shop_association)
-    check_and_remove_duplicate_product_analytics(date_pretty)
+    bulk_remove_duplicate_product_analytics(date_pretty)
 
     for product_id, banners in product_associations.items():
         try:
@@ -139,16 +139,16 @@ def fetch_failed_products(product_ids: list[int]):
     del products_api
 
 
-def fetch_product_ids(product_ids, date_pretty: str = get_today_pretty()):
+def fetch_product_ids(date_pretty: str = get_today_pretty()):
     # create_and_update_categories()
 
-    # categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
-    # product_ids: list[int] = []
-    # async_to_sync(get_all_product_ids_from_uzum)(
-    #     categories_filtered,
-    #     product_ids,
-    #     page_size=PAGE_SIZE,
-    # )
+    categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
+    product_ids: list[int] = []
+    async_to_sync(get_all_product_ids_from_uzum)(
+        categories_filtered,
+        product_ids,
+        page_size=PAGE_SIZE,
+    )
     product_ids = set(product_ids)
 
     aa = ProductAnalytics.objects.filter(date_pretty=date_pretty).values_list("product__product_id", flat=True)
@@ -426,34 +426,30 @@ def drop_sku_analytics_view():
         )
 
 
-def check_and_remove_duplicate_product_analytics(date_pretty):
-    duplicates = (
-        ProductAnalytics.objects.filter(date_pretty=date_pretty)
-        .values("product")
-        .annotate(count=Count("product"))
-        .filter(count__gt=1)
-    )
+def bulk_remove_duplicate_product_analytics(date_pretty):
+    # SQL Query to get the most recent ProductAnalytics for each product on given date_pretty
+    sql = f"""
+    SELECT DISTINCT ON (product_id)
+        id
+    FROM
+        product_productanalytics
+    WHERE
+        date_pretty = '{date_pretty}'
+    ORDER BY
+        product_id, created_at DESC
+    """
 
-    if duplicates:
-        print("Found duplicates for the following products on {}:".format(date_pretty))
-        total_duplicates = 0
-        for duplicate in duplicates:
-            duplicate_count = duplicate["count"]
-            total_duplicates += duplicate_count - 1  # Subtract 1 since we're keeping one copy
+    with connection.cursor() as cursor:
+        cursor.execute(sql)
+        keep_ids = [row[0] for row in cursor.fetchall()]
 
-            # Get the ProductAnalytics objects for this product on this date
-            pa_duplicates = ProductAnalytics.objects.filter(date_pretty=date_pretty, product_id=duplicate["product"])
+    # Then, get all ProductAnalytics objects for given date_pretty but exclude those whose id are in keep_ids
+    pa_to_delete = ProductAnalytics.objects.filter(date_pretty=date_pretty).exclude(id__in=keep_ids)
 
-            # Order by created_at in descending order, so the first one is the most recent
-            pa_duplicates = pa_duplicates.order_by("-created_at")
+    # Count the number of entries about to be deleted
+    delete_count = pa_to_delete.count()
+    print(f"About to delete {delete_count} duplicate ProductAnalytics entries for {date_pretty}")
 
-            # Delete all but the first (most recent) one
-            for pa in pa_duplicates[1:]:
-                pa.delete()
-
-        print("Total duplicate ProductAnalytics entries: {}".format(total_duplicates))
-        print(
-            "Duplicate removal complete. {} duplicate ProductAnalytics entries were deleted.".format(total_duplicates)
-        )
-    else:
-        print("No duplicates found on {}.".format(date_pretty))
+    # Execute the delete operation
+    pa_to_delete.delete()
+    print(f"Deleted {delete_count} duplicate ProductAnalytics entries for {date_pretty}")

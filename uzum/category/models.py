@@ -189,7 +189,7 @@ class CategoryAnalytics(models.Model):
             print(e, "Error in update_totals_for_date")
 
     @staticmethod
-    def update_total_shops_for_date_optimized(date_pretty=get_today_pretty()):
+    def update_totals_for_shops_and_products(date_pretty=get_today_pretty()):
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -197,45 +197,7 @@ class CategoryAnalytics(models.Model):
                     WITH aggs AS (
                         SELECT
                             c."categoryId",
-                            COUNT(DISTINCT p.shop_id) as total_shops
-                        FROM
-                            category_category c
-                            LEFT JOIN product_product p ON p.category_id = ANY(
-                                CASE
-                                    WHEN c.descendants IS NULL THEN ARRAY[c."categoryId"]::integer[]
-                                    ELSE ARRAY[c."categoryId"] || string_to_array(c.descendants, ',')::integer[]
-                                END
-                            )
-                            LEFT JOIN product_productanalytics pa ON pa.product_id = p.product_id
-                        WHERE
-                            pa.date_pretty = %s
-                        GROUP BY
-                            c."categoryId"
-                    )
-                    UPDATE
-                        category_categoryanalytics cca
-                    SET
-                        total_shops = aggs.total_shops
-                    FROM
-                        aggs
-                    WHERE
-                        cca.category_id = aggs."categoryId"
-                        AND cca.date_pretty = %s
-                    """,
-                    [date_pretty, date_pretty],
-                )
-        except Exception as e:
-            print(e, "Error in update_total_shops_for_date_optimized")
-
-    @staticmethod
-    def update_total_products_for_date_optimized(date_pretty=get_today_pretty()):
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    WITH aggs AS (
-                        SELECT
-                            c."categoryId",
+                            COUNT(DISTINCT p.shop_id) as total_shops,
                             COUNT(DISTINCT pa.product_id) as total_products
                         FROM
                             category_category c
@@ -254,6 +216,7 @@ class CategoryAnalytics(models.Model):
                     UPDATE
                         category_categoryanalytics cca
                     SET
+                        total_shops = aggs.total_shops,
                         total_products = aggs.total_products
                     FROM
                         aggs
@@ -264,7 +227,7 @@ class CategoryAnalytics(models.Model):
                     [date_pretty, date_pretty],
                 )
         except Exception as e:
-            print(e, "Error in update_total_products_for_date_optimized")
+            print(e, "Error in update_totals_for_shops_and_products")
 
     @staticmethod
     def update_totals_with_sale(date_pretty=get_today_pretty()):
@@ -335,8 +298,7 @@ class CategoryAnalytics(models.Model):
     def update_analytics(date_pretty=get_today_pretty()):
         try:
             CategoryAnalytics.update_totals_for_date(date_pretty)
-            CategoryAnalytics.update_total_shops_for_date_optimized(date_pretty)
-            CategoryAnalytics.update_total_products_for_date_optimized(date_pretty)
+            CategoryAnalytics.update_totals_for_shops_and_products(date_pretty)
             CategoryAnalytics.update_totals_with_sale(date_pretty)
         except Exception as e:
             print(e, "Error in update_analytics")
