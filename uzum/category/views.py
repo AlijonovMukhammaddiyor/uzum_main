@@ -30,7 +30,12 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView,
 from uzum.sku.models import Sku, SkuAnalytics
 
 from .models import Category, CategoryAnalytics
-from .serializers import CategoryProductsSerializer, ProductAnalyticsViewSerializer, CategorySerializer
+from .serializers import (
+    CategoryAnalyticsSeralizer,
+    CategoryProductsSerializer,
+    ProductAnalyticsViewSerializer,
+    CategorySerializer,
+)
 
 
 class CategoryTreeView(APIView):
@@ -102,16 +107,25 @@ class CategoryProductsView(ListAPIView):
         the category as determined by the category portion of the URL.
         """
         category_id = self.kwargs["category_id"]
+        ordering = self.request.query_params.get("order", "desc")
+        column = self.request.query_params.get("column", "orders_amount")
+
+        order_by_column = column
+        if ordering == "desc":
+            order_by_column = f"-{column}"
         # Get the category
         category = get_object_or_404(Category, pk=category_id)
-        date_pretty = get_today_pretty()
         # Get the descendant category IDs as a list of integers
-        descendant_ids = list(map(int, category.descendants.split(",")))
+        if not category.descendants:
+            descendant_ids = [category_id]
+        else:
+            print(category.descendants)
+            descendant_ids = list(map(int, category.descendants.split(",")))
 
         # Add the parent category ID to the list
         descendant_ids.append(category_id)
 
-        return ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by("-orders_amount")
+        return ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by(order_by_column)
 
     def list(self, request, *args, **kwargs):
         start_time = time.time()
@@ -293,46 +307,17 @@ class CategoryProductsPeriodComparisonView(APIView):
 class CategoryDailyAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    serializer_class = CategorySerializer
+    serializer_class = CategoryAnalyticsSeralizer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination
 
     @staticmethod
-    def analytics(categories: list[Category], start_date: datetime):
+    def analytics(category: Category, start_date: datetime):
         try:
-            products_in_category = Product.objects.filter(category__in=categories)
+            category_analytics = CategoryAnalytics.objects.filter(category=category, created_at__gte=start_date)
 
-            sku_analytics = SkuAnalytics.objects.filter(
-                sku__product__in=products_in_category,
-                created_at__lte=start_date,
-            ).aggregate(
-                avg_purchase_price=Avg("purchase_price"),
-                avg_full_price=Avg("full_price"),
-            )
-
-            category_analytics = (
-                CategoryAnalytics.objects.filter(
-                    category__in=categories,
-                    created_at__lte=start_date,
-                )
-                .order_by("created_at")
-                .values(
-                    "date_pretty",
-                    "total_orders_amount",
-                    "total_reviews",
-                    "total_products",
-                    "total_shops",
-                    "total_shops_with_sales",
-                    "total_products_with_sales",
-                    "average_product_rating",
-                )
-            )
-
-            for ca in category_analytics:
-                ca.update(sku_analytics)
-
-            return list(category_analytics)
+            return CategoryAnalyticsSeralizer(category_analytics, many=True).data
 
         except Exception as e:
             print(e)
@@ -353,15 +338,12 @@ class CategoryDailyAnalyticsView(APIView):
                 "date_pretty": "2021-01-01",
                 "orders_amount": 10,
                 "total_products": 10,
-                "total_available_amount": 10,
-                "products_with_zero_available_amount": 10,
-                "shops_count": 10,
+                "total_review": 10,
+                "total_shops_with_sales": 10,
+                "total_shops": 10,
                 "average_purchase_price": 10.0,
-                "average_full_price": 10.0,
-                "average_rating":  5
-                "products_with_sales": 10,
-                "shops_with_sales": 10,
-                "reviews_amount": 10,
+                "average_product_rating":  5
+                "total_products_with_sales": 10,
             }]
         """
         try:
@@ -371,22 +353,14 @@ class CategoryDailyAnalyticsView(APIView):
                 datetime.now() - timedelta(days=int(range)), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
-            # start_date = timezone.make_aware(
-            #     datetime.strptime(start_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            # )
-            # end_date = timezone.make_aware(
-            #     datetime.strptime(end_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            # )
-
             category = Category.objects.get(categoryId=category_id)
-            categories = category.get_category_descendants(include_self=True)
-
-            category_analytics = self.analytics(categories, start_date)
+            category_analytics = self.analytics(category, start_date)
 
             return Response(
                 status=status.HTTP_200_OK,
                 data={
                     "data": category_analytics,
+                    "labels": [item["date_pretty"] for item in category_analytics],
                     "total": len(category_analytics),
                 },
             )

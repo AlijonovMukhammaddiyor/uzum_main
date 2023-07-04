@@ -32,7 +32,9 @@ def create_product_analytics_bulk(analytics):
         return None
 
 
-def create_products_from_api(produts_api: list[dict], product_campaigns: dict = None, shop_analytics_done: dict = None):
+def create_products_from_api(
+    produts_api: list[dict], product_campaigns: dict = None, shop_analytics_done: dict = None
+):
     try:
         print("Starting createProductsFromApi...")
         start_1 = time.time()
@@ -44,14 +46,10 @@ def create_products_from_api(produts_api: list[dict], product_campaigns: dict = 
         shops_list = []
 
         shops = Shop.objects.all()
-        shops_dict = {
-            shop.seller_id: shop for shop in shops
-        }
+        shops_dict = {shop.seller_id: shop for shop in shops}
 
         badges_ = Badge.objects.all()
-        badges_dict = {
-            badge.badge_id: badge for badge in badges_
-        }
+        badges_dict = {badge.badge_id: badge for badge in badges_}
 
         badges_to_set = {}
         total_new_products = 0
@@ -73,7 +71,7 @@ def create_products_from_api(produts_api: list[dict], product_campaigns: dict = 
                 shop_analytics_track=shop_analytics_track,
                 shops_dict=shops_dict,
                 badges_dict=badges_dict,
-                shop_analytics_done=shop_analytics_done
+                shop_analytics_done=shop_analytics_done,
             )
 
             products_analytics.append(product_analytic)

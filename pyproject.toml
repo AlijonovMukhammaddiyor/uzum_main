@@ -18,6 +18,7 @@ plugins = ["django_coverage_plugin"]
 [tool.black]
 line-length = 119
 target-version = ['py311']
+skip = "E203"
 
 
 # ==== isort ====
@@ -53,6 +54,8 @@ ignore_errors = true
 [tool.django-stubs]
 django_settings_module = "config.settings.test"
 
+[tool.flake8]
+max-line-length = 150
 
 # ==== PyLint ====
 [tool.pylint.MASTER]

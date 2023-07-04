@@ -3,12 +3,14 @@ import uuid
 from datetime import datetime, timedelta
 
 import pytz
-from django.db import models, transaction
-from django.db.models import Avg, Subquery, Sum, OuterRef
-
-from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from django.db import models
+from django.db.models import Subquery, OuterRef, F, Count
+from django.db.models.functions import Coalesce
+from django.db import connection
+from uzum.product.models import ProductAnalytics, get_today_pretty
 from uzum.shop.models import Shop
-from uzum.sku.models import SkuAnalytics, get_day_before_pretty
+from uzum.sku.models import get_day_before_pretty
+from django.utils import timezone
 
 
 class Category(models.Model):
@@ -137,105 +139,204 @@ class CategoryAnalytics(models.Model):
             return None
 
     @staticmethod
-    def set_all_analytics(date_pretty=get_today_pretty()):
+    def update_totals_for_date(date_pretty=get_today_pretty()):
         try:
-            # Fetch CategoryAnalytics objects for the specific date
-            category_analytics_on_date = CategoryAnalytics.objects.filter(date_pretty=date_pretty)
-
-            with transaction.atomic():
-                for category_analytics in category_analytics_on_date:
-                    category = category_analytics.category
-                    descendants = Category.get_descendants(category, include_self=True)
-
-                    # Get the latest ProductAnalytics for each product in the category
-                    latest_product_analytics = ProductAnalytics.objects.filter(
-                        product__category__in=descendants,
-                        created_at=Subquery(
-                            ProductAnalytics.objects.filter(product=OuterRef("product"))
-                            .order_by("-created_at")
-                            .values("created_at")[:1]
-                        ),
-                    )
-
-                    # Get the latest SkuAnalytics for each product in the category
-                    latest_sku_analytics = SkuAnalytics.objects.filter(
-                        sku__product__category__in=descendants,
-                        created_at=Subquery(
-                            SkuAnalytics.objects.filter(sku=OuterRef("sku"))
-                            .order_by("-created_at")
-                            .values("created_at")[:1]
-                        ),
-                    )
-
-                    # Calculate totals and averages
-                    total_orders = latest_product_analytics.aggregate(sum=Sum("orders_amount"))["sum"] or 0
-                    total_reviews = latest_product_analytics.aggregate(sum=Sum("reviews_amount"))["sum"] or 0
-                    average_product_rating = latest_product_analytics.aggregate(avg=Avg("rating"))["avg"] or 0
-
-                    # Calculate total_shops
-                    total_shops = Shop.objects.filter(products__category__in=descendants).distinct().count()
-
-                    # Get yesterday's analytics for comparison
-                    last_analytics = category_analytics.get_yesterday_category_analytics()
-
-                    if last_analytics:
-                        # Calculate total_shops_with_sales
-                        total_shops_with_sales = (
-                            Shop.objects.filter(
-                                products__category__in=descendants,
-                                products__productanalytics__orders_amount__gt=last_analytics.total_orders,
-                            )
-                            .distinct()
-                            .count()
+            date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH latest_pa AS (
+                        SELECT pa1.product_id, pa1.orders_amount, pa1.reviews_amount, pa1.rating
+                        FROM product_productanalytics pa1
+                        WHERE pa1.created_at = (
+                            SELECT MAX(pa2.created_at)
+                            FROM product_productanalytics pa2
+                            WHERE pa2.product_id = pa1.product_id AND pa2.created_at <= %s
                         )
-
-                        # Calculate total_products_with_sales
-                        total_products_with_sales = (
-                            Product.objects.filter(
-                                category__in=descendants,
-                                productanalytics__orders_amount__gt=last_analytics.total_orders,
+                    ),
+                    aggs AS (
+                        SELECT
+                            c."categoryId",
+                            SUM(lpa.orders_amount) as total_orders,
+                            SUM(lpa.reviews_amount) as total_reviews,
+                            AVG(NULLIF(lpa.rating, 0)) as average_rating
+                        FROM
+                            category_category c
+                            LEFT JOIN product_product p ON p.category_id = ANY(
+                                ARRAY[c."categoryId"]::integer[] || CASE WHEN c.descendants IS NOT NULL THEN string_to_array(c.descendants, ',')::integer[] ELSE ARRAY[]::integer[] END
                             )
-                            .distinct()
-                            .count()
-                        )
-                    else:
-                        total_shops_with_sales = total_shops
-                        total_products_with_sales = category_analytics.total_products
-
-                    # Calculate average_purchase_price
-                    total_purchase_price = latest_sku_analytics.aggregate(sum=Sum("purchase_price"))["sum"] or 0
-                    total_number_of_skus = latest_sku_analytics.count()
-                    average_purchase_price = total_purchase_price / total_number_of_skus if total_number_of_skus else 0
-
-                    # Update CategoryAnalytics
-                    category_analytics.total_orders = total_orders
-                    category_analytics.total_reviews = total_reviews
-                    category_analytics.average_product_rating = average_product_rating
-                    category_analytics.total_shops = total_shops
-                    category_analytics.total_shops_with_sales = total_shops_with_sales
-                    category_analytics.total_products_with_sales = total_products_with_sales
-                    category_analytics.average_purchase_price = average_purchase_price
-                    category_analytics.save()
-
+                            LEFT JOIN latest_pa lpa ON lpa.product_id = p.product_id
+                        GROUP BY
+                            c."categoryId"
+                    )
+                    UPDATE
+                        category_categoryanalytics cca
+                    SET
+                        total_orders = aggs.total_orders,
+                        total_reviews = aggs.total_reviews,
+                        average_product_rating = aggs.average_rating
+                    FROM
+                        aggs
+                    WHERE
+                        cca.category_id = aggs."categoryId"
+                        AND cca.date_pretty = %s
+                    """,
+                    [date, date_pretty],
+                )
         except Exception as e:
-            traceback.print_exc()
-            print("Error in set_all_analytics: ", e)
+            print(e, "Error in update_totals_for_date")
 
     @staticmethod
-    def update_total_shops_for_date(date_pretty=get_today_pretty()):
+    def update_total_shops_for_date_optimized(date_pretty=get_today_pretty()):
         try:
-            categories = Category.objects.all()
-
-            with transaction.atomic():
-                for category in categories:
-                    descendants = Category.get_descendants(category, include_self=True)
-
-                    shop_count = Product.objects.filter(category__in=descendants).values("shop").distinct().count()
-
-                    CategoryAnalytics.objects.filter(category=category, date_pretty=date_pretty).update(
-                        total_shops=shop_count
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH aggs AS (
+                        SELECT
+                            c."categoryId",
+                            COUNT(DISTINCT p.shop_id) as total_shops
+                        FROM
+                            category_category c
+                            LEFT JOIN product_product p ON p.category_id = ANY(
+                                CASE
+                                    WHEN c.descendants IS NULL THEN ARRAY[c."categoryId"]::integer[]
+                                    ELSE ARRAY[c."categoryId"] || string_to_array(c.descendants, ',')::integer[]
+                                END
+                            )
+                            LEFT JOIN product_productanalytics pa ON pa.product_id = p.product_id
+                        WHERE
+                            pa.date_pretty = %s
+                        GROUP BY
+                            c."categoryId"
                     )
-
+                    UPDATE
+                        category_categoryanalytics cca
+                    SET
+                        total_shops = aggs.total_shops
+                    FROM
+                        aggs
+                    WHERE
+                        cca.category_id = aggs."categoryId"
+                        AND cca.date_pretty = %s
+                    """,
+                    [date_pretty, date_pretty],
+                )
         except Exception as e:
-            traceback.print_exc()
-            print("Error in set_total_shops: ", e)
+            print(e, "Error in update_total_shops_for_date_optimized")
+
+    @staticmethod
+    def update_total_products_for_date_optimized(date_pretty=get_today_pretty()):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH aggs AS (
+                        SELECT
+                            c."categoryId",
+                            COUNT(DISTINCT pa.product_id) as total_products
+                        FROM
+                            category_category c
+                            LEFT JOIN product_product p ON p.category_id = ANY(
+                                CASE
+                                    WHEN c.descendants IS NULL THEN ARRAY[c."categoryId"]::integer[]
+                                    ELSE ARRAY[c."categoryId"] || string_to_array(c.descendants, ',')::integer[]
+                                END
+                            )
+                            LEFT JOIN product_productanalytics pa ON pa.product_id = p.product_id
+                        WHERE
+                            pa.date_pretty = %s
+                        GROUP BY
+                            c."categoryId"
+                    )
+                    UPDATE
+                        category_categoryanalytics cca
+                    SET
+                        total_products = aggs.total_products
+                    FROM
+                        aggs
+                    WHERE
+                        cca.category_id = aggs."categoryId"
+                        AND cca.date_pretty = %s
+                """,
+                    [date_pretty, date_pretty],
+                )
+        except Exception as e:
+            print(e, "Error in update_total_products_for_date_optimized")
+
+    @staticmethod
+    def update_totals_with_sale(date_pretty=get_today_pretty()):
+        try:
+            # Convert the date_pretty to a datetime object and set it to be timezone aware
+            date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH latest_pa AS (
+                        SELECT DISTINCT ON (product_id) *
+                        FROM product_productanalytics
+                        WHERE created_at < %s
+                        ORDER BY product_id, created_at DESC
+                    ),
+                    today_pa AS (
+                        SELECT *
+                        FROM product_productanalytics
+                        WHERE date_pretty = %s
+                    ),
+                    order_difference AS (
+                        SELECT
+                            today_pa.product_id,
+                            product_product.shop_id,
+                            (today_pa.orders_amount - COALESCE(latest_pa.orders_amount, 0)) AS difference
+                        FROM
+                            today_pa
+                            JOIN product_product ON today_pa.product_id = product_product.product_id
+                            LEFT JOIN latest_pa ON today_pa.product_id = latest_pa.product_id
+                    ),
+                    shops_and_products_with_sales AS (
+                        SELECT
+                            category_category."categoryId",
+                            COUNT(DISTINCT order_difference.shop_id) FILTER (WHERE order_difference.difference > 0) AS total_shops_with_sales,
+                            COUNT(DISTINCT order_difference.product_id) FILTER (WHERE order_difference.difference > 0) AS total_products_with_sales
+                        FROM
+                            category_category
+                            LEFT JOIN product_product ON product_product.category_id = ANY (
+                                CASE
+                                    WHEN category_category.descendants IS NULL THEN ARRAY[category_category."categoryId"]::integer[]
+                                    ELSE ARRAY[category_category."categoryId"] || string_to_array(category_category.descendants, ',')::integer[]
+                                END
+                            )
+                            LEFT JOIN order_difference ON order_difference.product_id = product_product.product_id
+                        GROUP BY
+                            category_category."categoryId"
+                    )
+                    UPDATE
+                        category_categoryanalytics
+                    SET
+                        total_shops_with_sales = shops_and_products_with_sales.total_shops_with_sales,
+                        total_products_with_sales = shops_and_products_with_sales.total_products_with_sales
+                    FROM
+                        shops_and_products_with_sales
+                    WHERE
+                        category_categoryanalytics.category_id = shops_and_products_with_sales."categoryId"
+                        AND category_categoryanalytics.date_pretty = %s
+                    """,
+                    [date, date_pretty, date_pretty],
+                )
+        except Exception as e:
+            print(e, "Error in update_totals_with_sale")
+
+    @staticmethod
+    def update_analytics(date_pretty=get_today_pretty()):
+        try:
+            CategoryAnalytics.update_totals_for_date(date_pretty)
+            CategoryAnalytics.update_total_shops_for_date_optimized(date_pretty)
+            CategoryAnalytics.update_total_products_for_date_optimized(date_pretty)
+            CategoryAnalytics.update_totals_with_sale(date_pretty)
+        except Exception as e:
+            print(e, "Error in update_analytics")
