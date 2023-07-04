@@ -1,6 +1,7 @@
 from uzum.jobs.helpers import get_random_user_agent
 
-MAX_OFFSET = 9952  # max offset for fetching product ids
+MAX_ID_COUNT = 10_000  # max number of product ids to fetch
+MAX_OFFSET = 9_999  # max offset for fetching product ids
 PAGE_SIZE = 100  # page size for fetching product ids
 MAX_PAGE_SIZE = 100  # max page size for fetching product ids
 PRODUCTIDS_CONCURRENT_REQUESTS = 30  # number of concurrent requests for fetching product ids

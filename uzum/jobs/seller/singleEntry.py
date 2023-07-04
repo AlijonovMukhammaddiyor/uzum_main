@@ -9,6 +9,7 @@ def find_shop(shopId: int):
     except Exception as _:
         return None
 
+
 def create_shop(shop: dict):
     try:
         result = Shop.objects.create(**shop)

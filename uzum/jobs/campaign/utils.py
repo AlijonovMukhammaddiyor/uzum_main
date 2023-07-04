@@ -14,7 +14,7 @@ from uzum.jobs.constants import (
     CATEGORIES_HEADER,
     MAIN_PAGE_PAYLOAD,
     MAIN_PAGE_URL,
-    MAX_OFFSET,
+    MAX_ID_COUNT,
     PAGE_SIZE,
     PRODUCTIDS_CONCURRENT_REQUESTS,
     PRODUCTS_URL,
@@ -118,7 +118,7 @@ def concurrent_requests_for_campaign_product_ids(offer_category_id: int, total: 
     try:
         start_time = time.time()
         promises = []
-        eligable_total = min(MAX_OFFSET + PAGE_SIZE, total)
+        eligable_total = min(MAX_ID_COUNT, total)
         num_req = math.ceil(eligable_total / PAGE_SIZE)
 
         for i in range(num_req):

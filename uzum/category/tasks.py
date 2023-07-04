@@ -10,21 +10,21 @@ import pytz
 from asgiref.sync import async_to_sync
 from django.core.cache import cache
 from django.db import connection
+from django.db.models import Count
 
 from config import celery_app
 from uzum.banner.models import Banner
 from uzum.category.models import Category, CategoryAnalytics
 from uzum.jobs.campaign.main import update_or_create_campaigns
-from uzum.jobs.campaign.utils import associate_with_shop_or_product, get_product_and_aku_ids
+from uzum.jobs.campaign.utils import associate_with_shop_or_product
 from uzum.jobs.category.main import create_and_update_categories
 from uzum.jobs.category.MultiEntry import get_categories_with_less_than_n_products
-from uzum.jobs.constants import CATEGORIES_HEADER, MAX_OFFSET, PAGE_SIZE, POPULAR_SEARCHES_PAYLOAD
+from uzum.jobs.constants import CATEGORIES_HEADER, MAX_ID_COUNT, PAGE_SIZE, POPULAR_SEARCHES_PAYLOAD
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.jobs.product.fetch_details import get_product_details_via_ids
 from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
 from uzum.jobs.product.MultiEntry import create_products_from_api
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
-from uzum.product.views import PopularWords
 from uzum.review.models import PopularSeaches
 from uzum.shop.models import Shop, ShopAnalytics
 
@@ -34,13 +34,14 @@ from uzum.shop.models import Shop, ShopAnalytics
 )
 def update_uzum_data(args=None, **kwargs):
     print(get_today_pretty())
+    date_pretty = get_today_pretty()
     print(datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%H:%M:%S" + " - " + "%d/%m/%Y"))
 
     create_and_update_categories()
     # await create_and_update_products()
 
     # 1. Get all categories which have less than N products
-    categories_filtered = get_categories_with_less_than_n_products(MAX_OFFSET + PAGE_SIZE)
+    categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
     product_ids: list[int] = []
     async_to_sync(get_all_product_ids_from_uzum)(
         categories_filtered,
@@ -66,16 +67,22 @@ def update_uzum_data(args=None, **kwargs):
 
     time.sleep(600)
 
-    fetch_product_ids(product_ids)
+    fetch_product_ids()
 
     time.sleep(30)
 
     print("Setting banners...", product_associations, shop_association)
     print(product_associations, shop_association)
+    bulk_remove_duplicate_product_analytics(date_pretty)
+
     for product_id, banners in product_associations.items():
         try:
             product = Product.objects.get(product_id=product_id)
-            product_analytics = ProductAnalytics.objects.get(product=product, date_pretty=get_today_pretty())
+            product_analytics = ProductAnalytics.objects.filter(product=product, date_pretty=get_today_pretty())
+
+            if len(product_analytics) > 1:
+                # get the most recently created analytics
+                product_analytics = product_analytics.order_by("-created_at").first()
 
             product_analytics.banners.set(banners)
             product_analytics.save()
@@ -88,6 +95,9 @@ def update_uzum_data(args=None, **kwargs):
         try:
             shop_an = ShopAnalytics.objects.filter(shop=Shop.objects.get(link=link), date_pretty=get_today_pretty())
 
+            if len(shop_an) > 1:
+                shop_an = shop_an.order_by("-created_at").first()
+
             if len(shop_an) == 0:
                 continue
             target = shop_an.order_by("-created_at").first()  # get most recently created analytics
@@ -98,10 +108,11 @@ def update_uzum_data(args=None, **kwargs):
         except Exception as e:
             print("Error in setting shop banner(s): ", e)
 
-    date_pretty = get_today_pretty()
-
     create_todays_searches()
+
     Category.update_descendants()
+    CategoryAnalytics.update_analytics(date_pretty)
+    ProductAnalytics.set_position_in_shop(date_pretty)
 
     shop_analytics = ShopAnalytics.objects.filter(date_pretty=date_pretty)
 
@@ -128,20 +139,22 @@ def fetch_failed_products(product_ids: list[int]):
     del products_api
 
 
-def fetch_product_ids(product_ids, date_pretty: str = get_today_pretty()):
+def fetch_product_ids(date_pretty: str = get_today_pretty()):
     # create_and_update_categories()
 
-    categories_filtered = get_categories_with_less_than_n_products(MAX_OFFSET + PAGE_SIZE)
-    # product_ids: list[int] = []
-    # async_to_sync(get_all_product_ids_from_uzum)(
-    #     categories_filtered,
-    #     product_ids,
-    #     page_size=PAGE_SIZE,
-    # )
+    categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
+    product_ids: list[int] = []
+    async_to_sync(get_all_product_ids_from_uzum)(
+        categories_filtered,
+        product_ids,
+        page_size=PAGE_SIZE,
+    )
     product_ids = set(product_ids)
 
     aa = ProductAnalytics.objects.filter(date_pretty=date_pretty).values_list("product__product_id", flat=True)
 
+    print("aa: ", len(aa))
+    print(len(list(aa)))
     unfetched_product_ids = list(product_ids - set(aa))
     # remove already fetched products from product_ids
     # for product_id in product_ids:
@@ -226,7 +239,7 @@ async def fetch_popular_seaches_from_uzum(words: list[str]):
                 make_request(
                     client=client,
                 )
-                for _ in range(100)
+                for _ in range(200)
             ]
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -304,6 +317,13 @@ def update_category_tree():
 
 # psql -h db-postgresql-blr1-80747-do-user-14120836-0.b.db.ondigitalocean.com -d defaultdb -U doadmin -p 25060
 def create_materialized_view(date_pretty_str):
+    # drop materialized view if exists
+    drop_materialized_view()
+    # drop sku analytics view if exists
+    drop_sku_analytics_view()
+    # create sku analytics view
+    create_sku_analytics_materialized_view(date_pretty_str)
+
     with connection.cursor() as cursor:
         cursor.execute(
             f"""
@@ -313,6 +333,7 @@ def create_materialized_view(date_pretty_str):
             pa.product_id,
             p.title AS product_title,
             p.category_id,
+            c.title AS category_title,  -- Added category_title here
             p.characteristics AS product_characteristics,
             p.photos,
             sh.title AS shop_title,
@@ -333,6 +354,7 @@ def create_materialized_view(date_pretty_str):
         FROM
             product_productanalytics pa
             JOIN product_product p ON pa.product_id = p.product_id
+            JOIN category_category c ON p.category_id = c."categoryId"  -- Added join with category table here
             JOIN shop_shop sh ON p.shop_id = sh.seller_id
             LEFT JOIN product_productanalytics_badges pb ON pa.id = pb.productanalytics_id
             LEFT JOIN badge_badge b ON pb.badge_id = b.badge_id
@@ -344,6 +366,7 @@ def create_materialized_view(date_pretty_str):
             pa.product_id,
             p.title,
             p.category_id,
+            c.title,  -- Added category_title here
             p.characteristics,
             p.photos,
             sh.title,
@@ -392,3 +415,41 @@ def drop_materialized_view():
         DROP MATERIALIZED VIEW IF EXISTS product_sku_analytics;
         """
         )
+
+
+def drop_sku_analytics_view():
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+        DROP MATERIALIZED VIEW IF EXISTS sku_analytics_view;
+        """
+        )
+
+
+def bulk_remove_duplicate_product_analytics(date_pretty):
+    # SQL Query to get the most recent ProductAnalytics for each product on given date_pretty
+    sql = f"""
+    SELECT DISTINCT ON (product_id)
+        id
+    FROM
+        product_productanalytics
+    WHERE
+        date_pretty = '{date_pretty}'
+    ORDER BY
+        product_id, created_at DESC
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql)
+        keep_ids = [row[0] for row in cursor.fetchall()]
+
+    # Then, get all ProductAnalytics objects for given date_pretty but exclude those whose id are in keep_ids
+    pa_to_delete = ProductAnalytics.objects.filter(date_pretty=date_pretty).exclude(id__in=keep_ids)
+
+    # Count the number of entries about to be deleted
+    delete_count = pa_to_delete.count()
+    print(f"About to delete {delete_count} duplicate ProductAnalytics entries for {date_pretty}")
+
+    # Execute the delete operation
+    pa_to_delete.delete()
+    print(f"Deleted {delete_count} duplicate ProductAnalytics entries for {date_pretty}")

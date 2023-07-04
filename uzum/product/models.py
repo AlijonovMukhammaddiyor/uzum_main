@@ -5,7 +5,7 @@ import pytz
 from django.db import models
 from django.db.models import F, Window, JSONField
 from django.db.models.functions import Rank
-
+from django.db import connection
 from uzum.sku.models import get_day_before_pretty
 
 
@@ -74,46 +74,91 @@ class ProductAnalytics(models.Model):
     date_pretty = models.CharField(max_length=255, null=True, blank=True, db_index=True, default=get_today_pretty)
     position_in_shop = models.IntegerField(default=0, null=True, blank=True)
     position_in_category = models.IntegerField(default=0, null=True, blank=True)
+    position = models.IntegerField(default=0, null=True, blank=True)
 
     @staticmethod
     def set_position_in_shop(date_pretty=get_today_pretty()):
         try:
             # Sort product analytics by orders_amount for each shop and category separately
-            sorted_product_analytics_in_shop = list(
-                ProductAnalytics.objects.filter(date_pretty=date_pretty).order_by("product__shop", "-orders_amount")
-            )
-            sorted_product_analytics_in_category = list(
-                ProductAnalytics.objects.filter(date_pretty=date_pretty).order_by(
-                    "product__category", "-orders_amount"
+            with connection.cursor() as cursor:
+                # Position in shop
+                cursor.execute(
+                    f"""
+                    WITH ranked_products AS (
+                        SELECT
+                            pa.id,
+                            RANK() OVER (
+                                PARTITION BY p.shop_id
+                                ORDER BY pa.orders_amount DESC
+                            ) as rank
+                        FROM
+                            product_productanalytics pa
+                        INNER JOIN
+                            product_product p ON pa.product_id = p.product_id
+                        WHERE
+                            pa.date_pretty = '{date_pretty}'
+                    )
+                    UPDATE
+                        product_productanalytics
+                    SET
+                        position_in_shop = ranked_products.rank
+                    FROM
+                        ranked_products
+                    WHERE
+                        product_productanalytics.id = ranked_products.id;
+                """
                 )
-            )
 
-            to_update = []  # List of objects to update
+                cursor.execute(
+                    f"""
+                    WITH ranked_products AS (
+                        SELECT
+                            pa.id,
+                            RANK() OVER (
+                                PARTITION BY p.category_id
+                                ORDER BY pa.orders_amount DESC
+                            ) as rank
+                        FROM
+                            product_productanalytics pa
+                        INNER JOIN
+                            product_product p ON pa.product_id = p.product_id
+                        WHERE
+                            pa.date_pretty = '{date_pretty}'
+                    )
+                    UPDATE
+                        product_productanalytics
+                    SET
+                        position_in_category = ranked_products.rank
+                    FROM
+                        ranked_products
+                    WHERE
+                        product_productanalytics.id = ranked_products.id;
+                """
+                )
 
-            # Rank products within their shop by orders_amount
-            current_shop = None
-            current_rank = 1
-            i = 0
-            for pa in sorted_product_analytics_in_shop:
-                if i % 1000 == 0:
-                    print(i)
-                if current_shop != pa.product.shop:
-                    current_shop = pa.product.shop
-                    current_rank = 1  # Reset rank for the new shop
-                pa.position_in_shop = current_rank
-                current_rank += 1
-                to_update.append(pa)
-
-            # Rank products within their category by orders_amount
-            current_category = None
-            current_rank = 1
-            for pa in sorted_product_analytics_in_category:
-                if current_category != pa.product.category:
-                    current_category = pa.product.category
-                    current_rank = 1  # Reset rank for the new category
-                pa.position_in_category = current_rank
-                current_rank += 1
-                to_update.append(pa)
+                cursor.execute(
+                    f"""
+                    WITH ranked_products AS (
+                        SELECT
+                            pa.id,
+                            RANK() OVER (
+                                ORDER BY pa.orders_amount DESC
+                            ) as rank
+                        FROM
+                            product_productanalytics pa
+                        WHERE
+                            pa.date_pretty = '{date_pretty}'
+                    )
+                    UPDATE
+                        product_productanalytics
+                    SET
+                        position = ranked_products.rank
+                    FROM
+                        ranked_products
+                    WHERE
+                        product_productanalytics.id = ranked_products.id;
+                """
+                )
 
         except Exception as e:
             print(e, "error in set_position_in_shop")
@@ -173,6 +218,7 @@ class ProductAnalyticsView(models.Model):
     position_in_category = models.IntegerField(blank=True, null=True)
     badges = models.TextField(blank=True, null=True)
     sku_analytics = models.TextField(blank=True, null=True)
+    category_title = models.CharField(max_length=255)
 
     class Meta:
         managed = False

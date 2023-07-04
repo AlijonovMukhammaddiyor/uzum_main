@@ -1,4 +1,3 @@
-
 from uzum.sku.models import Sku
 
 

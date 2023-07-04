@@ -32,7 +32,17 @@ class SimpleCategorySerializer(ModelSerializer):
 class CategoryAnalyticsSeralizer(ModelSerializer):
     class Meta:
         model = CategoryAnalytics
-        fields = "__all__"
+        fields = [
+            "total_products",
+            "total_orders",
+            "total_reviews",
+            "average_product_rating",
+            "total_shops",
+            "total_shops_with_sales",
+            "total_products_with_sales",
+            "average_purchase_price",
+            "date_pretty",
+        ]
         depth = 1
 
 
@@ -111,6 +121,9 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
             "badges",
             "date_pretty",
             "sku_analytics",
+            "photos",
+            "category_id",
+            "category_title",
         ]
 
 
