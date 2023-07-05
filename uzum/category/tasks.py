@@ -359,7 +359,7 @@ def create_materialized_view(date_pretty_str):
                     'badge_text_color', b.text_color
                 )
             )::text AS badges,
-            COALESCE(sa.sku_analytics, '[]') AS sku_analytics  -- Added sku_analytics here
+            COALESCE(sa.sku_analytics, '[]') AS sku_analytics,  -- Added sku_analytics
             COALESCE(avp.avg_purchase_price, 0) AS avg_purchase_price  -- Added avg_purchase_price here
         FROM
             product_productanalytics pa
@@ -387,16 +387,15 @@ def create_materialized_view(date_pretty_str):
             pa.reviews_amount,
             pa.rating,
             pa.position_in_category,
-            sa.sku_analytics;
+            sa.sku_analytics,
             avp.avg_purchase_price;  -- Added avg_purchase_price here
         """
         )
 
-    # We have already created the materialized view, so we don't need these views anymore
     # drop sku analytics materialized view if exists
-    drop_sku_analytics_view()
+    # drop_sku_analytics_view()
     # drop product_avg_purchase_price_view if exists
-    drop_product_avg_purchase_price_view()
+    # drop_product_avg_purchase_price_view()
 
 
 def create_sku_analytics_materialized_view(date_pretty_str):
