@@ -66,7 +66,7 @@ def update_uzum_data(args=None, **kwargs):
 
     time.sleep(600)
 
-    fetch_product_ids()
+    # fetch_product_ids()
 
     time.sleep(30)
 
@@ -79,7 +79,7 @@ def update_uzum_data(args=None, **kwargs):
             product = Product.objects.get(product_id=product_id)
             product_analytics = ProductAnalytics.objects.filter(product=product, date_pretty=get_today_pretty())
 
-            if len(product_analytics) > 1:
+            if len(product_analytics) > 0:
                 # get the most recently created analytics
                 product_analytics = product_analytics.order_by("-created_at").first()
 
@@ -94,7 +94,7 @@ def update_uzum_data(args=None, **kwargs):
         try:
             shop_an = ShopAnalytics.objects.filter(shop=Shop.objects.get(link=link), date_pretty=get_today_pretty())
 
-            if len(shop_an) > 1:
+            if len(shop_an) > 0:
                 shop_an = shop_an.order_by("-created_at").first()
 
             if len(shop_an) == 0:
@@ -118,6 +118,10 @@ def update_uzum_data(args=None, **kwargs):
     for shop_an in shop_analytics:
         shop_an.set_total_products()
 
+    print("Creating ProductAnalyticsView...")
+    start = time.time()
+    create_materialized_view(date_pretty)
+    print(f"ProductAnalyticsView created in {time.time() - start} seconds")
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
     return True
@@ -318,12 +322,16 @@ def update_category_tree():
 
 # psql -h db-postgresql-blr1-80747-do-user-14120836-0.b.db.ondigitalocean.com -d defaultdb -U doadmin -p 25060
 def create_materialized_view(date_pretty_str):
-    # drop materialized view if exists
+    # drop product analytics materialized view if exists
     drop_materialized_view()
     # drop sku analytics view if exists
     drop_sku_analytics_view()
+    # drop product_avg_purchase_price_view if exists
+    drop_product_avg_purchase_price_view()
     # create sku analytics view
     create_sku_analytics_materialized_view(date_pretty_str)
+    # create product avg purchase price view
+    create_product_avg_purchase_price_view(date_pretty_str)
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -351,7 +359,8 @@ def create_materialized_view(date_pretty_str):
                     'badge_text_color', b.text_color
                 )
             )::text AS badges,
-            COALESCE(sa.sku_analytics, '[]') AS sku_analytics  -- Added sku_analytics here
+            COALESCE(sa.sku_analytics, '[]') AS sku_analytics,  -- Added sku_analytics
+            COALESCE(avp.avg_purchase_price, 0) AS avg_purchase_price  -- Added avg_purchase_price here
         FROM
             product_productanalytics pa
             JOIN product_product p ON pa.product_id = p.product_id
@@ -360,6 +369,7 @@ def create_materialized_view(date_pretty_str):
             LEFT JOIN product_productanalytics_badges pb ON pa.id = pb.productanalytics_id
             LEFT JOIN badge_badge b ON pb.badge_id = b.badge_id
             LEFT JOIN sku_analytics_view sa ON pa.product_id = sa.product_id
+            LEFT JOIN product_avg_purchase_price_view avp ON pa.product_id = avp.product_id  -- Added join
         WHERE
             pa.date_pretty = '{date_pretty_str}'
         GROUP BY
@@ -377,9 +387,15 @@ def create_materialized_view(date_pretty_str):
             pa.reviews_amount,
             pa.rating,
             pa.position_in_category,
-            sa.sku_analytics;
+            sa.sku_analytics,
+            avp.avg_purchase_price;  -- Added avg_purchase_price here
         """
         )
+
+    # drop sku analytics materialized view if exists
+    # drop_sku_analytics_view()
+    # drop product_avg_purchase_price_view if exists
+    # drop_product_avg_purchase_price_view()
 
 
 def create_sku_analytics_materialized_view(date_pretty_str):
@@ -405,6 +421,34 @@ def create_sku_analytics_materialized_view(date_pretty_str):
                 sa.date_pretty = '{date_pretty_str}'
             GROUP BY
                 s.product_id
+            """
+        )
+
+
+def create_product_avg_purchase_price_view(date_pretty_str):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            CREATE MATERIALIZED VIEW product_avg_purchase_price_view AS
+            SELECT
+                s.product_id,
+                AVG(sa.purchase_price) AS avg_purchase_price
+            FROM
+                sku_skuanalytics sa
+                JOIN sku_sku s ON sa.sku_id = s.sku
+            WHERE
+                sa.date_pretty = '{date_pretty_str}'
+            GROUP BY
+                s.product_id
+            """
+        )
+
+
+def drop_product_avg_purchase_price_view():
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            DROP MATERIALIZED VIEW IF EXISTS product_avg_purchase_price_view
             """
         )
 

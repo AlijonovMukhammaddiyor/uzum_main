@@ -219,6 +219,7 @@ class ProductAnalyticsView(models.Model):
     badges = models.TextField(blank=True, null=True)
     sku_analytics = models.TextField(blank=True, null=True)
     category_title = models.CharField(max_length=255)
+    avg_purchase_price = models.FloatField(blank=True, null=True)
 
     class Meta:
         managed = False

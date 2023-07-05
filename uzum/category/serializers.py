@@ -102,8 +102,6 @@ class CategoryProductsSkusSerializer(serializers.ModelSerializer):
 
 
 class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
-    sku_analytics = JSONField()
-
     class Meta:
         model = ProductAnalyticsView
         fields = [
@@ -124,6 +122,7 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
             "photos",
             "category_id",
             "category_title",
+            "avg_purchase_price",
         ]
 
 

@@ -3,14 +3,15 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from django.http import HttpRequest
 
 import numpy as np
 import pandas as pd
 import pytz
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum, Value, F, Func, JSONField
-from django.contrib.postgres.aggregates import ArrayAgg
+from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum, Case, When, F, FloatField
+from django.db import connection
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -27,7 +28,7 @@ from django.db.models.functions import Cast
 
 from uzum.category.utils import calculate_shop_analytics_in_category
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
-from uzum.sku.models import Sku, SkuAnalytics
+from uzum.sku.models import Sku, SkuAnalytics, get_day_before_pretty
 
 from .models import Category, CategoryAnalytics
 from .serializers import (
@@ -117,9 +118,8 @@ class CategoryProductsView(ListAPIView):
         category = get_object_or_404(Category, pk=category_id)
         # Get the descendant category IDs as a list of integers
         if not category.descendants:
-            descendant_ids = [category_id]
+            descendant_ids = []
         else:
-            print(category.descendants)
             descendant_ids = list(map(int, category.descendants.split(",")))
 
         # Add the parent category ID to the list
@@ -133,6 +133,57 @@ class CategoryProductsView(ListAPIView):
         response = super().list(request, *args, **kwargs)
         print(f"CATEGORY PRODUCTS: {time.time() - start_time} seconds")
         return response
+
+
+class CategoryTopProductsView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = ProductAnalyticsViewSerializer
+    pagination_class = CategoryProductsPagination
+    allowed_methods = ["GET"]
+
+    def get_products(self, category_id):
+        """
+        This view should return a list of all the products for
+        the category as determined by the category portion of the URL.
+        """
+        # Get the category
+        category = get_object_or_404(Category, pk=category_id)
+        # Get the descendant category IDs as a list of integers
+        if not category.descendants:
+            descendant_ids = []
+        else:
+            descendant_ids = list(map(int, category.descendants.split(",")))
+
+        descendants = category.get_category_descendants(include_self=True)
+
+        # Add the parent category ID to the list
+        descendant_ids.append(category_id)
+
+        total_orders = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).aggregate(
+            Sum("orders_amount")
+        )["orders_amount__sum"]
+
+        descendants_count = CategoryAnalytics.objects.filter(
+            category__in=descendants, date_pretty=get_today_pretty()
+        ).count()
+
+        # return ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by("-orders_amount")[:5]
+        return {
+            "products": ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
+            .order_by("-orders_amount")[:10]
+            .values("product_id", "product_title", "orders_amount"),
+            "total_orders": total_orders,
+            "descendants": descendants_count - 1,
+            "total_products": ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).count(),
+        }
+
+    def get(self, request, category_id: int):
+        start_time = time.time()
+        print("CATEGORY TOP PRODUCTS")
+        products = self.get_products(category_id)
+        print(f"CATEGORY TOP PRODUCTS: {time.time() - start_time} seconds")
+        return Response(status=status.HTTP_200_OK, data=products)
 
 
 class CategoryProductsPeriodComparisonView(APIView):
@@ -315,7 +366,9 @@ class CategoryDailyAnalyticsView(APIView):
     @staticmethod
     def analytics(category: Category, start_date: datetime):
         try:
-            category_analytics = CategoryAnalytics.objects.filter(category=category, created_at__gte=start_date)
+            category_analytics = CategoryAnalytics.objects.filter(
+                category=category, created_at__gte=start_date
+            ).order_by("created_at")
 
             return CategoryAnalyticsSeralizer(category_analytics, many=True).data
 
@@ -348,14 +401,15 @@ class CategoryDailyAnalyticsView(APIView):
         """
         try:
             range = request.query_params.get("range", 15)
+            start = time.time()
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=int(range)), timezone=pytz.timezone("Asia/Tashkent")
+                datetime.now() - timedelta(days=int(range) + 1), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             category = Category.objects.get(categoryId=category_id)
             category_analytics = self.analytics(category, start_date)
-
+            print(f"Category analytics: {time.time() - start} seconds")
             return Response(
                 status=status.HTTP_200_OK,
                 data={
@@ -383,96 +437,55 @@ class SubcategoriesView(APIView):
 
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    serializer_class = CategorySerializer
+    serializer_class = CategoryAnalyticsSeralizer
     queryset = Category.objects.all()
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination
 
-    @staticmethod
-    def analytics(subcategory: Category, start_date: datetime, end_date: datetime):
-        try:
-            categories = subcategory.get_category_descendants(include_self=True)
-            products_in_category = Product.objects.filter(category__in=categories)
-
-            sku_analytics = SkuAnalytics.objects.filter(
-                sku__product__in=products_in_category,
-                created_at__range=(start_date, end_date),
-            ).aggregate(
-                avg_purchase_price=Avg("purchase_price"),
-                avg_full_price=Avg("full_price"),
-                zero_available_count=Count("id", filter=Q(available_amount=0)),
-            )
-
-            category_analytics = (
-                CategoryAnalytics.objects.filter(
-                    category__in=categories,
-                    created_at__range=(start_date, end_date),
-                )
-                .order_by("created_at")
-                .values(
-                    "date_pretty",
-                    "total_orders_amount",
-                    "total_reviews",
-                    "total_products",
-                    "total_shops",
-                    "total_shops_with_sales",
-                    "total_products_with_sales",
-                    "total_products_with_reviews",
-                    "average_product_rating",
-                )
-            )
-
-            for ca in category_analytics:
-                ca.update(sku_analytics)
-
-            # add subcategory title and id
-            for ca in category_analytics:
-                ca.update({"subcategory_id": subcategory.categoryId, "subcategory_title": subcategory.title})
-
-            return list(category_analytics)
-
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return []
-
     @extend_schema(tags=["Category"])
     def get(self, request: Request, category_id):
         try:
-            start_date_str = request.query_params.get("start_date")
-            end_date_str = request.query_params.get("end_date")
-
-            start_date = timezone.make_aware(
-                datetime.strptime(start_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            )
-            end_date = timezone.make_aware(
-                datetime.strptime(end_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            )
+            start = time.time()
 
             category = Category.objects.get(categoryId=category_id)
             children = category.children.all()
-
             if not children:
-                return Response(status=status.HTTP_200_OK, data={"data": []})
+                return Response(status=status.HTTP_200_OK, data={"data": [], "total": 0, "main": []})
+            date_pretty = get_today_pretty()
 
-            res = []
+            # Get main_analytics using raw SQL
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT ca.*, c.title AS category_title
+                    FROM category_categoryanalytics AS ca
+                    JOIN category_category AS c ON ca.category_id = c."categoryId"
+                    WHERE ca.category_id = %s AND ca.date_pretty = %s
+                """,
+                    [category_id, date_pretty],
+                )
+                main_analytics = dictfetchall(cursor)
 
-            # for child in children:
-            #     category_analytics = self.analytics(child, start_date, end_date)
-            #     res.append(category_analytics)
+            # Get children_analytics using raw SQL
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT ca.*, c.title AS category_title
+                    FROM category_categoryanalytics AS ca
+                    JOIN category_category AS c ON ca.category_id = c."categoryId"
+                    WHERE ca.category_id IN %s AND ca.date_pretty = %s
+                """,
+                    [tuple(child.categoryId for child in children), date_pretty],
+                )
+                children_analytics = dictfetchall(cursor)
 
-            # use threads instead of for loop
-
-            with ThreadPoolExecutor() as executor:
-                futures = [executor.submit(self.analytics, child, start_date, end_date) for child in children]
-                for future in as_completed(futures):
-                    res.append(future.result())
-
+            print("children_analytics", time.time() - start)
             return Response(
                 status=status.HTTP_200_OK,
                 data={
-                    "data": res,
-                    "total": len(res),
+                    "data": children_analytics,
+                    "total": len(children_analytics),
+                    "main": main_analytics,
                 },
             )
         except Category.DoesNotExist:
@@ -481,6 +494,12 @@ class SubcategoriesView(APIView):
             print(e)
             traceback.print_exc()
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def dictfetchall(cursor):
+    "Return all rows from a cursor as a dict"
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
 class CategoryPriceSegmentationView(APIView):
@@ -492,158 +511,90 @@ class CategoryPriceSegmentationView(APIView):
     pagination_class = PageNumberPagination
 
     @staticmethod
-    @transaction.atomic
-    def segmentation_by_price(category: Category, start_date: datetime, end_date: datetime, segments_count: int):
-        try:
-            # get lowest and highest prices in category
-            categories = category.get_category_descendants(include_self=True)
-            # Aggregate product prices
-            products = Product.objects.filter(
-                category__in=categories,
-            ).annotate(
-                avg_price=Avg("skus__analytics__purchase_price"),  # get average price across all SKUs of a product
-            )
+    def calculate_segment(segment_min_price, segment_max_price, products):
+        segment_products = products.filter(avg_purchase_price__range=(segment_min_price, segment_max_price))
 
-            start_time = time.time()
-            df = pd.DataFrame(list(products.values("product_id", "avg_price")))
-
-            # Calculate quantiles
-            quantiles = np.linspace(0, 1, segments_count + 1)
-            bins = df["avg_price"].quantile(quantiles).values
-            print("Quantiles calculated in", time.time() - start_time, "seconds")
-
-            segments = []
-
-            with ThreadPoolExecutor(max_workers=segments_count) as executor:
-                futures = []
-
-                for i in range(segments_count):
-                    segment_min_price = bins[i]
-                    segment_max_price = bins[i + 1]
-                    futures.append(
-                        executor.submit(
-                            CategoryPriceSegmentationView.calculate_segment,
-                            segment_min_price,
-                            segment_max_price,
-                            start_date,
-                            end_date,
-                            products,
-                        )
-                    )
-
-                for future in as_completed(futures):
-                    segments.append(future.result())
-
-            return segments
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return []
-
-    @staticmethod
-    def calculate_segment(segment_min_price, segment_max_price, start_date, end_date, products):
-        segment_products = products.filter(avg_price__range=(segment_min_price, segment_max_price))
-
-        start_orders = ProductAnalytics.objects.filter(
-            created_at=start_date,
-            product__in=segment_products,
-        ).aggregate(
-            total_orders=Sum("orders_amount")
-        )["total_orders"]
-
-        end_orders = ProductAnalytics.objects.filter(
-            created_at=end_date,
-            product__in=segment_products,
-        ).aggregate(
-            total_orders=Sum("orders_amount")
-        )["total_orders"]
-
-        # Calculate the difference in total orders
-        total_orders_delta = end_orders - start_orders if start_orders and end_orders else 0
-
-        segment_analytics = ProductAnalytics.objects.filter(
-            product__in=segment_products,
-            created_at__range=(start_date, end_date),
-        ).aggregate(
+        segment_analytics = segment_products.aggregate(
             total_products=Count("product_id", distinct=True),
-            new_products=Count(
-                "product_id", filter=Q(product__created_at__range=(start_date, end_date)), distinct=True
-            ),
-            total_shops=Count("product__shop", distinct=True),
-            new_shops=Count(
-                "product__shop",
-                filter=Q(product__shop__created_at__range=(start_date, end_date)),
-                distinct=True,
-            ),
-            total_shops_with_sales=Count("product__shop", filter=Q(orders_amount__gt=0), distinct=True),
-            total_products_with_sales=Count("product_id", filter=Q(orders_amount__gt=0), distinct=True),
-            average_purchase_price=Avg("orders_money"),
+            total_shops=Count("shop_link", distinct=True),
+            total_orders=Sum("orders_amount"),
+            total_reviews=Sum("reviews_amount"),
+            average_rating=Avg("rating"),
+            avg_purchase_price=Avg("avg_purchase_price"),
         )
 
         return {
             "from": segment_min_price,
             "to": segment_max_price,
             **segment_analytics,
-            "total_orders": total_orders_delta,
         }
 
     @extend_schema(tags=["Category"])
     def get(self, request: Request, category_id):
-        """
-        For this endpoint, we need to get the following data:
-        -
-        Args:
-            request (Request): _description_
-            category_id (_type_): _description_
+        start_time = time.time()
+        # range_count = request.query_params.get("range", 15)
+        segments_count = request.query_params.get("segments_count", 15)
 
-        Returns:
-            [{
-                from: 0,
-                to: $100,
-                total_orders: 100,
-                new-products: 100, # How: CategoryAnalytics.total_products now - CategoryAnalytics.total_products before
-                total_products: 100, # How: CategoryAnalytics.total_products now
-                total_shops: 100, # How: CategoryAnalytics.total_shops now
-                new_shops: 100, # How: CategoryAnalytics.total_shops now - CategoryAnalytics.total_shops before
-                total_shops_with_sales: 100,
-                total_products_with_sales: 100,
-                average_price_per_order: 100,
-            }]
-        """
-        try:
-            start_time = time.time()
-            start_date_str = request.query_params.get("start_date")
-            end_date_str = request.query_params.get("end_date")
-            segments_count = request.query_params.get("segments_count")
-            if not segments_count:
-                segments_count = 15
-            else:
-                segments_count = int(segments_count)
+        segments_count = int(segments_count)
 
-            start_date = timezone.make_aware(
-                datetime.strptime(start_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+        # start_date = timezone.make_aware(
+        #     datetime.now() - timedelta(days=int(range_count) + 1), timezone=pytz.timezone("Asia/Tashkent")
+        # ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+        category = Category.objects.get(categoryId=category_id)
+        if not category.descendants:
+            descendant_ids = []
+        else:
+            descendant_ids = list(map(int, category.descendants.split(",")))
+
+        # Add the parent category ID to the list
+        descendant_ids.append(category_id)
+        products = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
+        start = time.time()
+        df = pd.DataFrame(list(products.values("product_id", "avg_purchase_price")))
+
+        # Use pandas qcut to divide the products into 'segments_count' quantiles.
+        # The result is a pandas series where the value of each product is the bin it belongs to.
+        bin_series = pd.qcut(df["avg_purchase_price"], segments_count, labels=False, duplicates="drop")
+
+        # We then get the range of each bin using the groupby operation on the dataframe
+        bins_df = df.groupby(bin_series).agg({"avg_purchase_price": ["min", "max"]})
+
+        # Convert the bin ranges into a list of tuples and round to nearest 1000
+        bins = [
+            (
+                np.floor(row[1]["avg_purchase_price"]["min"] / 1000) * 1000,
+                np.ceil(row[1]["avg_purchase_price"]["max"] / 1000) * 1000,
             )
-            end_date = timezone.make_aware(
-                datetime.strptime(end_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            )
+            for row in bins_df.iterrows()
+        ]
 
-            category = Category.objects.get(categoryId=category_id)
+        segments = []
 
-            category_analytics = self.segmentation_by_price(category, start_date, end_date, segments_count)
-            print(f"Category analytics took {time.time() - start_time} seconds")
-            return Response(
-                status=status.HTTP_200_OK,
-                data={
-                    "data": category_analytics,
-                },
-            )
+        with ThreadPoolExecutor(max_workers=segments_count) as executor:
+            futures = []
+            for i in range(len(bins)):
+                (segment_min_price, segment_max_price) = bins[i]
+                futures.append(
+                    executor.submit(
+                        self.calculate_segment,
+                        segment_min_price,
+                        segment_max_price,
+                        # start_date,
+                        products,
+                    )
+                )
 
-        except Category.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND, data={"message": "Category not found"})
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            for future in as_completed(futures):
+                segments.append(future.result())
+
+        print(f"Category Segmentation took {time.time() - start_time} seconds")
+        return Response(
+            status=status.HTTP_200_OK,
+            data={
+                "data": segments,
+            },
+        )
 
 
 class CategoryShopsView(APIView):
@@ -667,41 +618,41 @@ class CategoryShopsView(APIView):
 
     @extend_schema(tags=["Category"])
     def get(self, request: Request, category_id):
-        """
-        For this endpoint, we need to get the following data:
-        -
-        Args:
-            request (Request): request should contain start_date and end_date
-            category_id (_type_): categoryId
-
-        Returns:
-            [{
-                shop_title: "Shop title",
-                shop_id: 1,
-
-            }]
-        """
         try:
             start_time = time.time()
-            start_date_str = request.query_params.get("start_date")
-            end_date_str = request.query_params.get("end_date")
-
-            start_date = timezone.make_aware(
-                datetime.strptime(start_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            )
-            end_date = timezone.make_aware(
-                datetime.strptime(end_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            )
-
             category = Category.objects.get(categoryId=category_id)
 
-            category_analytics = self.shops_share(category, start_date, end_date)
+            if category.descendants:
+                descendant_ids = list(map(int, category.descendants.split(",")))
+            else:
+                descendant_ids = []
 
-            print(f"Category shops took {time.time() - start_time} seconds")
+            # Add the parent category ID to the list
+            descendant_ids.append(category_id)
+            shops = (
+                ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
+                .values("shop_link", "shop_title")  # group by shop_link and shop_title
+                .annotate(
+                    total_orders=Sum("orders_amount"),
+                    total_products=Count("product_id", distinct=True),
+                    total_reviews=Sum("reviews_amount"),
+                    average_product_rating=Avg(
+                        Case(
+                            When(rating__gt=0, then=F("rating")),  # only consider rating when it's greater than 0
+                            default=None,
+                            output_field=FloatField(),
+                        )
+                    ),
+                    avg_purchase_price=Avg("avg_purchase_price"),
+                )
+            )
+
+            data = list(shops)
+
             return Response(
                 status=status.HTTP_200_OK,
                 data={
-                    "data": category_analytics,
+                    "data": data,
                 },
             )
 

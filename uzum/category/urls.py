@@ -15,6 +15,11 @@ urlpatterns = [
         name="category-products",
     ),
     path(
+        "products/top/<int:category_id>/",
+        views.CategoryTopProductsView.as_view(),
+        name="category-products",
+    ),
+    path(
         "products/comparison/<int:category_id>/",
         cache_page(seconds_until_midnight())(views.CategoryProductsPeriodComparisonView.as_view()),
         name="category-products",

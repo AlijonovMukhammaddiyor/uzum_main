@@ -229,7 +229,7 @@ def get_average_price_per_order(category: Category, start_date: datetime.datetim
     return total_price / total_orders
 
 
-def gini_coefficient(category: Category, date: datetime.datetime):
+def gini_coefficient(category: Category, date_pretty: str):
     """
     This function calculates Gini coefficient for a category on a given date
     Args:
@@ -244,7 +244,7 @@ def gini_coefficient(category: Category, date: datetime.datetime):
     categories = Category.get_descendants(category, include_self=True)
 
     shop_analytics = (
-        ShopAnalytics.objects.filter(categories__in=categories, date_pretty=date.strftime("%Y-%m-%d"))
+        ShopAnalytics.objects.filter(categories__in=categories, date_pretty=date_pretty)
         .distinct()
         .order_by("total_orders")
     )
@@ -261,7 +261,7 @@ def gini_coefficient(category: Category, date: datetime.datetime):
     return gini_coefficient
 
 
-def HHI(category: Category, date: datetime.datetime):
+def HHI(category: Category, date_pretty: str):
     """
     This function calculates Herfindahl-Hirschman Index for a category on a given date
     Args:
@@ -272,10 +272,10 @@ def HHI(category: Category, date: datetime.datetime):
         _type_: _description_
     """
     categories = category.get_descendants(include_self=True)
-    total_orders = CategoryAnalytics.objects.get(category=category, date_pretty=date.strftime("%Y-%m-%d")).total_orders
+    total_orders = CategoryAnalytics.objects.get(category=category, date_pretty=date_pretty).total_orders
 
     shop_analytics = (
-        ShopAnalytics.objects.filter(categories__in=categories, date_pretty=date.strftime("%Y-%m-%d"))
+        ShopAnalytics.objects.filter(categories__in=categories, date_pretty=date_pretty)
         .distinct()
         .order_by("total_orders")
     )
@@ -285,7 +285,7 @@ def HHI(category: Category, date: datetime.datetime):
     return sum(shop_market_shares)
 
 
-def concentration_ratio(category: Category, N, date: datetime.datetime):
+def concentration_ratio(category: Category, date_pretty: str, N: int = 5):
     """
     This function calculates concentration ratio for a category
     Args:
@@ -298,7 +298,7 @@ def concentration_ratio(category: Category, N, date: datetime.datetime):
     categories = category.get_descendants(include_self=True)
 
     shop_analytics = (
-        ShopAnalytics.objects.filter(categories__in=categories, date_pretty=date.strftime("%Y-%m-%d"))
+        ShopAnalytics.objects.filter(categories__in=categories, date_pretty=date_pretty)
         .distinct()
         .order_by("total_orders")
     )
@@ -306,12 +306,12 @@ def concentration_ratio(category: Category, N, date: datetime.datetime):
     top_n_shops = shop_analytics[:N]
 
     top_n_orders = sum(shop.total_orders for shop in top_n_shops)
-    total_orders = CategoryAnalytics.objects.get(category=category, date_pretty=date.strftime("%Y-%m-%d")).total_orders
+    total_orders = CategoryAnalytics.objects.get(category=category, date_pretty=date_pretty).total_orders
 
     return top_n_orders / total_orders
 
 
-def growth_rate(category: Category, date: datetime.datetime, period: int = 7):
+def growth_rate(category: Category, date_pretty: datetime.datetime, period: int = 7):
     """
     This function calculates growth rate for a category
     Args:
@@ -321,14 +321,15 @@ def growth_rate(category: Category, date: datetime.datetime, period: int = 7):
     Returns:
         _type_: _description_
     """
-    period_ago = date - datetime.timedelta(days=period)
+    date = datetime.datetime.strptime(date_pretty, "%Y-%m-%d").astimezone(pytz.timezone("Asia/Tashkent"))
+    period_ago = ((date - datetime.timedelta(days=period)).replace(tzinfo=pytz.timezone("Asia/Tashkent"))).strftime(
+        "%Y-%m-%d"
+    )
     current_orders = CategoryAnalytics.objects.get(
         category=category, date_pretty=date.strftime("%Y-%m-%d")
     ).total_orders
     try:
-        previous_orders = CategoryAnalytics.objects.get(
-            category=category, date_pretty=period_ago.strftime("%Y-%m-%d")
-        ).total_orders
+        previous_orders = CategoryAnalytics.objects.get(category=category, date_pretty=period_ago).total_orders
 
         return (current_orders - previous_orders) / previous_orders
     except CategoryAnalytics.DoesNotExist:
@@ -347,10 +348,10 @@ def calculate_market_opportunity_index(category: Category, date: datetime.dateti
     return market_opportunity_index
 
 
-def calculate_competitiveness_index(category: Category, date: datetime.datetime):
-    cat_analytics = CategoryAnalytics.objects.get(category=category, date_pretty=date.strftime("%Y-%m-%d"))
+def calculate_competitiveness_index(category: Category, date_pretty: str):
+    cat_analytics = CategoryAnalytics.objects.get(category=category, date_pretty=date_pretty)
     total_shops = cat_analytics.total_shops
-    gini_c = gini_coefficient(category, date)
+    gini_c = gini_coefficient(category, date_pretty)
 
     competitiveness_index = total_shops * (1 - gini_c)
 

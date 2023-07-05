@@ -324,7 +324,7 @@ def prepareSku(sku_api: dict, product_id: int, characteristics: list[dict]):
 def extract_product_photos(product_photos: list[dict]):
     photos = []
     for photo_obj in product_photos:
-        url = photo_obj["photo"]["24034"]["high"]
+        url = photo_obj["photo"]["800"]["high"]
         photos.append(url)
 
     return photos
