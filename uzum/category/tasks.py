@@ -115,8 +115,7 @@ def update_uzum_data(args=None, **kwargs):
 
     shop_analytics = ShopAnalytics.objects.filter(date_pretty=date_pretty)
 
-    for shop_an in shop_analytics:
-        shop_an.set_total_products()
+    ShopAnalytics.set_categories(date_pretty)
 
     print("Creating ProductAnalyticsView...")
     start = time.time()
