@@ -27,14 +27,13 @@ class ShopAnalyticsSerializer(ModelSerializer):
     class Meta:
         model = ShopAnalytics
         fields = [
-            "id",
-            "shop",
-            "created_at",
             "total_products",
             "total_orders",
             "total_reviews",
             "rating",
             "date_pretty",
+            "position",
+            "average_purchase_price",
         ]
 
 

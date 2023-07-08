@@ -10,7 +10,7 @@ import pandas as pd
 import pytz
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Avg, Count, OuterRef, Q, Subquery, Sum, Case, When, F, FloatField
+from django.db.models import Avg, Count, OuterRef, Subquery, Sum, Case, When, F, FloatField
 from django.db import connection
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -28,12 +28,11 @@ from django.db.models.functions import Cast
 
 from uzum.category.utils import calculate_shop_analytics_in_category
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
-from uzum.sku.models import Sku, SkuAnalytics, get_day_before_pretty
+from uzum.sku.models import SkuAnalytics
 
 from .models import Category, CategoryAnalytics
 from .serializers import (
     CategoryAnalyticsSeralizer,
-    CategoryProductsSerializer,
     ProductAnalyticsViewSerializer,
     CategorySerializer,
 )
