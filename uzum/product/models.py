@@ -77,7 +77,7 @@ class ProductAnalytics(models.Model):
     position = models.IntegerField(default=0, null=True, blank=True)
 
     @staticmethod
-    def set_position_in_shop(date_pretty=get_today_pretty()):
+    def set_positions(date_pretty=get_today_pretty()):
         try:
             # Sort product analytics by orders_amount for each shop and category separately
             with connection.cursor() as cursor:

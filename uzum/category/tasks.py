@@ -26,6 +26,7 @@ from uzum.jobs.product.MultiEntry import create_products_from_api
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.review.models import PopularSeaches
 from uzum.shop.models import Shop, ShopAnalytics
+from uzum.sku.models import SkuAnalytics
 
 
 @celery_app.task(
@@ -109,18 +110,32 @@ def update_uzum_data(args=None, **kwargs):
 
     create_todays_searches()
 
+    bulk_remove_duplicate_product_analytics(date_pretty)
+    bulk_remove_duplicate_shop_analytics(date_pretty)
+    bulk_remove_duplicate_sku_analytics(date_pretty)
+
+    print("Updating Category Descendants...")
+    start = time.time()
     Category.update_descendants()
+    print(f"Category Descendants updated in {time.time() - start} seconds")
+    print("Updating Category Analytics...")
+    start = time.time()
     CategoryAnalytics.update_analytics(date_pretty)
-    ProductAnalytics.set_position_in_shop(date_pretty)
+    print(f"Category Analytics updated in {time.time() - start} seconds")
+    print("Updating ProductAnalytics positions...")
+    start = time.time()
+    ProductAnalytics.set_positions(date_pretty)
+    print(f"ProductAnalytics positions updated in {time.time() - start} seconds")
 
-    shop_analytics = ShopAnalytics.objects.filter(date_pretty=date_pretty)
-
-    ShopAnalytics.set_categories(date_pretty)
-
-    print("Creating ProductAnalyticsView...")
+    print("Creating Materialized View...")
     start = time.time()
     create_materialized_view(date_pretty)
-    print(f"ProductAnalyticsView created in {time.time() - start} seconds")
+    print(f"Materialized View created in {time.time() - start} seconds")
+
+    print("ShopAnalytics updating...")
+    start = time.time()
+    ShopAnalytics.update_analytics(date_pretty)
+    print(f"ShopAnalytics updated in {time.time() - start} seconds")
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
     return True
@@ -351,6 +366,8 @@ def create_materialized_view(date_pretty_str):
             pa.reviews_amount,
             pa.rating,
             pa.position_in_category,
+            pa.position_in_shop,
+            pa.position,
             jsonb_agg(
                 json_build_object(
                     'badge_text', b.text,
@@ -386,6 +403,8 @@ def create_materialized_view(date_pretty_str):
             pa.reviews_amount,
             pa.rating,
             pa.position_in_category,
+            pa.position_in_shop,
+            pa.position,
             sa.sku_analytics,
             avp.avg_purchase_price;  -- Added avg_purchase_price here
         """
@@ -497,3 +516,61 @@ def bulk_remove_duplicate_product_analytics(date_pretty):
     # Execute the delete operation
     pa_to_delete.delete()
     print(f"Deleted {delete_count} duplicate ProductAnalytics entries for {date_pretty}")
+
+
+def bulk_remove_duplicate_shop_analytics(date_pretty):
+    # SQL Query to get the most recent ShopAnalytics for each shop on given date_pretty
+    sql = f"""
+    SELECT DISTINCT ON (shop_id)
+        id
+    FROM
+        shop_shopanalytics
+    WHERE
+        date_pretty = '{date_pretty}'
+    ORDER BY
+        shop_id, created_at DESC
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql)
+        keep_ids = [row[0] for row in cursor.fetchall()]
+
+    # Then, get all ShopAnalytics objects for given date_pretty but exclude those whose id are in keep_ids
+    sa_to_delete = ShopAnalytics.objects.filter(date_pretty=date_pretty).exclude(id__in=keep_ids)
+
+    # Count the number of entries about to be deleted
+    delete_count = sa_to_delete.count()
+    print(f"About to delete {delete_count} duplicate ShopAnalytics entries for {date_pretty}")
+
+    # Execute the delete operation
+    sa_to_delete.delete()
+    print(f"Deleted {delete_count} duplicate ShopAnalytics entries for {date_pretty}")
+
+
+def bulk_remove_duplicate_sku_analytics(date_pretty):
+    # SQL Query to get the most recent ShopAnalytics for each shop on given date_pretty
+    sql = f"""
+    SELECT DISTINCT ON (sku_id)
+        id
+    FROM
+        sku_skuanalytics
+    WHERE
+        date_pretty = '{date_pretty}'
+    ORDER BY
+        sku_id, created_at DESC
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql)
+        keep_ids = [row[0] for row in cursor.fetchall()]
+
+    # Then, get all SkuAnalytics objects for given date_pretty but exclude those whose id are in keep_ids
+    sa_to_delete = SkuAnalytics.objects.filter(date_pretty=date_pretty).exclude(id__in=keep_ids)
+
+    # Count the number of entries about to be deleted
+    delete_count = sa_to_delete.count()
+    print(f"About to delete {delete_count} duplicate SkuAnalytics entries for {date_pretty}")
+
+    # Execute the delete operation
+    # sa_to_delete.delete()
+    # print(f"Deleted {delete_count} duplicate ShopAnalytics entries for {date_pretty}")

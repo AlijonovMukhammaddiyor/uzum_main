@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta
 
 import pytz
-from django.db import models
+from django.db import connection, models
 from django.db.models import Window, F, Subquery, OuterRef, Count
 from django.db.models.functions import Rank
 from django.apps import apps
@@ -63,14 +63,40 @@ class ShopAnalytics(models.Model):
     categories = models.ManyToManyField(
         "category.Category",
     )
+    position = models.IntegerField(default=0, null=True, blank=True)
 
     def __str__(self):
         return f"{self.shop.title} - {self.total_products}"
 
     @staticmethod
-    def set_average_price(date_pretty: str = get_today_pretty()):
-        from django.db import connection
+    def update_analytics(date_pretty: str = get_today_pretty()):
+        ShopAnalytics.set_total_products(date_pretty)
+        ShopAnalytics.set_shop_positions(date_pretty)
+        ShopAnalytics.set_average_price(date_pretty)
+        ShopAnalytics.set_categories(date_pretty)
 
+    @staticmethod
+    def set_shop_positions(date_pretty: str = get_today_pretty()):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE shop_shopanalytics AS sa
+                    SET position = sa_new.rank
+                    FROM (
+                        SELECT sa_inner.id, RANK() OVER (ORDER BY sa_inner.total_orders DESC) as rank
+                        FROM shop_shopanalytics as sa_inner
+                        WHERE sa_inner.date_pretty = %s
+                    ) AS sa_new
+                    WHERE sa.id = sa_new.id
+                    """,
+                    [date_pretty],
+                )
+        except Exception as e:
+            print("Error in set_shop_positions: ", e)
+
+    @staticmethod
+    def set_average_price(date_pretty: str = get_today_pretty()):
         try:
             with connection.cursor() as cursor:
                 # update average_price
@@ -90,32 +116,6 @@ class ShopAnalytics(models.Model):
                 )
         except Exception as e:
             print("Error in set_average_price: ", e)
-
-    @staticmethod
-    def set_categories_and_total_products_for_date(date_pretty):
-        # Get queryset of shops and annotate with total_products
-        shop_products_subquery = Product.objects.filter(shop=OuterRef("pk")).order_by().values("shop")
-
-        shop_products_subquery = shop_products_subquery.annotate(product_count=Count("product_id")).values(
-            "product_count"
-        )
-
-        # Get queryset of shops and annotate with categories
-        Category = get_model("category", "Category")
-
-        shop_categories_subquery = (
-            Category.objects.filter(products__shop=OuterRef("pk")).order_by().values("products__shop")
-        )
-
-        shop_categories_subquery = shop_categories_subquery.annotate(category_count=Count("categoryId")).values(
-            "category_count"
-        )
-
-        # Update the ShopAnalytics model
-        ShopAnalytics.objects.filter(date_pretty=date_pretty).update(
-            total_products=Subquery(shop_products_subquery[:1]),
-            categories=Subquery(shop_categories_subquery[:1]),
-        )
 
     @staticmethod
     def set_total_products(date_pretty: str = get_today_pretty()):

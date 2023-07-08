@@ -28,7 +28,12 @@ from uzum.jobs.constants import CATEGORIES_HEADER, POPULAR_SEARCHES_PAYLOAD, PRO
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.product.pagination import ExamplePagination
-from uzum.product.serializers import ExtendedProductAnalyticsSerializer, ExtendedProductSerializer, ProductSerializer
+from uzum.product.serializers import (
+    ExtendedProductAnalyticsSerializer,
+    ExtendedProductSerializer,
+    ProductAnalyticsSerializer,
+    ProductSerializer,
+)
 from uzum.review.models import PopularSeaches
 from uzum.sku.models import Sku, SkuAnalytics, get_day_before_pretty
 
