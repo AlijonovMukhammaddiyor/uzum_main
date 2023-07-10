@@ -100,6 +100,7 @@ class CategoryProductsView(ListAPIView):
     authentication_classes = [JWTAuthentication]
     serializer_class = ProductAnalyticsViewSerializer
     pagination_class = CategoryProductsPagination
+    VALID_SEARCHES = ["shop_title", "product_title", "category_title"]
 
     def get_queryset(self):
         """
@@ -109,10 +110,27 @@ class CategoryProductsView(ListAPIView):
         category_id = self.kwargs["category_id"]
         ordering = self.request.query_params.get("order", "desc")
         column = self.request.query_params.get("column", "orders_amount")
-
         order_by_column = column
         if ordering == "desc":
             order_by_column = f"-{column}"
+
+        search_columns = self.request.query_params.get("searches", "")
+        searches_dict = {}
+
+        if search_columns:
+            filters = self.request.query_params.get("filters", "")
+
+            searchs = search_columns.split(",")
+
+            for col in searchs:
+                if col not in self.VALID_SEARCHES:
+                    return Response({"error": f"Invalid search column: {col}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            filters = filters.split(",")
+
+            for i in range(len(searchs)):
+                searches_dict[searchs[i]] = filters[i]
+
         # Get the category
         category = get_object_or_404(Category, pk=category_id)
         # Get the descendant category IDs as a list of integers
@@ -124,7 +142,18 @@ class CategoryProductsView(ListAPIView):
         # Add the parent category ID to the list
         descendant_ids.append(category_id)
 
-        return ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by(order_by_column)
+        # Prepare base queryset
+        queryset = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
+
+        # Apply search filters
+        for column, search_text in searches_dict.items():
+            # Here, we use the __icontains lookup to perform a case-insensitive search
+            queryset = queryset.filter(**{f"{column}__icontains": search_text})
+
+        # Apply ordering
+        queryset = queryset.order_by(order_by_column)
+
+        return queryset
 
     def list(self, request, *args, **kwargs):
         start_time = time.time()

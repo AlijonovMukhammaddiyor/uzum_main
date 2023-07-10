@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 import traceback
 from collections import Counter
 from datetime import date, datetime, timedelta
@@ -12,8 +13,9 @@ from asgiref.sync import async_to_sync
 
 # from sklearn.feature_extraction.text import TfidfVectorizer
 # from sklearn.metrics.pairwise import linear_kernel
-from django.db.models import Avg, Count, OuterRef, Prefetch, Subquery
+from django.db.models import Avg, Count, OuterRef, Prefetch, Subquery, Q
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
@@ -22,13 +24,15 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-
+from rest_framework.generics import ListAPIView
 from uzum.category.models import Category
+from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.jobs.constants import CATEGORIES_HEADER, POPULAR_SEARCHES_PAYLOAD, PRODUCT_HEADER
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
-from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
 from uzum.product.pagination import ExamplePagination
 from uzum.product.serializers import (
+    CurrentProductSerializer,
     ExtendedProductAnalyticsSerializer,
     ExtendedProductSerializer,
     ProductAnalyticsSerializer,
@@ -36,6 +40,30 @@ from uzum.product.serializers import (
 )
 from uzum.review.models import PopularSeaches
 from uzum.sku.models import Sku, SkuAnalytics, get_day_before_pretty
+from uzum.sku.serializers import SkuAnalyticsSerializer, SkuSerializer
+
+
+class ProductView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Product"])
+    def get(self, request: Request, product_id: int):
+        try:
+            product = Product.objects.get(product_id=product_id)
+
+            return Response(
+                {
+                    "title": product.title,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Product.DoesNotExist as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class Top5ProductsView(APIView):
@@ -148,55 +176,105 @@ class ProductsSegmentationView(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ProductsView(APIView):
+class CurrentProductView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
-    pagination_class = ExamplePagination
-    serializer_class = ExtendedProductSerializer
 
     @extend_schema(tags=["Product"])
-    def get(self, request: Request):
+    def get(self, request: Request, product_id: str):
         try:
-            latest_analytics = ProductAnalytics.objects.filter(product=OuterRef("pk")).order_by("-created_at")
-
-            latest_sku_analytics = SkuAnalytics.objects.filter(
-                sku__product=OuterRef("pk"),
-                date_pretty=Subquery(
-                    SkuAnalytics.objects.filter(sku__product=OuterRef("sku__product"))
-                    .order_by("-created_at")
-                    .values("date_pretty")[:1]
-                ),
+            start = time.time()
+            date_pretty = get_today_pretty()
+            if product_id is None:
+                return Response({"error": "product_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            # product = Product.objects.get(product_id=product_id).prefetch_related(
+            #     "skus", "analytics", "sku__analytics"
+            # )
+            product = Product.objects.prefetch_related("skus", "analytics", "skus__analytics").get(
+                product_id=product_id
             )
 
-            min_price = latest_sku_analytics.order_by("purchase_price").values("purchase_price")[:1]
-            max_price = latest_sku_analytics.order_by("-purchase_price").values("purchase_price")[:1]
+            serializer = CurrentProductSerializer(product)
 
-            products = Product.objects.annotate(
-                skus_count=Count("skus"),
-                orders_amount=Subquery(latest_analytics.values("orders_amount")[:1]),
-                reviews_amount=Subquery(latest_analytics.values("reviews_amount")[:1]),
-                rating=Subquery(latest_analytics.values("rating")[:1]),
-                available_amount=Subquery(latest_analytics.values("available_amount")[:1]),
-                min_price=Subquery(min_price),
-                max_price=Subquery(max_price),
-            ).order_by("-created_at")
+            print(f"CurrentProductView: {time.time() - start}")
+            return Response(
+                {
+                    "product": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            paginator = ExamplePagination()
 
-            page = paginator.paginate_queryset(products, request)
+class ProductsView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = ProductAnalyticsViewSerializer
+    pagination_class = ExamplePagination
 
-            serializer = self.serializer_class(page, many=True)
+    VALID_SORT_FIELDS = [
+        "orders_amount",
+        "reviews_amount",
+        "product_available_amount",
+        "rating",
+        "position_in_category",
+        "avg_purchase_price",
+    ]
+    VALID_FILTER_FIELDS = ["product_title", "shop_title", "category_title"]
 
-            return paginator.get_paginated_response(serializer.data)
+    @extend_schema(tags=["Product"])
+    def get_queryset(self):
+        try:
+            # Get query parameters
+            start = time.time()
+            column = self.request.query_params.get("column", "orders_amount")  # default is 'orders_amount'
+            order = self.request.query_params.get("order", "desc")  # default is 'asc'
+            search_columns = self.request.query_params.get("searches", "")  # default is empty string
+            filters = self.request.query_params.get("filters", "")  # default is empty string
 
+            # Validate sorting
+            if column not in self.VALID_SORT_FIELDS:
+                raise ValidationError({"error": f"Invalid column: {column}"})
+
+            if order not in ["asc", "desc"]:
+                raise ValidationError({"error": f"Invalid order: {order}"})
+
+            # Determine sorting order
+            if order == "desc":
+                column = "-" + column
+
+            # Build filter query
+            filter_query = Q()
+            if search_columns and filters:
+                search_columns = search_columns.split(",")
+                filters = filters.split("#####")
+
+                if len(search_columns) != len(filters):
+                    raise ValidationError({"error": "Number of search columns and filters does not match"})
+
+                for i in range(len(search_columns)):
+                    if search_columns[i] not in self.VALID_FILTER_FIELDS:
+                        raise ValidationError({"error": f"Invalid search column: {search_columns[i]}"})
+
+                    # filter_query |= Q(**{f"{search_columns[i]}__icontains": filters[i]})
+                    # it should be And not Or and case insensitive
+                    filter_query &= Q(**{f"{search_columns[i]}__icontains": filters[i]})
+
+            print("filter_query", filter_query)
+            # Query the database
+            data = ProductAnalyticsView.objects.filter(filter_query).order_by(column)
+            print("Products query time", time.time() - start)
+            return data
         except Exception as e:
             print(e)
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ProductAnalyticsView(APIView):
+class SingleProductAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
@@ -206,12 +284,14 @@ class ProductAnalyticsView(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request, product_id: str):
         try:
+            start = time.time()
+            print("SingleProductAnalyticsView")
             start_date_str = request.query_params.get("start_date", None)
 
             if not start_date_str:
                 # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
                 start_date = timezone.make_aware(
-                    datetime.combine(date.today() - timedelta(days=30), datetime.min.time()),
+                    datetime.combine(date.today() - timedelta(days=48), datetime.min.time()),
                     timezone=pytz.timezone("Asia/Tashkent"),
                 )
             else:
@@ -248,7 +328,7 @@ class ProductAnalyticsView(APIView):
             # for each SKU in `product.skus.all()`, to get the analytics records since the start date.
 
             serializer = ExtendedProductAnalyticsSerializer(product)
-
+            print("SingleProductAnalyticsView query time", time.time() - start)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -268,7 +348,7 @@ class SimilarProductsViewByUzum(APIView):
     def fetch_similar_products_from_uzum(product_id: str):
         try:
             response = requests.get(
-                "https://api.uzum.uz/api/v2/product/254379/similar?size=200",
+                "https://api.uzum.uz/api/v2/product/254379/similar?size=100",
                 headers={
                     **PRODUCT_HEADER,
                     "User-Agent": get_random_user_agent(),
@@ -295,31 +375,16 @@ class SimilarProductsViewByUzum(APIView):
 
             products = Product.objects.filter(product_id__in=productIds)
 
-            latest_analytics = ProductAnalytics.objects.filter(product=OuterRef("pk")).order_by("-created_at")
-
-            latest_sku_analytics = SkuAnalytics.objects.filter(
-                sku__product=OuterRef("pk"),
-                date_pretty=Subquery(
-                    SkuAnalytics.objects.filter(sku__product=OuterRef("sku__product"))
-                    .order_by("-created_at")
-                    .values("date_pretty")[:1]
-                ),
+            start_date = timezone.make_aware(
+                datetime.combine(date.today() - timedelta(days=45), datetime.min.time()),
+                timezone=pytz.timezone("Asia/Tashkent"),
             )
 
-            min_price = latest_sku_analytics.order_by("purchase_price").values("purchase_price")[:1]
-            max_price = latest_sku_analytics.order_by("-purchase_price").values("purchase_price")[:1]
-
-            products = products.annotate(
-                skus_count=Count("skus"),
-                orders_amount=Subquery(latest_analytics.values("orders_amount")[:1]),
-                reviews_amount=Subquery(latest_analytics.values("reviews_amount")[:1]),
-                rating=Subquery(latest_analytics.values("rating")[:1]),
-                available_amount=Subquery(latest_analytics.values("available_amount")[:1]),
-                min_price=Subquery(min_price),
-                max_price=Subquery(max_price),
-            ).order_by("-created_at")
-
-            serializer = self.serializer_class(products, many=True)
+            analytics = (
+                ProductAnalytics.objects.select_related("product")
+                .filter(product__product_id__in=productIds, created_at__gte=start_date)
+                .order_by("created_at")
+            )
 
             return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -329,100 +394,6 @@ class SimilarProductsViewByUzum(APIView):
             print(e)
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-# class SimilarProductsViewByContent(APIView):
-#     permission_classes = [IsAuthenticated]
-#     authentication_classes = [TokenAuthentication]
-#     allowed_methods = ["GET"]
-#     pagination_class = PageNumberPagination
-#     serializer_class = ProductSerializer
-
-#     @extend_schema(tags=["Product"])
-#     def get(self, request: Request, product_id: str):
-#         try:
-#             # get all products in the same category
-#             product = Product.objects.get(product_id=product_id)
-
-#             category: Category = product.category
-#             print(category)
-
-#             parent = category.parent
-
-#             if not parent:
-#                 print("Category has no parent")
-#                 parent = category
-
-#             categories = Category.get_descendants(parent, include_self=True)
-#             # print(categories)
-#             # exclude the currect product's category
-#             categories = [c for c in categories if c.categoryId != category.categoryId]
-
-#             all_products = Product.objects.filter(category__in=categories)
-
-#             # include the current product to the queryset because we excluded its category
-#             # currently it is not in the queryset
-#             all_products = all_products | Product.objects.filter(product_id=product_id)
-
-#             all_products_df = pd.DataFrame.from_records(all_products.values())
-
-#             # Load stop words from JSON file
-#             with open("uzum/product/uz_stopwords.json", "r") as f:
-#                 stopwords = json.load(f)
-
-#             # Preprocessing: Combine title and description and fill any null values with an empty string
-#             all_products_df["content"] = all_products_df["title"] + " " + all_products_df["description"].fillna("")
-
-#             # Vectorize the text
-#             vectorizer = TfidfVectorizer(stop_words=[])  # assuming the text is in Uzbek
-#             tfidf_matrix = vectorizer.fit_transform(all_products_df["content"])
-
-#             # Compute cosine similarity
-#             cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
-
-#             # Get the index of the product that matches the product_id
-#             indices = pd.Series(all_products_df.index, index=all_products_df["product_id"]).drop_duplicates()
-#             idx = indices[product_id]
-
-#             # Get the pairwsie similarity scores of all products with the given product
-#             sim_scores = list(enumerate(cosine_sim[idx]))
-
-#             # Define a similarity threshold
-#             similarity_threshold = 0.1  # adjust as needed
-
-#             # Sort the products based on the similarity scores
-#             sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-
-#             # Get the scores of the 10 most similar products
-#             sim_scores = [score for score in sim_scores if score[1] >= similarity_threshold]
-
-#             # Get the product indices
-#             product_indices = [i[0] for i in sim_scores]
-
-#             # Get the top 10 most similar products
-#             similar_products_df = all_products_df.iloc[product_indices]
-
-#             similar_products = Product.objects.filter(product_id__in=similar_products_df["product_id"])
-
-#             # exlude the current product
-#             similar_products = similar_products.exclude(product_id=product_id)
-
-#             paginators = PageNumberPagination()
-
-#             page = paginators.paginate_queryset(similar_products, request)
-
-#             serializer = self.serializer_class(page, many=True)
-
-#             # serializer = self.serializer_class(similar_products, many=True)
-
-#             return paginators.get_paginated_response(serializer.data)
-
-#         except Product.DoesNotExist:
-#             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
-#         except Exception as e:
-#             print(e)
-#             traceback.print_exc()
-#             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ProductReviews(APIView):

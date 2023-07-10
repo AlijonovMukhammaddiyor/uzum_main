@@ -44,7 +44,7 @@ class ShopAnalytics(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="analytics")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     total_products = models.IntegerField(default=0)
-    total_orders = models.IntegerField(default=0)
+    total_orders = models.IntegerField(default=0, db_index=True)
     total_reviews = models.IntegerField(default=0)
     average_purchase_price = models.FloatField(default=0, null=True, blank=True)
     average_order_price = models.FloatField(default=0, null=True, blank=True)
@@ -103,16 +103,18 @@ class ShopAnalytics(models.Model):
                 cursor.execute(
                     """
                     UPDATE shop_shopanalytics sa
-                    SET average_purchase_price = (
-                        SELECT AVG(ska.purchase_price)
+                    SET average_purchase_price = sub.average_price
+                    FROM (
+                        SELECT p.shop_id, AVG(ska.purchase_price) as average_price
                         FROM sku_skuanalytics ska
                         JOIN sku_sku s ON ska.sku_id = s.sku
                         JOIN product_product p ON s.product_id = p.product_id
-                        WHERE sa.shop_id = p.shop_id AND sa.date_pretty = %s AND ska.date_pretty = %s
-                    )
-                    WHERE sa.date_pretty = %s
+                        WHERE ska.date_pretty = %s
+                        GROUP BY p.shop_id
+                    ) sub
+                    WHERE sa.shop_id = sub.shop_id AND sa.date_pretty = %s
                     """,
-                    [date_pretty, date_pretty, date_pretty],
+                    [date_pretty, date_pretty],
                 )
         except Exception as e:
             print("Error in set_average_price: ", e)
@@ -127,15 +129,17 @@ class ShopAnalytics(models.Model):
                 cursor.execute(
                     """
                     UPDATE shop_shopanalytics sa
-                    SET total_products = (
-                        SELECT COUNT(*)
+                    SET total_products = sub.product_count
+                    FROM (
+                        SELECT p.shop_id, COUNT(*) as product_count
                         FROM product_productanalytics pa
                         JOIN product_product p ON pa.product_id = p.product_id
-                        WHERE sa.shop_id = p.shop_id AND sa.date_pretty = %s AND pa.date_pretty = %s
-                    )
-                    WHERE sa.date_pretty = %s
+                        WHERE pa.date_pretty = %s
+                        GROUP BY p.shop_id
+                    ) sub
+                    WHERE sa.shop_id = sub.shop_id AND sa.date_pretty = %s
                     """,
-                    [date_pretty, date_pretty, date_pretty],
+                    [date_pretty, date_pretty],
                 )
         except Exception as e:
             print("Error in set_total_products: ", e)
@@ -146,30 +150,19 @@ class ShopAnalytics(models.Model):
 
         try:
             with connection.cursor() as cursor:
-                # remove existing categories of the day
+                # Insert new associations directly
                 cursor.execute(
                     """
-                    DELETE FROM shop_shopanalytics_categories
-                    WHERE shopanalytics_id IN (
-                        SELECT id FROM shop_shopanalytics
-                        WHERE date_pretty = %s
-                    )
-                """,
-                    [date_pretty],
-                )
-
-                # insert categories
-                cursor.execute(
-                    """
-                INSERT INTO shop_shopanalytics_categories(shopanalytics_id, category_id)
-                SELECT sa.id, p.category_id
-                FROM shop_shopanalytics sa
-                JOIN product_product p ON sa.shop_id = p.shop_id
-                JOIN product_productanalytics pa ON p.product_id = pa.product_id
-                WHERE sa.date_pretty = %s AND pa.date_pretty = %s
-                GROUP BY sa.id, p.category_id
-                """,
+                    INSERT INTO shop_shopanalytics_categories(shopanalytics_id, category_id)
+                    SELECT sa.id AS shopanalytics_id, p.category_id
+                    FROM shop_shopanalytics sa
+                    JOIN product_product p ON sa.shop_id = p.shop_id
+                    JOIN product_productanalytics pa ON p.product_id = pa.product_id
+                    WHERE sa.date_pretty = %s AND pa.date_pretty = %s
+                    GROUP BY sa.id, p.category_id
+                    """,
                     [date_pretty, date_pretty],
                 )
+
         except Exception as e:
             print("Error in set_categories: ", e)

@@ -8,14 +8,16 @@ from . import views
 app_name = "products"
 urlpatterns = [
     path("", views.ProductsView.as_view(), name="all-products"),
+    path("<int:product_id>/", views.ProductView.as_view(), name="all-products"),
+    path("current/<int:product_id>/", views.CurrentProductView.as_view(), name="current-product"),
     path(
         "segmentation",
         cache_page(seconds_until_midnight())(views.ProductsSegmentationView.as_view()),
         name="segmentation",
     ),
     path(
-        "analytics/<int:product_id>",
-        views.ProductAnalyticsView.as_view(),
+        "analytics/<int:product_id>/",
+        views.SingleProductAnalyticsView.as_view(),
         name="product-analytics",
     ),
     path(
