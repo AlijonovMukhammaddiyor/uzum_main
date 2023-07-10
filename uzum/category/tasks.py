@@ -125,6 +125,7 @@ def update_uzum_data(args=None, **kwargs):
     print("Updating ProductAnalytics positions...")
     start = time.time()
     ProductAnalytics.set_positions(date_pretty)
+    ProductAnalytics.update_average_purchase_price(date_pretty)
     print(f"ProductAnalytics positions updated in {time.time() - start} seconds")
 
     print("Creating Materialized View...")

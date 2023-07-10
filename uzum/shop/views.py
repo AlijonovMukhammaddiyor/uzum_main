@@ -142,14 +142,36 @@ class ShopsView(APIView):
         "num_categories",
     ]
     VALID_ORDERS = ["asc", "desc"]
+    VALID_SEARCHES = ["shop_title"]
 
     def get(self, request: Request, *args, **kwargs):
         try:
-            date_pretty = "2023-07-06"
+            date_pretty = "2023-07-09"
             page_number = int(request.query_params.get("page", 1))
             offset = (page_number - 1) * self.PAGE_SIZE
             column = request.query_params.get("column", "position")
             order = request.query_params.get("order", "asc")
+
+            search_columns = request.query_params.get("searches", "")
+            searches_dict = {}
+
+            if search_columns:
+                filters = request.query_params.get("filters", "")
+
+                searchs = search_columns.split(",")
+
+                for col in searchs:
+                    if col not in self.VALID_SEARCHES:
+                        return Response({"error": f"Invalid search column: {col}"}, status=status.HTTP_400_BAD_REQUEST)
+
+                if len(searchs) == 0 or len(searchs) > 1:
+                    return Response({"error": "Invalid search columns"}, status=status.HTTP_400_BAD_REQUEST)
+                searchs[0] = "s.title"
+
+                filters = filters.split(",")
+
+                for i in range(len(searchs)):
+                    searches_dict[searchs[i]] = filters[i]
 
             if column not in self.VALID_COLUMNS:
                 return Response({"error": f"Invalid column: {column}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -157,6 +179,15 @@ class ShopsView(APIView):
                 return Response({"error": f"Invalid order: {order}"}, status=status.HTTP_400_BAD_REQUEST)
 
             with connection.cursor() as cursor:
+                # Construct search clause
+                search_clause = ""
+                if searches_dict:
+                    for key, value in searches_dict.items():
+                        if search_clause:
+                            search_clause += " AND "
+                        search_clause += f"LOWER({key}) LIKE LOWER('%%{value}%%')"
+                    search_clause = " AND " + search_clause
+
                 # First, count total number of rows
                 cursor.execute(
                     """
@@ -182,7 +213,7 @@ class ShopsView(APIView):
                     FROM shop_shopanalytics sa
                     JOIN shop_shop s ON sa.shop_id = s.seller_id
                     LEFT JOIN shop_shopanalytics_categories sac ON sa.id = sac.shopanalytics_id
-                    WHERE sa.date_pretty = %s
+                    WHERE sa.date_pretty = %s {search_clause}
                     GROUP BY sa.id, s.title, s.link
                     ORDER BY {column} {order}
                     LIMIT %s OFFSET %s
@@ -589,6 +620,7 @@ class ShopDailySalesView(APIView):
         Get Productanalytics of a shop at a specific date and next day
         """
         try:
+            #! TODO: some products are not showing up in the analytics
             print("Shop Daily Sales View")
             PAGE_SIZE = 100
             start = time.time()
@@ -675,6 +707,7 @@ class ShopDailySalesView(APIView):
                     average_purchase_price=Subquery(sku_analytics_subquery, output_field=FloatField()),
                 )
 
+            print("before date_pretty")
             day_before_analytics = annotate_latest_avg_purchase_price(
                 ProductAnalytics.objects.filter(
                     product__shop=shop,
@@ -695,7 +728,9 @@ class ShopDailySalesView(APIView):
             )
 
             target_analytics = list(analytics_date)
+            print("target_analytics", len(target_analytics))
             before_analytics_dict = {i["product__product_id"]: i for i in day_before_analytics}
+            print("before_analytics_dict", len(before_analytics_dict))
             print("before date_pretty", day_before_analytics[0]["date_pretty"])
             for item in target_analytics:
                 before_item = before_analytics_dict.get(item["product__product_id"], None)
@@ -768,16 +803,18 @@ class ShopDailySalesView(APIView):
                     if before_item
                     else item["average_purchase_price"],
                 }
-
-            final_res = [
-                entry
-                for entry in target_analytics
-                if entry["average_purchase_price"]["change"] != 0
-                or (entry["orders"]["change"] != 0 and entry["orders"]["change"] is not None)
-                or (entry["reviews"]["change"] != 0 and entry["reviews"]["change"] is not None)
-                or (entry["rating"]["change"] != 0 and entry["rating"]["change"] is not None)
-                or (entry["available_amount"]["change"] != 0 and entry["available_amount"]["change"] is not None)
-            ]
+            if len(target_analytics) > 300:
+                final_res = [
+                    entry
+                    for entry in target_analytics
+                    if entry["average_purchase_price"]["change"] != 0
+                    or (entry["orders"]["change"] != 0 and entry["orders"]["change"] is not None)
+                    or (entry["reviews"]["change"] != 0 and entry["reviews"]["change"] is not None)
+                    or (entry["rating"]["change"] != 0 and entry["rating"]["change"] is not None)
+                    or (entry["available_amount"]["change"] != 0 and entry["available_amount"]["change"] is not None)
+                ]
+            else:
+                final_res = target_analytics
 
             print("Shop Daily Sales View Time taken: ", time.time() - start)
 
@@ -885,7 +922,7 @@ class StoppedProductsView(APIView):
             LEFT JOIN sku_sku s ON p.product_id = s.product_id
             LEFT JOIN sku_skuanalytics ska ON s.sku = ska.sku_id AND pa.date_pretty = ska.date_pretty
             WHERE p.shop_id = {seller_id}
-            GROUP BY p.title, pa.id, c.title, p.photos, pa.created_at, pa.date_pretty, pa.product_id, pa.reviews_amount, pa.orders_amount, pa.rating, pa.available_amount, pa.orders_money, pa.position, pa.position_in_category, pa.position_in_shop
+            GROUP BY p.title, pa.id, c.title, p.photos, pa.created_at, pa.date_pretty, pa.product_id, pa.reviews_amount, pa.orders_amount, pa.rating, pa.available_amount, pa.orders_money, pa.position, pa.position_in_category, pa.position_in_shop, pa.average_purchase_price
             """
 
             with connection.cursor() as cursor:
@@ -1020,6 +1057,7 @@ class ShopCategoryAnalyticsView(APIView):
 
                 res.append(
                     {
+                        "category_id": Category.objects.get(pk=category_id).categoryId,
                         "date": date,
                         "data": {
                             "orders_amount": total_orders,

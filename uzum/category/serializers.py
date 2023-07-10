@@ -125,6 +125,11 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
             "avg_purchase_price",
         ]
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation["product_title"] = f"{representation['product_title']} (({representation['product_id']}))"
+        return representation
+
 
 class CategorySkuAnalyticsSerializer(serializers.ModelSerializer):
     class Meta:

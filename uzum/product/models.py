@@ -75,6 +75,7 @@ class ProductAnalytics(models.Model):
     position_in_shop = models.IntegerField(default=0, null=True, blank=True)
     position_in_category = models.IntegerField(default=0, null=True, blank=True)
     position = models.IntegerField(default=0, null=True, blank=True)
+    average_purchase_price = models.IntegerField(default=0, null=True, blank=True)
 
     @staticmethod
     def set_positions(date_pretty=get_today_pretty()):
@@ -200,6 +201,23 @@ class ProductAnalytics(models.Model):
 
         except Exception as e:
             return self.reviews_amount
+
+    @staticmethod
+    def update_average_purchase_price(date_pretty: str):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE product_productanalytics PA
+                SET average_purchase_price = (
+                    SELECT AVG(SA.purchase_price)
+                    FROM sku_sku S
+                    JOIN sku_skuanalytics SA ON S.sku = SA.sku_id
+                    WHERE S.product_id = PA.product_id AND SA.date_pretty = PA.date_pretty
+                )
+                WHERE PA.date_pretty = %s
+            """,
+                [date_pretty],
+            )
 
 
 class ProductAnalyticsView(models.Model):
