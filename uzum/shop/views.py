@@ -2,23 +2,22 @@ import math
 import time
 import traceback
 from datetime import datetime, timedelta
-from django.shortcuts import get_object_or_404
 
 import pytz
-from django.db.models import Avg, Count, F, FloatField, Max, Min, OuterRef, Q, Subquery, Sum, CharField
-from django.db.models.functions import Coalesce, TruncDate
-from django.utils import timezone
 from django.db import connection
-
+from django.db.models import Avg, CharField, Count, F, FloatField, Max, Min, OuterRef, Subquery, Sum
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.generics import ListAPIView
+
 from uzum.category.models import Category, CategoryAnalytics
 from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.serializers import ProductAnalyticsViewSerializer
@@ -1122,3 +1121,84 @@ class ShopProductsByCategoryView(APIView):
             print(e)
             traceback.print_exc()
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
+
+
+class UzumTotalOrders(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request):
+        """
+        For everyday, sum all orders in all shopanalytics
+        Args:
+            request (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        try:
+            start_date = timezone.make_aware(
+                datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # Group by date_pretty and calculate the sum of total_orders for each day
+            data = (
+                ShopAnalytics.objects.filter(created_at__gte=start_date)
+                .values("date_pretty")
+                .annotate(total_orders=Sum("total_orders"))
+                .order_by("date_pretty")
+            )
+
+            return Response(list(data), status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UzumTotalProducts(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request):
+        try:
+            start_date = timezone.make_aware(
+                datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
+            )
+            product_analytics = ProductAnalytics.objects.filter(created_at__gte=start_date)
+            daily_totals = (
+                product_analytics.values("date_pretty")
+                .annotate(total_products=Count("product__product_id"))
+                .values("date_pretty", "total_products")
+                .order_by("date_pretty")
+            )
+            return Response(daily_totals, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(e)
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UzumTotalShops(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request):
+        try:
+            start_date = timezone.make_aware(
+                datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
+            )
+            product_analytics = ShopAnalytics.objects.filter(created_at__gte=start_date)
+            daily_totals = (
+                product_analytics.values("date_pretty")
+                .annotate(total_shops=Count("shop__seller_id"))
+                .values("date_pretty", "total_shops")
+                .order_by("date_pretty")
+            )
+            return Response(daily_totals, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(e)
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

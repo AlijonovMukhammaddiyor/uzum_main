@@ -1,12 +1,14 @@
-from rest_framework.serializers import ModelSerializer
+from django.contrib.postgres.fields import JSONField
+from django.db.models import Prefetch
 from rest_framework import serializers
+from rest_framework.serializers import ModelSerializer
+
 from uzum.badge.models import Badge
 from uzum.badge.serializers import ProductBadgeSerializer
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
 from uzum.sku.models import Sku, SkuAnalytics
-from django.db.models import Prefetch
+
 from .models import Category, CategoryAnalytics
-from django.contrib.postgres.fields import JSONField
 
 
 class CategoryChildSerializer(ModelSerializer):

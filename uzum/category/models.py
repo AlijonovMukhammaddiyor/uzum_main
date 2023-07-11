@@ -1,16 +1,12 @@
-import traceback
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytz
-from django.db import models
-from django.db.models import Subquery, OuterRef, F, Count
-from django.db.models.functions import Coalesce
-from django.db import connection
-from uzum.product.models import ProductAnalytics, get_today_pretty
-from uzum.shop.models import Shop
-from uzum.sku.models import get_day_before_pretty
+from django.db import connection, models
 from django.utils import timezone
+
+from uzum.product.models import get_today_pretty
+from uzum.sku.models import get_day_before_pretty
 
 
 class Category(models.Model):
@@ -139,91 +135,125 @@ class CategoryAnalytics(models.Model):
             return None
 
     @staticmethod
-    def update_totals_for_date(date_pretty=get_today_pretty()):
+    def set_average_purchase_price(date_pretty=None):
         try:
-            date = timezone.make_aware(
-                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            if date_pretty is None:
+                date_pretty = get_today_pretty()
+
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    WITH latest_pa AS (
-                        SELECT pa1.product_id, pa1.orders_amount, pa1.reviews_amount, pa1.rating
-                        FROM product_productanalytics pa1
-                        WHERE pa1.created_at = (
-                            SELECT MAX(pa2.created_at)
-                            FROM product_productanalytics pa2
-                            WHERE pa2.product_id = pa1.product_id AND pa2.created_at <= %s
-                        )
-                    ),
-                    aggs AS (
+                    WITH agg_price AS (
                         SELECT
                             c."categoryId",
-                            SUM(lpa.orders_amount) as total_orders,
-                            SUM(lpa.reviews_amount) as total_reviews,
-                            AVG(NULLIF(lpa.rating, 0)) as average_rating
+                            AVG(pa.average_purchase_price) as average_price
                         FROM
                             category_category c
-                            LEFT JOIN product_product p ON p.category_id = ANY(
-                                ARRAY[c."categoryId"]::integer[] || CASE WHEN c.descendants IS NOT NULL THEN string_to_array(c.descendants, ',')::integer[] ELSE ARRAY[]::integer[] END
-                            )
-                            LEFT JOIN latest_pa lpa ON lpa.product_id = p.product_id
+                            INNER JOIN product_product p ON p.category_id = c."categoryId"
+                            INNER JOIN product_productanalytics pa ON pa.product_id = p.product_id AND pa.date_pretty = %s
                         GROUP BY
                             c."categoryId"
                     )
                     UPDATE
                         category_categoryanalytics cca
                     SET
-                        total_orders = aggs.total_orders,
-                        total_reviews = aggs.total_reviews,
-                        average_product_rating = aggs.average_rating
+                        average_purchase_price = agg_price.average_price
                     FROM
-                        aggs
+                        agg_price
                     WHERE
-                        cca.category_id = aggs."categoryId"
+                        cca.category_id = agg_price."categoryId"
                         AND cca.date_pretty = %s
+                    """,
+                    [date_pretty, date_pretty],
+                )
+        except Exception as e:
+            print(e, "Error in set_average_purchase_price")
+
+    @staticmethod
+    def update_totals_for_date(date_pretty):
+        try:
+            # Convert date_pretty to datetime
+            date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=23, minute=59, second=0, microsecond=0)
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH latest_pa AS (
+                    SELECT DISTINCT ON (pa.product_id) pa.product_id, pa.orders_amount, pa.reviews_amount, pa.rating
+                    FROM product_productanalytics pa
+                    WHERE pa.created_at <= %s
+                    ORDER BY pa.product_id, pa.created_at DESC
+                ),
+                aggs AS (
+                    SELECT
+                        c."categoryId" AS categoryid,
+                        COALESCE(SUM(lpa.orders_amount), 0) as total_orders,
+                        COALESCE(SUM(lpa.reviews_amount), 0) as total_reviews,
+                        COALESCE(AVG(NULLIF(lpa.rating, 0)), 0) as average_rating
+                    FROM
+                        category_category c
+                        LEFT JOIN product_product p ON p.category_id = ANY(
+                            ARRAY[c."categoryId"] || CASE WHEN c.descendants IS NOT NULL THEN string_to_array(c.descendants, ',')::integer[] ELSE ARRAY[]::integer[] END
+                        )
+                        LEFT JOIN latest_pa lpa ON lpa.product_id = p.product_id
+                    GROUP BY
+                        c."categoryId"
+                )
+                UPDATE
+                    category_categoryanalytics cca
+                SET
+                    total_orders = aggs.total_orders,
+                    total_reviews = aggs.total_reviews,
+                    average_product_rating = aggs.average_rating
+                FROM
+                    aggs
+                WHERE
+                    cca.category_id = aggs.categoryid
+                    AND cca.date_pretty = %s
                     """,
                     [date, date_pretty],
                 )
         except Exception as e:
-            print(e, "Error in update_totals_for_date")
+            print("Error in update_totals_for_date: ", e)
 
     @staticmethod
-    def update_totals_for_shops_and_products(date_pretty=get_today_pretty()):
+    def update_totals_for_shops_and_products(date_pretty=None):
         try:
+            if date_pretty is None:
+                date_pretty = get_today_pretty()
+
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    WITH aggs AS (
+                    WITH category_totals AS (
                         SELECT
                             c."categoryId",
                             COUNT(DISTINCT p.shop_id) as total_shops,
-                            COUNT(DISTINCT pa.product_id) as total_products
+                            COUNT(pa.product_id) as total_products
                         FROM
                             category_category c
-                            LEFT JOIN product_product p ON p.category_id = ANY(
+                            INNER JOIN product_productanalytics pa ON pa.date_pretty = %s
+                            INNER JOIN product_product p ON pa.product_id = p.product_id AND p.category_id = ANY(
                                 CASE
                                     WHEN c.descendants IS NULL THEN ARRAY[c."categoryId"]::integer[]
                                     ELSE ARRAY[c."categoryId"] || string_to_array(c.descendants, ',')::integer[]
                                 END
                             )
-                            LEFT JOIN product_productanalytics pa ON pa.product_id = p.product_id
-                        WHERE
-                            pa.date_pretty = %s
                         GROUP BY
                             c."categoryId"
                     )
                     UPDATE
-                        category_categoryanalytics cca
+                        category_categoryanalytics ca
                     SET
-                        total_shops = aggs.total_shops,
-                        total_products = aggs.total_products
+                        total_shops = ct.total_shops,
+                        total_products = ct.total_products
                     FROM
-                        aggs
+                        category_totals ct
                     WHERE
-                        cca.category_id = aggs."categoryId"
-                        AND cca.date_pretty = %s
-                """,
+                        ca.category_id = ct."categoryId" AND ca.date_pretty = %s
+                    """,
                     [date_pretty, date_pretty],
                 )
         except Exception as e:
@@ -300,5 +330,6 @@ class CategoryAnalytics(models.Model):
             CategoryAnalytics.update_totals_for_date(date_pretty)
             CategoryAnalytics.update_totals_for_shops_and_products(date_pretty)
             CategoryAnalytics.update_totals_with_sale(date_pretty)
+            CategoryAnalytics.set_average_purchase_price(date_pretty)
         except Exception as e:
             print(e, "Error in update_analytics")

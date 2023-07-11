@@ -2,10 +2,10 @@ import uuid
 from datetime import datetime
 
 import pytz
-from django.db import models
-from django.db.models import F, Window, JSONField
+from django.db import connection, models
+from django.db.models import F, JSONField, Window
 from django.db.models.functions import Rank
-from django.db import connection
+
 from uzum.sku.models import get_day_before_pretty
 
 

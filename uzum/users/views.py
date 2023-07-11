@@ -1,23 +1,24 @@
-from datetime import timedelta
 import datetime
 import logging
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import DetailView, RedirectView, UpdateView
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt import authentication
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt import authentication
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from twilio.base.exceptions import TwilioRestException
 from twilio.rest import Client
-from rest_framework_simplejwt.views import TokenRefreshView
-from rest_framework_simplejwt.views import TokenObtainPairView
+
 from config.settings.base import env
 from uzum.users.api.serializers import (
     CheckUserNameAndPhoneSerializer,
@@ -25,7 +26,6 @@ from uzum.users.api.serializers import (
     PasswordRenewSerializer,
     UserLoginSerializer,
 )
-from django.utils import timezone
 
 # disable twilio info logs
 twilio_logger = logging.getLogger("twilio.http_client")

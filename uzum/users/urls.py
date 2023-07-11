@@ -1,12 +1,10 @@
 from django.urls import path
 
-from uzum.users.views import (
-    # CodeVerificationView,
-    # VerificationSendView,
+from uzum.users.views import (  # CodeVerificationView,; VerificationSendView,
+    PasswordRenewView,
     user_detail_view,
     user_redirect_view,
     user_update_view,
-    PasswordRenewView,
 )
 
 app_name = "users"

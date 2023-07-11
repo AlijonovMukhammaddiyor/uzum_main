@@ -13,18 +13,19 @@ from asgiref.sync import async_to_sync
 
 # from sklearn.feature_extraction.text import TfidfVectorizer
 # from sklearn.metrics.pairwise import linear_kernel
-from django.db.models import Avg, Count, OuterRef, Prefetch, Subquery, Q
+from django.db.models import Avg, Count, OuterRef, Prefetch, Q, Subquery
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.generics import ListAPIView
+
 from uzum.category.models import Category
 from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.jobs.constants import CATEGORIES_HEADER, POPULAR_SEARCHES_PAYLOAD, PRODUCT_HEADER
