@@ -5,7 +5,9 @@ from django.urls import include, path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from rest_framework_simplejwt.views import TokenVerifyView, TokenRefreshView, TokenObtainPairView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
+
+from uzum.shop.views import UzumTotalOrders, UzumTotalProducts, UzumTotalShops
 from uzum.users.views import (
     CheckUserNameAndPhone,
     CodeVerificationView,
@@ -54,6 +56,9 @@ urlpatterns += [
     path("api/newpassword/", view=PasswordRenewView.as_view(), name="check_username"),
     path("api/code/", view=VerificationSendView.as_view(), name="check_username"),
     path("api/verify/", view=CodeVerificationView.as_view(), name="check_username"),
+    path("api/uzum/orders/", view=UzumTotalOrders.as_view(), name="uzum_orders"),
+    path("api/uzum/products/", view=UzumTotalProducts.as_view(), name="uzum_products"),
+    path("api/uzum/sellers/", view=UzumTotalShops.as_view(), name="uzum_products"),
 ]
 
 if settings.DEBUG:

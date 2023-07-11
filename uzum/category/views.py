@@ -3,39 +3,34 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from django.http import HttpRequest
 
 import numpy as np
 import pandas as pd
 import pytz
 from django.core.cache import cache
-from django.db import transaction
-from django.db.models import Avg, Count, OuterRef, Subquery, Sum, Case, When, F, FloatField
-from django.db import connection
+from django.db import connection, transaction
+from django.db.models import Avg, Case, Count, F, FloatField, OuterRef, Subquery, Sum, When
+from django.db.models.functions import Cast
+from django.http import HttpRequest
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.generics import ListAPIView
-from uzum.category.pagination import CategoryProductsPagination
-from django.shortcuts import get_object_or_404
-from django.db.models.functions import Cast
 
+from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.utils import calculate_shop_analytics_in_category
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
 from uzum.sku.models import SkuAnalytics
 
 from .models import Category, CategoryAnalytics
-from .serializers import (
-    CategoryAnalyticsSeralizer,
-    ProductAnalyticsViewSerializer,
-    CategorySerializer,
-)
+from .serializers import CategoryAnalyticsSeralizer, CategorySerializer, ProductAnalyticsViewSerializer
 
 
 class CategoryTreeView(APIView):
@@ -559,70 +554,89 @@ class CategoryPriceSegmentationView(APIView):
 
     @extend_schema(tags=["Category"])
     def get(self, request: Request, category_id):
-        start_time = time.time()
-        # range_count = request.query_params.get("range", 15)
-        segments_count = request.query_params.get("segments_count", 15)
+        try:
+            start_time = time.time()
+            # range_count = request.query_params.get("range", 15)
+            segments_count = request.query_params.get("segments_count", 15)
 
-        segments_count = int(segments_count)
+            segments_count = int(segments_count)
 
-        # start_date = timezone.make_aware(
-        #     datetime.now() - timedelta(days=int(range_count) + 1), timezone=pytz.timezone("Asia/Tashkent")
-        # ).replace(hour=0, minute=0, second=0, microsecond=0)
+            # start_date = timezone.make_aware(
+            #     datetime.now() - timedelta(days=int(range_count) + 1), timezone=pytz.timezone("Asia/Tashkent")
+            # ).replace(hour=0, minute=0, second=0, microsecond=0)
 
-        category = Category.objects.get(categoryId=category_id)
-        if not category.descendants:
-            descendant_ids = []
-        else:
-            descendant_ids = list(map(int, category.descendants.split(",")))
+            category = Category.objects.get(categoryId=category_id)
+            if not category.descendants:
+                descendant_ids = []
+            else:
+                descendant_ids = list(map(int, category.descendants.split(",")))
 
-        # Add the parent category ID to the list
-        descendant_ids.append(category_id)
-        products = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
-        start = time.time()
-        df = pd.DataFrame(list(products.values("product_id", "avg_purchase_price")))
+            # Add the parent category ID to the list
+            descendant_ids.append(category_id)
+            products = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
+            start = time.time()
+            df = pd.DataFrame(list(products.values("product_id", "avg_purchase_price")))
 
-        # Use pandas qcut to divide the products into 'segments_count' quantiles.
-        # The result is a pandas series where the value of each product is the bin it belongs to.
-        bin_series = pd.qcut(df["avg_purchase_price"], segments_count, labels=False, duplicates="drop")
+            # Calculate the number of distinct average purchase prices
+            distinct_prices_count = df["avg_purchase_price"].nunique()
 
-        # We then get the range of each bin using the groupby operation on the dataframe
-        bins_df = df.groupby(bin_series).agg({"avg_purchase_price": ["min", "max"]})
+            # Set the segments_count to the number of distinct prices if it exceeds the count
+            segments_count = min(segments_count, distinct_prices_count)
 
-        # Convert the bin ranges into a list of tuples and round to nearest 1000
-        bins = [
-            (
-                np.floor(row[1]["avg_purchase_price"]["min"] / 1000) * 1000,
-                np.ceil(row[1]["avg_purchase_price"]["max"] / 1000) * 1000,
-            )
-            for row in bins_df.iterrows()
-        ]
+            # Calculate the number of products per segment
+            products_per_segment = len(df) // segments_count
 
-        segments = []
+            # Sort the DataFrame by average purchase price
+            df = df.sort_values("avg_purchase_price")
 
-        with ThreadPoolExecutor(max_workers=segments_count) as executor:
-            futures = []
-            for i in range(len(bins)):
-                (segment_min_price, segment_max_price) = bins[i]
-                futures.append(
-                    executor.submit(
-                        self.calculate_segment,
-                        segment_min_price,
-                        segment_max_price,
-                        # start_date,
-                        products,
+            # Create the bins by dividing the DataFrame into segments with equal number of products
+            bins = []
+            start_idx = 0
+            for i in range(segments_count):
+                end_idx = start_idx + products_per_segment
+                if i < len(df) % segments_count:
+                    end_idx += 1
+                min_price = df.iloc[start_idx]["avg_purchase_price"]
+                max_price = df.iloc[end_idx - 1]["avg_purchase_price"]
+                bins.append((min_price, max_price))
+                start_idx = end_idx
+
+            # Round the bin values to the nearest 1000
+            bins = [
+                (np.floor(min_price / 1000) * 1000, np.ceil(max_price / 1000) * 1000) for min_price, max_price in bins
+            ]
+
+            segments = []
+            with ThreadPoolExecutor(max_workers=segments_count) as executor:
+                futures = []
+                for i in range(len(bins)):
+                    (segment_min_price, segment_max_price) = bins[i]
+                    futures.append(
+                        executor.submit(
+                            self.calculate_segment,
+                            segment_min_price,
+                            segment_max_price,
+                            # start_date,
+                            products,
+                        )
                     )
-                )
 
-            for future in as_completed(futures):
-                segments.append(future.result())
+                for future in as_completed(futures):
+                    segments.append(future.result())
 
-        print(f"Category Segmentation took {time.time() - start_time} seconds")
-        return Response(
-            status=status.HTTP_200_OK,
-            data={
-                "data": segments,
-            },
-        )
+            print(f"Category Segmentation took {time.time() - start_time} seconds")
+            return Response(
+                status=status.HTTP_200_OK,
+                data={
+                    "data": segments,
+                },
+            )
+        except Category.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND, data={"message": "Category not found"})
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CategoryShopsView(APIView):

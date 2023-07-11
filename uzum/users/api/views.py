@@ -1,6 +1,6 @@
+import time
 from django.contrib.auth import get_user_model
-from django.http import HttpRequest
-from django.http import HttpResponseBadRequest
+from django.http import HttpRequest, HttpResponseBadRequest
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin
@@ -8,7 +8,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework_simplejwt.authentication import JWTAuthentication
+
 from config.settings.base import env
+
 from .serializers import UserSerializer
 
 User = get_user_model()
@@ -62,5 +64,7 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
         Returns:
             _type_: _description_
         """
+        start = time.time()
         serializer = UserSerializer(request.user, context={"request": request})
+        print(f"Time taken by current user: {time.time() - start}")
         return Response(status=status.HTTP_200_OK, data=serializer.data)

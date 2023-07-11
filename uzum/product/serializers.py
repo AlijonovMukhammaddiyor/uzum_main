@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from uzum.sku.models import SkuAnalytics
 
+from uzum.sku.models import SkuAnalytics
 from uzum.sku.serializers import ExtendedSkuSerializer
 
 from .models import Product, ProductAnalytics

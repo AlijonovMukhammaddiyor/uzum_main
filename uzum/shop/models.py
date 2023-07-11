@@ -1,12 +1,12 @@
-from collections import defaultdict
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 import pytz
-from django.db import connection, models
-from django.db.models import Window, F, Subquery, OuterRef, Count
-from django.db.models.functions import Rank
 from django.apps import apps
+from django.db import connection, models
+from django.db.models import Count, F, OuterRef, Subquery, Window
+from django.db.models.functions import Rank
 
 from uzum.product.models import Product
 

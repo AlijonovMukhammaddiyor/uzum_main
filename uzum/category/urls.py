@@ -26,18 +26,18 @@ urlpatterns = [
     ),
     path(
         "analytics/<int:category_id>/",
-        cache_page(seconds_until_midnight())(views.CategoryDailyAnalyticsView.as_view()),
+        views.CategoryDailyAnalyticsView.as_view(),
         name="category-products",
     ),
     path("analytics/subcategory/<int:category_id>/", views.SubcategoriesView.as_view(), name="category-products"),
     path(
         "analytics/segmentation/<int:category_id>/",
-        cache_page(seconds_until_midnight())(views.CategoryPriceSegmentationView.as_view()),
+        views.CategoryPriceSegmentationView.as_view(),
         name="category-products",
     ),
     path(
         "analytics/shops/<int:category_id>/",
-        cache_page(seconds_until_midnight())(views.CategoryShopsView.as_view()),
+        views.CategoryShopsView.as_view(),
         name="category-products",
     ),
     path("niches/", views.NicheSlectionView.as_view(), name="niches"),
