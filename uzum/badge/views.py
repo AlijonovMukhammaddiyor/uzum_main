@@ -12,6 +12,8 @@ from rest_framework_simplejwt import authentication
 
 from uzum.product.models import Product, ProductAnalytics, get_today_pretty
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
+from uzum.review.models import PopularSeaches
+from uzum.review.serializers import PopularSearchesSerializer
 
 from .models import Badge
 from .serializers import BadgeSerializer
@@ -152,6 +154,21 @@ class BadgeAnalytics(APIView):
         except Badge.DoesNotExist:
             return Response(status=404, data={"message": "Badge not found"})
 
+        except Exception as e:
+            traceback.print_exc()
+            return Response(status=500, data={"message": str(e)})
+
+
+class PopularWordsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [authentication.JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request):
+        try:
+            words = PopularSeaches.objects.all()
+            data = PopularSearchesSerializer(words, many=True).data
+            return Response(status=200, data=data)
         except Exception as e:
             traceback.print_exc()
             return Response(status=500, data={"message": str(e)})

@@ -128,15 +128,18 @@ def update_uzum_data(args=None, **kwargs):
     ProductAnalytics.update_average_purchase_price(date_pretty)
     print(f"ProductAnalytics positions updated in {time.time() - start} seconds")
 
+    print("ShopAnalytics updating...")
+    start = time.time()
+    ShopAnalytics.update_analytics(date_pretty)
+    print(f"ShopAnalytics updated in {time.time() - start} seconds")
+
     print("Creating Materialized View...")
     start = time.time()
     create_materialized_view(date_pretty)
     print(f"Materialized View created in {time.time() - start} seconds")
 
-    print("ShopAnalytics updating...")
-    start = time.time()
-    ShopAnalytics.update_analytics(date_pretty)
-    print(f"ShopAnalytics updated in {time.time() - start} seconds")
+    print("Setting top products...")
+    ProductAnalytics.set_top_growing_products()
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
     return True
@@ -573,8 +576,8 @@ def bulk_remove_duplicate_sku_analytics(date_pretty):
     print(f"About to delete {delete_count} duplicate SkuAnalytics entries for {date_pretty}")
 
     # Execute the delete operation
-    # sa_to_delete.delete()
-    # print(f"Deleted {delete_count} duplicate ShopAnalytics entries for {date_pretty}")
+    sa_to_delete.delete()
+    print(f"Deleted {delete_count} duplicate ShopAnalytics entries for {date_pretty}")
 
 
 def bulk_remove_duplicate_category_analytics(date_pretty):
@@ -602,5 +605,5 @@ def bulk_remove_duplicate_category_analytics(date_pretty):
     print(f"About to delete {delete_count} duplicate CategoryAnalytics entries for {date_pretty}")
 
     # Execute the delete operation
-    # ca_to_delete.delete()
-    # print(f"Deleted {delete_count} duplicate CategoryAnalytics entries for {date_pretty}")
+    ca_to_delete.delete()
+    print(f"Deleted {delete_count} duplicate CategoryAnalytics entries for {date_pretty}")

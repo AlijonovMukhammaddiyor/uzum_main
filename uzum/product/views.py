@@ -1,20 +1,17 @@
-import asyncio
-import json
+from collections import defaultdict
 import time
 import traceback
-from collections import Counter
 from datetime import date, datetime, timedelta
-
-import httpx
+from itertools import groupby
+from django.db import connection
+from django.core.cache import cache
 import pandas as pd
 import pytz
 import requests
-from asgiref.sync import async_to_sync
-
-# from sklearn.feature_extraction.text import TfidfVectorizer
-# from sklearn.metrics.pairwise import linear_kernel
-from django.db.models import Avg, Count, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Avg, Count, F, OuterRef, Prefetch, Q, Subquery
 from django.utils import timezone
+from django.core.paginator import Paginator
+
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -26,9 +23,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from uzum.category.models import Category
 from uzum.category.serializers import ProductAnalyticsViewSerializer
-from uzum.jobs.constants import CATEGORIES_HEADER, POPULAR_SEARCHES_PAYLOAD, PRODUCT_HEADER
+from uzum.jobs.constants import PRODUCT_HEADER
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
 from uzum.product.pagination import ExamplePagination
@@ -39,9 +35,7 @@ from uzum.product.serializers import (
     ProductAnalyticsSerializer,
     ProductSerializer,
 )
-from uzum.review.models import PopularSeaches
-from uzum.sku.models import Sku, SkuAnalytics, get_day_before_pretty
-from uzum.sku.serializers import SkuAnalyticsSerializer, SkuSerializer
+from uzum.sku.models import SkuAnalytics, get_day_before_pretty
 
 
 class ProductView(APIView):
@@ -349,7 +343,7 @@ class SimilarProductsViewByUzum(APIView):
     def fetch_similar_products_from_uzum(product_id: str):
         try:
             response = requests.get(
-                "https://api.uzum.uz/api/v2/product/254379/similar?size=100",
+                f"https://api.uzum.uz/api/v2/product/{product_id}/similar?size=100",
                 headers={
                     **PRODUCT_HEADER,
                     "User-Agent": get_random_user_agent(),
@@ -372,9 +366,10 @@ class SimilarProductsViewByUzum(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request, product_id: str):
         try:
-            productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
+            start = time.time()
 
-            products = Product.objects.filter(product_id__in=productIds)
+            productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
+            productIds.append(product_id)
 
             start_date = timezone.make_aware(
                 datetime.combine(date.today() - timedelta(days=45), datetime.min.time()),
@@ -384,10 +379,44 @@ class SimilarProductsViewByUzum(APIView):
             analytics = (
                 ProductAnalytics.objects.select_related("product")
                 .filter(product__product_id__in=productIds, created_at__gte=start_date)
-                .order_by("created_at")
+                .order_by("product__product_id", "created_at")
+                .values(
+                    "product__product_id",
+                    "product__title",
+                    "average_purchase_price",
+                    "rating",
+                    "orders_amount",
+                    "reviews_amount",
+                    "product__created_at",
+                    "available_amount",
+                    "product__category__title",
+                    "position",
+                    "position_in_category",
+                    "date_pretty",
+                    "product__shop__title",
+                    "product__shop__link",
+                    "product__category__categoryId",
+                    "product__photos",
+                )
             )
 
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            # group by product__product_id
+            grouped_analytics = []
+            for product_id, group in groupby(analytics, key=lambda x: x["product__product_id"]):
+                grouped_analytics.append(
+                    {
+                        "product_id": product_id,
+                        "analytics": list(group),
+                    }
+                )
+
+            print("SimilarProductsViewByUzum query time", time.time() - start)
+            return Response(
+                {
+                    "data": grouped_analytics,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Product.DoesNotExist:
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -470,87 +499,121 @@ class ProductReviews(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class PopularWords(APIView):
+class NewProductsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
-    pagination_class = PageNumberPagination
-    serializer_class = ExtendedProductSerializer
-
-    WORD_REQUESTS_COUNT = 50
-
-    @staticmethod
-    async def make_request(client=None):
-        try:
-            return await client.post(
-                "https://graphql.uzum.uz/",
-                json=POPULAR_SEARCHES_PAYLOAD,
-                headers={
-                    **CATEGORIES_HEADER,
-                    "User-Agent": get_random_user_agent(),
-                    "x-iid": generateUUID(),
-                },
-            )
-        except Exception as e:
-            print("Error in makeRequestProductIds: ", e)
-
-    @staticmethod
-    async def fetch_popular_seaches_from_uzum(words: list[str]):
-        try:
-            async with httpx.AsyncClient() as client:
-                tasks = [
-                    PopularWords.make_request(
-                        client=client,
-                    )
-                    for _ in range(PopularWords.WORD_REQUESTS_COUNT)
-                ]
-
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                for res in results:
-                    if isinstance(res, Exception):
-                        print("Error in fetch_popular_seaches_from_uzum:", res)
-                    else:
-                        if not res:
-                            continue
-                        if res.status_code != 200:
-                            continue
-                        res_data = res.json()
-                        if "errors" not in res_data:
-                            words_ = res_data["data"]["getSuggestions"]["blocks"][0]["popularSuggestions"]
-                            words.extend(words_)
-
-        except Exception as e:
-            traceback.print_exc()
-            return None
 
     @extend_schema(tags=["Product"])
     def get(self, request: Request):
         try:
-            words = PopularSeaches.objects.get(date_pretty=get_today_pretty()).words
+            print("Start NewProductsView")
+            start = time.time()
+            # get the recent products created last week
+            start_date = timezone.make_aware(
+                datetime.combine(date.today() - timedelta(days=2), datetime.min.time()),
+            ).replace(tzinfo=pytz.timezone("Asia/Tashkent"))
 
-            words = json.loads(words)
+            products = (
+                ProductAnalytics.objects.select_related("product", "product__category", "product__shop")
+                .filter(date_pretty=get_today_pretty(), product__created_at__gte=start_date)
+                .values(
+                    "product__product_id",
+                    "product__title",
+                    "product__created_at",
+                    "product__photos",
+                    "product__category__categoryId",
+                    "product__category__title",
+                    "product__shop__link",
+                    "product__shop__title",
+                    "average_purchase_price",
+                    "rating",
+                    "orders_amount",
+                    "reviews_amount",
+                    "available_amount",
+                    "position",
+                    "position_in_category",
+                    "date_pretty",
+                )
+            ).order_by("-orders_amount", "-product__created_at")
 
-            return Response({"words": words, "count": len(words)}, status=status.HTTP_200_OK)
-        except PopularSeaches.DoesNotExist:
-            words = []
-            async_to_sync(PopularWords.fetch_popular_seaches_from_uzum)(words)
+            paginator = Paginator(products, 20)
+            page_number = request.query_params.get("page", 1)
+            page_obj = paginator.get_page(page_number)
 
-            if len(words) == 0:
-                return Response({"error": "No words found"}, status=status.HTTP_404_NOT_FOUND)
+            # add category_id to category__title -> product__category__title + (categoryId)
+            for product in page_obj:
+                product["product__category__title"] += f" ({product['product__category__categoryId']})"
+                product["product__shop__title"] += f" ({product['product__shop__link']})"
+                product["product__title"] += f" ({product['product__product_id']})"
 
-            # get frequency of words
-            word_count = Counter(words)
+            # Get the total count of matching products
+            print("Time taken for NewProductsView", time.time() - start)
+            return Response(
+                {
+                    "results": list(page_obj),
+                    "count": products.count(),
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            _ = PopularSeaches.objects.create(
-                date_pretty=get_today_pretty(),
-                words=json.dumps(word_count),
-                requests_count=PopularWords.WORD_REQUESTS_COUNT,
+
+class GrowingProductsView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Product"])
+    def get(self, request: Request):
+        try:
+            print("Start GrowingProductsView")
+            start = time.time()
+
+            start_date = timezone.make_aware(
+                datetime.combine(date.today() - timedelta(days=30), datetime.min.time()),
+                timezone=pytz.timezone("Asia/Tashkent"),
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            top_growing_products = cache.get("top_growing_products", [])
+
+            products = (
+                ProductAnalytics.objects.select_related("product", "product__category", "product__shop")
+                .filter(product__product_id__in=top_growing_products, created_at__gte=start_date)
+                .values(
+                    "product__product_id",
+                    "product__title",
+                    "product__created_at",
+                    "product__photos",
+                    "product__category__categoryId",
+                    "product__category__title",
+                    "product__shop__link",
+                    "product__shop__title",
+                    "average_purchase_price",
+                    "rating",
+                    "orders_amount",
+                    "reviews_amount",
+                    "available_amount",
+                    "position",
+                    "position_in_category",
+                    "date_pretty",
+                )
+                .order_by("product__product_id", "date_pretty")
             )
 
-            return Response({"words": word_count, "count": len(word_count)}, status=status.HTTP_200_OK)
+            grouped_analytics = []
+            for product_id, group in groupby(products, key=lambda x: x["product__product_id"]):
+                grouped_analytics.append(
+                    {
+                        "product_id": product_id,
+                        "analytics": list(group),
+                    }
+                )
+            print("Time taken for GrowingProductsView", time.time() - start)
+            return Response(grouped_analytics, status=status.HTTP_200_OK)
 
         except Exception as e:
-            print(e)
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

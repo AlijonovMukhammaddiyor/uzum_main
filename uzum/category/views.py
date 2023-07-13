@@ -1,4 +1,3 @@
-import json
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -10,8 +9,6 @@ import pytz
 from django.core.cache import cache
 from django.db import connection, transaction
 from django.db.models import Avg, Case, Count, F, FloatField, OuterRef, Subquery, Sum, When
-from django.db.models.functions import Cast
-from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema

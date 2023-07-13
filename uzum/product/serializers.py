@@ -48,6 +48,7 @@ class CurrentProductSerializer(serializers.ModelSerializer):
             "position_in_category",
             "position_in_shop",
             "position",
+            "available_amount",
         )[:1]
 
     def get_sku_analytics(self, obj):
@@ -103,6 +104,7 @@ class ProductAnalyticsSerializer(serializers.ModelSerializer):
             "position_in_category",
             "position_in_shop",
             "position",
+            "average_purchase_price",
         ]
         read_only_fields = ("id", "created_at", "date_pretty")
 

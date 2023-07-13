@@ -21,12 +21,13 @@ urlpatterns = [
         name="product-analytics",
     ),
     path(
-        "similar/<int:product_id>",
+        "similar/<int:product_id>/",
         views.SimilarProductsViewByUzum.as_view(),
         name="similar-products",
     ),
     # path("similar/content/<int:product_id>", views.ProductReviews.as_view(), name="all-products"),
     path("reviews/<int:product_id>", views.ProductReviews.as_view(), name="product-reviews"),
-    path("seaches", views.PopularWords.as_view(), name="popular-searches"),
     path("top/", views.Top5ProductsView.as_view(), name="top-products"),
+    path("recent/", (views.NewProductsView.as_view()), name="new-products"),
+    path("growing/", (views.GrowingProductsView.as_view()), name="growing-products"),
 ]

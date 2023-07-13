@@ -160,6 +160,7 @@ class ShopAnalytics(models.Model):
                     JOIN product_productanalytics pa ON p.product_id = pa.product_id
                     WHERE sa.date_pretty = %s AND pa.date_pretty = %s
                     GROUP BY sa.id, p.category_id
+                    ON CONFLICT DO NOTHING
                     """,
                     [date_pretty, date_pretty],
                 )
