@@ -20,4 +20,5 @@ urlpatterns = [
         cache_page(seconds_until_midnight())(views.BadgeAnalytics.as_view()),
         name="all-badges",
     ),
+    path("seaches/", views.PopularWordsView.as_view(), name="popular-searches"),
 ]

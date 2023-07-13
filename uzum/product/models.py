@@ -1,17 +1,20 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+import pandas as pd
+
 
 import pytz
 from django.db import connection, models
 from django.db.models import F, JSONField, Window
 from django.db.models.functions import Rank
-
+from django.utils import timezone
 from uzum.sku.models import get_day_before_pretty
+from django.core.cache import cache
 
 
 class Product(models.Model):
     product_id = models.IntegerField(unique=True, primary_key=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     title = models.TextField(db_index=True)
     description = models.TextField(default=None, null=True, blank=True)
@@ -218,6 +221,51 @@ class ProductAnalytics(models.Model):
             """,
                 [date_pretty],
             )
+
+    @staticmethod
+    def set_top_growing_products():
+        # Set date range (last 30 days)
+        end_date = pd.to_datetime(get_today_pretty())
+        start_date = end_date - pd.DateOffset(days=30)
+
+        # Retrieve product sales data for the last 30 days
+        sales_data = ProductAnalytics.objects.filter(date_pretty__range=[start_date, end_date]).values(
+            "product__product_id", "date_pretty", "orders_amount"
+        )
+
+        # Convert QuerySet to DataFrame
+        sales_df = pd.DataFrame.from_records(sales_data)
+
+        # Make sure date_pretty is a datetime type
+        sales_df["date_pretty"] = pd.to_datetime(sales_df["date_pretty"])
+
+        # Set date_pretty as index (required for rolling function)
+        sales_df = sales_df.set_index("date_pretty")
+
+        # Group by product and calculate the 7-day and 30-day EMA of sales
+        sales_df["ema_ratio"] = sales_df.groupby("product__product_id")["orders_amount"].transform(
+            lambda x: x.ewm(span=7).mean() / x.ewm(span=30).mean()
+        )
+
+        # Reset index (to allow the next operations)
+        sales_df = sales_df.reset_index()
+
+        # Get the last day (most recent) of EMA ratio for each product
+        sales_df = sales_df.groupby("product__product_id").last()
+
+        # Only consider products with total sales greater than a certain threshold
+        sales_df = sales_df[sales_df["orders_amount"] > 200]
+
+        # Sort products by EMA ratio in descending order and take the top 100
+        top_growing_products = sales_df.sort_values("ema_ratio", ascending=False).head(100)
+
+        # Return the list of top growing product IDs
+
+        # Return the list of top growing product IDs
+        top_growing_products = top_growing_products.index.tolist()
+        # set to cache with tieout 1 day
+        print("setting top_growing_products to cache", len(top_growing_products), top_growing_products)
+        cache.set("top_growing_products", top_growing_products, timeout=None)
 
 
 class ProductAnalyticsView(models.Model):
