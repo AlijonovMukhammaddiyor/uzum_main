@@ -1,18 +1,9 @@
 import uuid
-from collections import defaultdict
-from datetime import datetime, timedelta
 
-import pytz
 from django.apps import apps
 from django.db import connection, models
-from django.db.models import Count, F, OuterRef, Subquery, Window
-from django.db.models.functions import Rank
 
-from uzum.product.models import Product
-
-
-def get_today_pretty():
-    return datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
+from uzum.utils.general import get_today_pretty
 
 
 def get_model(app_name, model_name):

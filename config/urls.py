@@ -3,12 +3,12 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from django.views import defaults as default_views
+from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
-from uzum.category.utils import seconds_until_midnight
-from django.views.decorators.cache import cache_page
 
+from uzum.category.utils import seconds_until_midnight
 from uzum.shop.views import UzumTotalOrders, UzumTotalProducts, UzumTotalShops
 from uzum.users.views import (
     CheckUserNameAndPhone,
@@ -58,15 +58,13 @@ urlpatterns += [
     path("api/newpassword/", view=PasswordRenewView.as_view(), name="check_username"),
     path("api/code/", view=VerificationSendView.as_view(), name="check_username"),
     path("api/verify/", view=CodeVerificationView.as_view(), name="check_username"),
-    path("api/uzum/orders/", view=cache_page(seconds_until_midnight())(UzumTotalOrders.as_view()), name="uzum_orders"),
+    path("api/uzum/orders/", view=(UzumTotalOrders.as_view()), name="uzum_orders"),
     path(
         "api/uzum/products/",
-        view=cache_page(seconds_until_midnight())(UzumTotalProducts.as_view()),
+        view=(UzumTotalProducts.as_view()),
         name="uzum_products",
     ),
-    path(
-        "api/uzum/sellers/", view=cache_page(seconds_until_midnight())(UzumTotalShops.as_view()), name="uzum_products"
-    ),
+    path("api/uzum/sellers/", view=(UzumTotalShops.as_view()), name="uzum_products"),
 ]
 
 if settings.DEBUG:

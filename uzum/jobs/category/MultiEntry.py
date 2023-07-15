@@ -1,9 +1,7 @@
 import traceback
 
-from asgiref.sync import sync_to_async
-
 from uzum.category.models import Category, CategoryAnalytics
-from uzum.product.models import get_today_pretty
+from uzum.utils.general import get_today_pretty
 
 
 def get_all_categories():
@@ -53,7 +51,6 @@ def get_categories_with_less_than_n_products(n):
         all_category_analytics = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty()).order_by(
             "category__categoryId"
         )
-        # all_categories = []
         print(
             f"getCategoriesWithLessThanNProducts: all category analytics fetched {len(all_category_analytics)}",
         )

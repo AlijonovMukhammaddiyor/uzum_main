@@ -13,14 +13,9 @@ from uzum.banner.models import Banner
 from uzum.banner.serializers import BannerSerializer
 
 # from uzum.category.utils import seconds_until_midnight
-from uzum.product.models import Product, ProductAnalytics, get_today_pretty
-from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
-from uzum.shop.models import Shop, ShopAnalytics
-from uzum.shop.serializers import ShopSerializer
-from uzum.sku.models import get_day_before_pretty
-
-# from django.views.decorators.cache import cache_page
-# from django.utils.decorators import method_decorator
+from uzum.product.models import Product, ProductAnalytics
+from uzum.product.serializers import ProductAnalyticsSerializer
+from uzum.utils.general import get_day_before_pretty, get_today_pretty_fake
 
 
 # @method_decorator(cache_page(seconds_until_midnight()), name="get")
@@ -65,7 +60,7 @@ class OngoingBannersView(APIView):
     def get(self, request):
         try:
             banners = Banner.objects.all()
-            date_pretty = get_today_pretty()
+            date_pretty = get_today_pretty_fake()
             date_pretty = get_day_before_pretty(date_pretty)
 
             product_analytics_today = ProductAnalytics.objects.filter(date_pretty=date_pretty)

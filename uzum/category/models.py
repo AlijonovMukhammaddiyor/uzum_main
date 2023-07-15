@@ -1,12 +1,14 @@
 import uuid
 from datetime import datetime
 
+import numpy as np
+import pandas as pd
 import pytz
+from django.core.cache import cache
 from django.db import connection, models
 from django.utils import timezone
 
-from uzum.product.models import get_today_pretty
-from uzum.sku.models import get_day_before_pretty
+from uzum.utils.general import get_day_before_pretty, get_today_pretty
 
 
 class Category(models.Model):
@@ -26,6 +28,35 @@ class Category(models.Model):
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
 
     descendants = models.TextField(null=True, blank=True)  # descendant categoryIds separated by comma
+    ancestors = models.TextField(null=True, blank=True)
+
+    def generate_ancestors_string(self):
+        current_category = self
+        ancestors = []
+
+        while current_category.parent:
+            ancestors.append(current_category.parent.title + ":" + str(current_category.parent.categoryId))
+            current_category = current_category.parent
+
+        # reverse the list since we want to start from the root
+        ancestors.reverse()
+
+        # join the list using '/' as a delimiter
+        return "/".join(ancestors)
+
+    @staticmethod
+    def update_ancestors():
+        """
+        Updates ancestors field of all categories.
+        """
+        i = 0
+        categories = Category.objects.all()
+        for category in categories:
+            print(i)
+            i += 1
+            ancestors = category.generate_ancestors_string()
+            category.ancestors = ancestors
+            category.save()
 
     def __str__(self):
         return self.title + " " + str(self.categoryId)
@@ -149,7 +180,9 @@ class CategoryAnalytics(models.Model):
                             AVG(pa.average_purchase_price) as average_price
                         FROM
                             category_category c
-                            INNER JOIN product_product p ON p.category_id = c."categoryId"
+                            INNER JOIN product_product p ON p.category_id = ANY(
+                                ARRAY[c."categoryId"] || CASE WHEN c.descendants IS NOT NULL THEN string_to_array(c.descendants, ',')::integer[] ELSE ARRAY[]::integer[] END
+                            )
                             INNER JOIN product_productanalytics pa ON pa.product_id = p.product_id AND pa.date_pretty = %s
                         GROUP BY
                             c."categoryId"
@@ -333,3 +366,67 @@ class CategoryAnalytics(models.Model):
             CategoryAnalytics.set_average_purchase_price(date_pretty)
         except Exception as e:
             print(e, "Error in update_analytics")
+
+    @staticmethod
+    def set_top_growing_categories_ema():
+        # Set date range (last 50 days)
+        end_date = pd.to_datetime("2023-07-13")
+        start_date = end_date - pd.DateOffset(days=50)
+
+        # Retrieve category sales data for the last 50 days
+        sales_data = CategoryAnalytics.objects.filter(
+            created_at__range=[start_date, end_date], category__descendants=None
+        ).values("category__categoryId", "created_at", "total_orders")
+
+        # Convert QuerySet to DataFrame
+        sales_df = pd.DataFrame.from_records(sales_data)
+
+        # Make sure created_at is a datetime type
+        sales_df["created_at"] = pd.to_datetime(sales_df["created_at"])
+
+        # Set created_at as index (required for rolling function)
+        sales_df = sales_df.set_index("created_at").sort_index()
+
+        # Group by category and calculate the 3-day, 7-day, 14-day, 21-day, 30-day, and 50-day EMA of sales
+        for span in [3, 7, 14, 21, 30, 50]:
+            sales_df[f"ema_{span}_days"] = sales_df.groupby("category__categoryId")["total_orders"].transform(
+                lambda x: x.ewm(span=span).mean()
+            )
+
+        # Calculate trend indicators (ratios of EMAs)
+        sales_df["trend_3_to_7"] = sales_df["ema_3_days"] / sales_df["ema_7_days"]
+        sales_df["trend_7_to_14"] = sales_df["ema_7_days"] / sales_df["ema_14_days"]
+        sales_df["trend_7_to_21"] = sales_df["ema_7_days"] / sales_df["ema_21_days"]
+        sales_df["trend_14_to_30"] = sales_df["ema_14_days"] / sales_df["ema_30_days"]
+        sales_df["trend_21_to_50"] = sales_df["ema_21_days"] / sales_df["ema_50_days"]
+
+        # Reset index (to allow the next operations)
+        sales_df = sales_df.reset_index()
+
+        # Get the last day (most recent) of trend indicators for each category
+        sales_df = sales_df.groupby("category__categoryId").last()
+
+        # Only consider categories with total orders greater than 100
+        sales_df = sales_df[sales_df["total_orders"] > 100]
+
+        # Calculate score as the mean of trend indicators
+        weights = [0.4, 0.3, 0.2, 0.1, 0.05]  # adjust these weights as needed
+        sales_df["score"] = sales_df[
+            [
+                "trend_3_to_7",
+                "trend_7_to_14",
+                "trend_7_to_21",
+                "trend_14_to_30",
+                "trend_21_to_50",
+            ]
+        ].apply(lambda x: np.average(x, weights=weights), axis=1)
+
+        # Sort categories by score in descending order and take the top 10
+        top_growing_categories = sales_df.sort_values("score", ascending=False).head(20)
+
+        # Return the list of top growing category IDs
+        top_growing_categories = top_growing_categories.index.tolist()
+
+        # Set to cache with timeout 1 day
+        print("Setting top_growing_categories to cache", len(top_growing_categories), top_growing_categories)
+        cache.set("top_growing_categories", top_growing_categories, timeout=60 * 60 * 24)

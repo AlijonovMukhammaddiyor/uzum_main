@@ -3,7 +3,7 @@
 from django.db import migrations, models
 import django.db.models.deletion
 import uuid
-import uzum.product.models
+from uzum.utils.general import get_today_pretty
 
 
 class Migration(migrations.Migration):
@@ -61,7 +61,7 @@ class Migration(migrations.Migration):
                     models.CharField(
                         blank=True,
                         db_index=True,
-                        default=uzum.product.models.get_today_pretty,
+                        default=get_today_pretty,
                         max_length=255,
                         null=True,
                     ),

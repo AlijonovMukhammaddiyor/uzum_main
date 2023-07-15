@@ -1,17 +1,15 @@
-from collections import defaultdict
 import time
 import traceback
 from datetime import date, datetime, timedelta
 from itertools import groupby
-from django.db import connection
-from django.core.cache import cache
+
 import pandas as pd
 import pytz
 import requests
-from django.db.models import Avg, Count, F, OuterRef, Prefetch, Q, Subquery
-from django.utils import timezone
+from django.core.cache import cache
 from django.core.paginator import Paginator
-
+from django.db.models import Avg, Count, OuterRef, Prefetch, Q, Subquery
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -26,16 +24,16 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.jobs.constants import PRODUCT_HEADER
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
-from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.pagination import ExamplePagination
 from uzum.product.serializers import (
     CurrentProductSerializer,
     ExtendedProductAnalyticsSerializer,
     ExtendedProductSerializer,
-    ProductAnalyticsSerializer,
     ProductSerializer,
 )
-from uzum.sku.models import SkuAnalytics, get_day_before_pretty
+from uzum.sku.models import SkuAnalytics
+from uzum.utils.general import get_day_before_pretty, get_today_pretty, get_today_pretty_fake
 
 
 class ProductView(APIView):
@@ -69,7 +67,7 @@ class Top5ProductsView(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request):
         try:
-            date_pretty = request.query_params.get("date", get_today_pretty())
+            date_pretty = request.query_params.get("date", get_today_pretty_fake())
             products = (
                 ProductAnalytics.objects.filter(date_pretty=date_pretty)
                 .order_by("-orders_amount")[:5]
@@ -102,7 +100,7 @@ class ProductsSegmentationView(APIView):
 
             start_date_str = request.query_params.get("start_date", None)
             if start_date_str is None:
-                date_pretty = datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
+                date_pretty = get_today_pretty()
             else:
                 date_pretty = start_date_str
 
@@ -180,12 +178,9 @@ class CurrentProductView(APIView):
     def get(self, request: Request, product_id: str):
         try:
             start = time.time()
-            date_pretty = get_today_pretty()
             if product_id is None:
                 return Response({"error": "product_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-            # product = Product.objects.get(product_id=product_id).prefetch_related(
-            #     "skus", "analytics", "sku__analytics"
-            # )
+
             product = Product.objects.prefetch_related("skus", "analytics", "skus__analytics").get(
                 product_id=product_id
             )
@@ -245,7 +240,7 @@ class ProductsView(ListAPIView):
             filter_query = Q()
             if search_columns and filters:
                 search_columns = search_columns.split(",")
-                filters = filters.split("#####")
+                filters = filters.split("---")
 
                 if len(search_columns) != len(filters):
                     raise ValidationError({"error": "Number of search columns and filters does not match"})
@@ -295,12 +290,23 @@ class SingleProductAnalyticsView(APIView):
                     timezone=pytz.timezone("Asia/Tashkent"),
                 )
 
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                end_date = timezone.make_aware(
+                    datetime.combine(date.today() - timedelta(days=1), datetime.min.time()),
+                    timezone=pytz.timezone("Asia/Tashkent"),
+                ).replace(hour=23, minute=59, second=59)
+            else:
+                end_date = timezone.make_aware(
+                    datetime.combine(date.today(), datetime.min.time()),
+                    timezone=pytz.timezone("Asia/Tashkent"),
+                ).replace(hour=23, minute=59, second=59)
+
             product_analytics_qs = ProductAnalytics.objects.filter(
-                product__product_id=product_id, created_at__gte=start_date
+                product__product_id=product_id, created_at__range=[start_date, end_date]
             ).order_by("created_at")
 
             sku_analytics_qs = SkuAnalytics.objects.filter(
-                sku__product__product_id=product_id, created_at__gte=start_date
+                sku__product__product_id=product_id, created_at__range=[start_date, end_date]
             ).order_by("created_at")
 
             product = (
@@ -399,6 +405,11 @@ class SimilarProductsViewByUzum(APIView):
                     "product__photos",
                 )
             )
+
+            for product in analytics:
+                product["product__category__title"] += f"(({product['product__category__categoryId']}))"
+                product["product__shop__title"] += f"(({product['product__shop__link']}))"
+                product["product__title"] += f"(({product['product__product_id']}))"
 
             # group by product__product_id
             grouped_analytics = []
@@ -503,20 +514,61 @@ class NewProductsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
+    VALID_SORT_FIELDS = [
+        "orders_amount",
+        "reviews_amount",
+        "product_available_amount",
+        "rating",
+        "position_in_category",
+        "average_purchase_price",
+    ]
+    VALID_FILTER_FIELDS = ["product__title", "product__shop__title", "product__category__title"]
 
     @extend_schema(tags=["Product"])
     def get(self, request: Request):
         try:
             print("Start NewProductsView")
             start = time.time()
+            column = request.query_params.get("column", "orders_amount")  # default is 'orders_amount'
+            order = request.query_params.get("order", "desc")  # default is 'desc'
+            search_columns = request.query_params.get("searches", "")  # default is empty string
+            filters = request.query_params.get("filters", "")  # default is empty string
+
+            # Validate sorting
+            if column not in self.VALID_SORT_FIELDS:
+                raise ValidationError({"error": f"Invalid column: {column}"})
+
+            if order not in ["asc", "desc"]:
+                raise ValidationError({"error": f"Invalid order: {order}"})
+
+            # Determine sorting order
+            if order == "desc":
+                column = "-" + column
+
+            # Build filter query
+            filter_query = Q()
+            if search_columns and filters:
+                search_columns = search_columns.split(",")
+                filters = filters.split("---")
+
+                if len(search_columns) != len(filters):
+                    raise ValidationError({"error": "Number of search columns and filters does not match"})
+
+                for i in range(len(search_columns)):
+                    if search_columns[i] not in self.VALID_FILTER_FIELDS:
+                        raise ValidationError({"error": f"Invalid search column: {search_columns[i]}"})
+
+                    filter_query &= Q(**{f"{search_columns[i]}__icontains": filters[i]})
+
             # get the recent products created last week
             start_date = timezone.make_aware(
-                datetime.combine(date.today() - timedelta(days=2), datetime.min.time()),
+                datetime.combine(date.today() - timedelta(days=3), datetime.min.time()),
             ).replace(tzinfo=pytz.timezone("Asia/Tashkent"))
 
             products = (
                 ProductAnalytics.objects.select_related("product", "product__category", "product__shop")
-                .filter(date_pretty=get_today_pretty(), product__created_at__gte=start_date)
+                .filter(date_pretty=get_today_pretty_fake(), product__created_at__gte=start_date)
+                .filter(filter_query)
                 .values(
                     "product__product_id",
                     "product__title",
@@ -535,7 +587,7 @@ class NewProductsView(APIView):
                     "position_in_category",
                     "date_pretty",
                 )
-            ).order_by("-orders_amount", "-product__created_at")
+            ).order_by(column, "-product__created_at")
 
             paginator = Paginator(products, 20)
             page_number = request.query_params.get("page", 1)
@@ -543,9 +595,9 @@ class NewProductsView(APIView):
 
             # add category_id to category__title -> product__category__title + (categoryId)
             for product in page_obj:
-                product["product__category__title"] += f" ({product['product__category__categoryId']})"
-                product["product__shop__title"] += f" ({product['product__shop__link']})"
-                product["product__title"] += f" ({product['product__product_id']})"
+                product["product__category__title"] += f"(({product['product__category__categoryId']}))"
+                product["product__shop__title"] += f"(({product['product__shop__link']}))"
+                product["product__title"] += f"(({product['product__product_id']}))"
 
             # Get the total count of matching products
             print("Time taken for NewProductsView", time.time() - start)
@@ -557,6 +609,7 @@ class NewProductsView(APIView):
                 status=status.HTTP_200_OK,
             )
         except Exception as e:
+            print(e)
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -565,23 +618,45 @@ class GrowingProductsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
+    pagination_class = ExamplePagination
+    VALID_FILTER_FIELDS = ["product__title", "product__shop__title", "product__category__title"]
 
     @extend_schema(tags=["Product"])
     def get(self, request: Request):
         try:
             print("Start GrowingProductsView")
             start = time.time()
+            search_columns = request.query_params.get("searches", "")  # default is empty string
+            filters = request.query_params.get("filters", "")  # default is empty string
 
+            # Build filter query
+            filter_query = Q()
+            if search_columns and filters:
+                search_columns = search_columns.split(",")
+                filters = filters.split("---")
+
+                if len(search_columns) != len(filters):
+                    raise ValidationError({"error": "Number of search columns and filters does not match"})
+
+                for i in range(len(search_columns)):
+                    if search_columns[i] not in self.VALID_FILTER_FIELDS:
+                        raise ValidationError({"error": f"Invalid search column: {search_columns[i]}"})
+
+                    filter_query &= Q(**{f"{search_columns[i]}__icontains": filters[i]})
+            page = int(request.query_params.get("page", 1))
             start_date = timezone.make_aware(
                 datetime.combine(date.today() - timedelta(days=30), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             top_growing_products = cache.get("top_growing_products", [])
+            paginator = Paginator(top_growing_products, 20)
+            product_ids_page = paginator.get_page(page)
 
             products = (
                 ProductAnalytics.objects.select_related("product", "product__category", "product__shop")
-                .filter(product__product_id__in=top_growing_products, created_at__gte=start_date)
+                .filter(product__product_id__in=product_ids_page, created_at__gte=start_date)
+                .filter(filter_query)
                 .values(
                     "product__product_id",
                     "product__title",
@@ -599,20 +674,64 @@ class GrowingProductsView(APIView):
                     "position",
                     "position_in_category",
                     "date_pretty",
+                    "created_at",
                 )
-                .order_by("product__product_id", "date_pretty")
+                .order_by("product__product_id", "created_at")
             )
 
             grouped_analytics = []
             for product_id, group in groupby(products, key=lambda x: x["product__product_id"]):
+                analytics = list(group)
+                last_analytics = analytics[-1]
+                prev_orders = analytics[0]["orders_amount"]
+
+                i = 1
+                orders = []
+                reviews = []
+                available_amount = []
+
+                while i < len(analytics):
+                    orders.append({"y": analytics[i]["orders_amount"] - prev_orders, "x": analytics[i]["date_pretty"]})
+                    reviews.append({"y": analytics[i]["reviews_amount"], "x": analytics[i]["date_pretty"]})
+                    available_amount.append(
+                        {
+                            "y": analytics[i]["available_amount"],
+                            "x": analytics[i]["date_pretty"],
+                        }
+                    )
+                    prev_orders = analytics[i]["orders_amount"]
+
+                    i += 1
+
                 grouped_analytics.append(
                     {
                         "product_id": product_id,
-                        "analytics": list(group),
+                        "product__title": last_analytics["product__title"]
+                        + f"(({last_analytics['product__product_id']}))",
+                        "product__category__title": last_analytics["product__category__title"]
+                        + f"(({last_analytics['product__category__categoryId']}))",
+                        "product__shop__title": last_analytics["product__shop__title"]
+                        + f"(({last_analytics['product__shop__link']}))",
+                        "position": last_analytics["position"],
+                        "position_in_category": last_analytics["position_in_category"],
+                        "orders": orders,
+                        "reviews": reviews,
+                        "available_amount": available_amount,
+                        "average_purchase_price": last_analytics["average_purchase_price"],
+                        "product__created_at": last_analytics["product__created_at"],
+                        "photos": last_analytics["product__photos"],
+                        "rating": last_analytics["rating"],
                     }
                 )
             print("Time taken for GrowingProductsView", time.time() - start)
-            return Response(grouped_analytics, status=status.HTTP_200_OK)
+
+            return Response(
+                {
+                    "results": grouped_analytics,
+                    "count": products.count(),
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             traceback.print_exc()

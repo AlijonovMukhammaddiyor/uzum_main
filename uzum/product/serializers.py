@@ -121,6 +121,7 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             "product_id",
+            "created_at",
             "title",
             "description",
             "adult",
