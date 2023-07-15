@@ -119,15 +119,17 @@ def update_uzum_data(args=None, **kwargs):
     start = time.time()
     Category.update_descendants()
     print(f"Category Descendants updated in {time.time() - start} seconds")
-    print("Updating Category Analytics...")
-    start = time.time()
-    CategoryAnalytics.update_analytics(date_pretty)
-    print(f"Category Analytics updated in {time.time() - start} seconds")
+
     print("Updating ProductAnalytics positions...")
     start = time.time()
     ProductAnalytics.set_positions(date_pretty)
     ProductAnalytics.update_average_purchase_price(date_pretty)
     print(f"ProductAnalytics positions updated in {time.time() - start} seconds")
+
+    print("Updating Category Analytics...")
+    start = time.time()
+    CategoryAnalytics.update_analytics(date_pretty)
+    print(f"Category Analytics updated in {time.time() - start} seconds")
 
     print("ShopAnalytics updating...")
     start = time.time()
@@ -141,6 +143,9 @@ def update_uzum_data(args=None, **kwargs):
 
     print("Setting top products...")
     ProductAnalytics.set_top_growing_products()
+
+    print("Setting top categories...")
+    CategoryAnalytics.set_top_growing_categories_ema()
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
     return True
