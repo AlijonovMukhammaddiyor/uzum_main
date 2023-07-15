@@ -32,6 +32,7 @@ from uzum.product.serializers import (
     ExtendedProductSerializer,
     ProductSerializer,
 )
+from uzum.review.views import CookieJWTAuthentication
 from uzum.sku.models import SkuAnalytics
 from uzum.utils.general import get_day_before_pretty, get_today_pretty, get_today_pretty_fake
 

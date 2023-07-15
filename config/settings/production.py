@@ -22,6 +22,7 @@ ALLOWED_HOSTS += [
     "localhost:3000",
     "uzanalitika.uz",
     "www.uzanalitika.uz",
+    "207.154.218.194",
 ]
 
 # DATABASES
@@ -212,11 +213,14 @@ CORS_ORIGIN_WHITELIST = [
     # Add other allowed origins if needed
 ]
 
-# CSRF_TRUSTED_ORIGINS = [
-#     # "https://api.alijonov.com",
-#     "http://localhost:3000",
-#     # Add other allowed origins if needed
-# ]
+CSRF_TRUSTED_ORIGINS = [
+    # "https://api.alijonov.com",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "https://uzanalitika.uz",
+    "https://www.uzanalitika.uz",
+    # Add other allowed origins if needed
+]
 
 CORS_ALLOW_METHODS = [
     "DELETE",
@@ -231,7 +235,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + ["Set-Cookie"]
 # SESSION_COOKIE_SECURE = False
 # SESSION_COOKIE_DOMAIN = "localhost"
 SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "None"
-# CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
 CORS_ALLOW_CREDENTIALS = True

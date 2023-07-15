@@ -18,6 +18,7 @@ from rest_framework_simplejwt import authentication
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from twilio.base.exceptions import TwilioRestException
 from twilio.rest import Client
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from config.settings.base import env
 from uzum.users.api.serializers import (
@@ -151,29 +152,71 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
     @extend_schema(tags=["token"], operation_id="login")
     def post(self, request, *args, **kwargs):
+        print("request.data: ", request.data)
         serializer = self.get_serializer(data=request.data)
 
         serializer.is_valid(raise_exception=True)
 
-        data = {
-            "refresh": str(serializer.validated_data["refresh"]),
-            "access": str(serializer.validated_data["access"]),
-        }
-        return Response(data)
+        response = Response()
+        max_age = 3600 * 24 * 14  # Two weeks
+        max_age_access = 60 * 15  # 15 minutes
+        response.set_cookie(
+            key="refresh",
+            value=str(serializer.validated_data["refresh"]),
+            httponly=True,
+            max_age=max_age,
+            samesite="Lax",
+        )
+        response.set_cookie(
+            key="access",
+            value=str(serializer.validated_data["access"]),
+            httponly=False,
+            samesite="Lax",
+            max_age=max_age_access,
+        )
+
+        return response
+
+
+# class CustomTokenRefreshView(TokenRefreshView):
+#     @extend_schema(tags=["token"], operation_id="refresh_token")
+#     def finalize_response(self, request, response, *args, **kwargs):
+#         if response.data.get("refresh"):
+#             response.set_cookie(
+#                 "refresh_token",
+#                 response.data["refresh"],
+#                 httponly=True,
+#             )
+#             response.set_cookie("access_token", response.data["access"], httponly=False)
+#             del response.data["refresh"]
+#         return super().finalize_response(request, response, *args, **kwargs)
 
 
 class CustomTokenRefreshView(TokenRefreshView):
     @extend_schema(tags=["token"], operation_id="refresh_token")
-    def finalize_response(self, request, response, *args, **kwargs):
-        if response.data.get("refresh"):
-            response.set_cookie(
-                "refresh_token",
-                response.data["refresh"],
-                httponly=True,
+    def post(self, request: Request, *args, **kwargs):
+        try:
+            serializer = self.get_serializer(
+                data={
+                    "refresh": request.COOKIES.get("refresh"),
+                }
             )
-            response.set_cookie("access_token", response.data["access"], httponly=False)
-            del response.data["refresh"]
-        return super().finalize_response(request, response, *args, **kwargs)
+
+            serializer.is_valid(raise_exception=True)
+
+            response = Response(serializer.validated_data)
+            access_token = str(serializer.validated_data["access"])
+
+            # Set the new access token as an HttpOnly cookie
+            max_age_access = 60 * 15  # 15 minutes
+            response.set_cookie(
+                key="access", value=access_token, httponly=False, samesite="Lax", max_age=max_age_access
+            )
+            # print("new access token set", access_token)
+            return response
+        except Exception as e:
+            print("Error in CustomTokenRefreshView: ", e)
+            return Response(status=500, data={"message": "Internal server error"})
 
 
 class LogoutView(APIView):
@@ -192,8 +235,8 @@ class LogoutView(APIView):
         # Clear the cookies
         print("Cookies cleared")
         response = Response({"detail": "Logged out"})
-        response.delete_cookie("access_token")
-        response.delete_cookie("refresh_token")
+        response.delete_cookie("access")
+        response.delete_cookie("refresh")
 
         return response
 

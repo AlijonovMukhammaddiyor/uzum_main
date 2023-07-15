@@ -23,6 +23,7 @@ from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
+from uzum.review.views import CookieJWTAuthentication
 from uzum.shop.models import Shop, ShopAnalytics
 from uzum.sku.models import SkuAnalytics
 from uzum.utils.general import get_day_before_pretty, get_next_day_pretty, get_today_pretty, get_today_pretty_fake
@@ -1093,7 +1094,7 @@ class ShopCategoryAnalyticsView(APIView):
 
 class ShopProductsByCategoryView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     serializer_class = ProductSerializer
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination
@@ -1223,7 +1224,8 @@ class UzumTotalProducts(APIView):
         try:
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
-            )
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
             if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
                 # end date is end of yesterday
                 end_date = timezone.make_aware(
@@ -1256,7 +1258,7 @@ class UzumTotalShops(APIView):
         try:
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
-            )
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
             if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
                 # end date is end of yesterday
                 end_date = timezone.make_aware(
