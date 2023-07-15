@@ -1,14 +1,17 @@
+import math
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from itertools import groupby
+from rest_framework.exceptions import ValidationError
 
 import numpy as np
 import pandas as pd
 import pytz
 from django.core.cache import cache
 from django.db import connection, transaction
-from django.db.models import Avg, Case, Count, F, FloatField, OuterRef, Subquery, Sum, When
+from django.db.models import Avg, Case, Count, F, FloatField, OuterRef, Subquery, Sum, When, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -23,8 +26,9 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.utils import calculate_shop_analytics_in_category
-from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.sku.models import SkuAnalytics
+from uzum.utils.general import get_today_pretty, get_today_pretty_fake
 
 from .models import Category, CategoryAnalytics
 from .serializers import CategoryAnalyticsSeralizer, CategorySerializer, ProductAnalyticsViewSerializer
@@ -106,22 +110,23 @@ class CategoryProductsView(ListAPIView):
         if ordering == "desc":
             order_by_column = f"-{column}"
 
-        search_columns = self.request.query_params.get("searches", "")
-        searches_dict = {}
+        search_columns = self.request.query_params.get("searches", "")  # default is empty string
+        filters = self.request.query_params.get("filters", "")  # default is empty string
 
-        if search_columns:
-            filters = self.request.query_params.get("filters", "")
+        # Build filter query
+        filter_query = Q()
+        if search_columns and filters:
+            search_columns = search_columns.split(",")
+            filters = filters.split("---")
 
-            searchs = search_columns.split(",")
+            if len(search_columns) != len(filters):
+                raise ValidationError({"error": "Number of search columns and filters does not match"})
 
-            for col in searchs:
-                if col not in self.VALID_SEARCHES:
-                    return Response({"error": f"Invalid search column: {col}"}, status=status.HTTP_400_BAD_REQUEST)
+            for i in range(len(search_columns)):
+                if search_columns[i] not in self.VALID_SEARCHES:
+                    raise ValidationError({"error": f"Invalid search column: {search_columns[i]}"})
 
-            filters = filters.split(",")
-
-            for i in range(len(searchs)):
-                searches_dict[searchs[i]] = filters[i]
+                filter_query &= Q(**{f"{search_columns[i]}__icontains": filters[i]})
 
         # Get the category
         category = get_object_or_404(Category, pk=category_id)
@@ -137,10 +142,8 @@ class CategoryProductsView(ListAPIView):
         # Prepare base queryset
         queryset = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
 
-        # Apply search filters
-        for column, search_text in searches_dict.items():
-            # Here, we use the __icontains lookup to perform a case-insensitive search
-            queryset = queryset.filter(**{f"{column}__icontains": search_text})
+        # Apply filters
+        queryset = queryset.filter(filter_query)
 
         # Apply ordering
         queryset = queryset.order_by(order_by_column)
@@ -185,7 +188,7 @@ class CategoryTopProductsView(ListAPIView):
         )["orders_amount__sum"]
 
         descendants_count = CategoryAnalytics.objects.filter(
-            category__in=descendants, date_pretty=get_today_pretty()
+            category__in=descendants, date_pretty=get_today_pretty_fake()
         ).count()
 
         # return ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by("-orders_amount")[:5]
@@ -223,11 +226,10 @@ class CategoryProductsPeriodComparisonView(APIView):
             three_weeks_ago_date = timezone.now() - timedelta(weeks=3)
             four_weeks_ago_date = timezone.now() - timedelta(weeks=4)
             four_weeks_and_day_ago_date = timezone.now() - timedelta(weeks=4, days=1)
-            today = timezone.now()
 
-            today_analytics = ProductAnalytics.objects.filter(
-                product=OuterRef("pk"), date_pretty=today.strftime("%Y-%m-%d")
-            )
+            date_pretty = get_today_pretty()
+
+            today_analytics = ProductAnalytics.objects.filter(product=OuterRef("pk"), date_pretty=date_pretty)
             week_ago_analytics = ProductAnalytics.objects.filter(
                 product=OuterRef("pk"), date_pretty=one_week_ago_date.strftime("%Y-%m-%d")
             )
@@ -245,7 +247,7 @@ class CategoryProductsPeriodComparisonView(APIView):
             )
 
             today_sku_analytics = SkuAnalytics.objects.filter(
-                sku__product_id=OuterRef("product_id"), date_pretty=today.strftime("%Y-%m-%d")
+                sku__product_id=OuterRef("product_id"), date_pretty=date_pretty
             )
             week_ago_sku_analytics = SkuAnalytics.objects.filter(
                 sku__product_id=OuterRef("product_id"), date_pretty=one_week_ago_date.strftime("%Y-%m-%d")
@@ -469,9 +471,11 @@ class SubcategoriesView(APIView):
 
             category = Category.objects.get(categoryId=category_id)
             children = category.children.all()
+
             if not children:
                 return Response(status=status.HTTP_200_OK, data={"data": [], "total": 0, "main": []})
-            date_pretty = get_today_pretty()
+
+            date_pretty = get_today_pretty_fake()
 
             # Get main_analytics using raw SQL
             with connection.cursor() as cursor:
@@ -487,6 +491,9 @@ class SubcategoriesView(APIView):
                 main_analytics = dictfetchall(cursor)
 
             # Get children_analytics using raw SQL
+            print("children", len(children))
+            ids = [child.categoryId for child in children]
+            print("ids", ids)
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -495,7 +502,7 @@ class SubcategoriesView(APIView):
                     JOIN category_category AS c ON ca.category_id = c."categoryId"
                     WHERE ca.category_id IN %s AND ca.date_pretty = %s
                 """,
-                    [tuple(child.categoryId for child in children), date_pretty],
+                    [tuple(ids), date_pretty],
                 )
                 children_analytics = dictfetchall(cursor)
 
@@ -687,7 +694,13 @@ class CategoryShopsView(APIView):
             )
 
             data = list(shops)
+            # convert title to title + ((shop_link))
+            for item in data:
+                item["title"] = f"{item['shop_title']} (({item['shop_link']}))"
+                del item["shop_title"]
+                del item["shop_link"]
 
+            print(f"Category Shops took {time.time() - start_time} seconds")
             return Response(
                 status=status.HTTP_200_OK,
                 data={
@@ -729,3 +742,187 @@ class NicheSlectionView(APIView):
         except Exception as e:
             print("Error in NicheSlectionView: ", e)
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
+
+
+class GrowingCategoriesView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Product"])
+    def get(self, request: Request):
+        try:
+            print("Start GrowingProductsView")
+            start = time.time()
+
+            start_date = timezone.make_aware(
+                datetime.combine(date.today() - timedelta(days=30), datetime.min.time()),
+                timezone=pytz.timezone("Asia/Tashkent"),
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            top_growing_categories = cache.get("top_growing_categories", [])
+
+            categories = (
+                CategoryAnalytics.objects.select_related("product", "product__category", "product__shop")
+                .filter(category__categoryId__in=top_growing_categories, created_at__gte=start_date)
+                .values(
+                    "category__categoryId",
+                    "category__title",
+                    "category__created_at",
+                    "category__descendants",
+                    "average_purchase_price",
+                    "average_product_rating",
+                    "total_products",
+                    "total_orders",
+                    "total_reviews",
+                    "total_shops",
+                    "total_shops_with_sales",
+                    "total_products_with_sales",
+                    "date_pretty",
+                )
+                .order_by("category__categoryId", "date_pretty")
+            )
+
+            grouped_analytics = []
+            for categoryId, group in groupby(categories, key=lambda x: x["category__categoryId"]):
+                grouped_analytics.append(
+                    {
+                        "categoryId": categoryId,
+                        "analytics": list(group),
+                    }
+                )
+            print("Time taken for GrowingCategories", time.time() - start)
+            return Response(grouped_analytics, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class MainCategoriesAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request: Request):
+        try:
+            start = time.time()
+            start_date = timezone.make_aware(
+                datetime.combine(date.today() - timedelta(days=45), datetime.min.time()),
+                timezone=pytz.timezone("Asia/Tashkent"),
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            main_category = Category.objects.get(categoryId=1)
+            children = main_category.children.all()
+
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                end_date = timezone.make_aware(
+                    datetime.combine(date.today() - timedelta(days=1), datetime.min.time()),
+                    timezone=pytz.timezone("Asia/Tashkent"),
+                ).replace(hour=23, minute=59, second=59, microsecond=0)
+
+            else:
+                end_date = timezone.make_aware(
+                    datetime.combine(date.today(), datetime.min.time()),
+                    timezone=pytz.timezone("Asia/Tashkent"),
+                ).replace(hour=23, minute=59, second=59, microsecond=0)
+
+            analytics = (
+                CategoryAnalytics.objects.filter(category__in=children, created_at__range=[start_date, end_date])
+                .order_by("category__categoryId", "created_at")
+                .values(
+                    "category__categoryId",
+                    "category__title",
+                    "average_purchase_price",
+                    "average_product_rating",
+                    "total_products",
+                    "total_orders",
+                    "total_reviews",
+                    "total_shops",
+                    "total_shops_with_sales",
+                    "total_products_with_sales",
+                    "date_pretty",
+                )
+            )
+
+            grouped_analytics = []
+            for _, group in groupby(analytics, key=lambda x: x["category__categoryId"]):
+                analytics = list(group)
+
+                all_orders = []
+                daily_orders = []
+                all_products = []
+                all_reviews = []
+                daily_reviews = []
+                all_shops = []
+                shops_with_sales = []
+                all_products_with_sales = []
+                average_price = []
+
+                prev_orders = analytics[0]["total_orders"]
+                prev_reviews = analytics[0]["total_reviews"]
+
+                i = 0
+                while i < len(analytics):
+                    # all_orders.append(analytics[i]["total_orders"])
+                    all_orders.append({"x": analytics[i]["date_pretty"], "y": analytics[i]["total_orders"]})
+                    # all_products.append(analytics[i]["total_products"])
+                    all_products.append({"x": analytics[i]["date_pretty"], "y": analytics[i]["total_products"]})
+                    # all_reviews.append(analytics[i]["total_reviews"])
+                    all_reviews.append({"x": analytics[i]["date_pretty"], "y": analytics[i]["total_reviews"]})
+
+                    # all_shops.append(analytics[i]["total_shops"])
+                    all_shops.append({"x": analytics[i]["date_pretty"], "y": analytics[i]["total_shops"]})
+                    # shops_with_sales.append(analytics[i]["total_shops_with_sales"])
+                    shops_with_sales.append(
+                        {"x": analytics[i]["date_pretty"], "y": analytics[i]["total_shops_with_sales"]}
+                    )
+                    # all_products_with_sales.append(analytics[i]["total_products_with_sales"])
+                    all_products_with_sales.append(
+                        {"x": analytics[i]["date_pretty"], "y": analytics[i]["total_products_with_sales"]}
+                    )
+                    # average_price.append(analytics[i]["average_purchase_price"])
+                    average_price.append(
+                        {
+                            "x": analytics[i]["date_pretty"],
+                            "y": math.floor(analytics[i]["average_purchase_price"])
+                            if analytics[i]["average_purchase_price"]
+                            else 0,
+                        }
+                    )
+
+                    if i > 0:
+                        # daily_orders.append(analytics[i]["total_orders"] - prev_orders)
+                        daily_orders.append(
+                            {"x": analytics[i]["date_pretty"], "y": analytics[i]["total_orders"] - prev_orders}
+                        )
+                        # daily_reviews.append(analytics[i]["total_reviews"] - prev_reviews)/
+                        daily_reviews.append(
+                            {"x": analytics[i]["date_pretty"], "y": analytics[i]["total_reviews"] - prev_reviews}
+                        )
+
+                    prev_orders = analytics[i]["total_orders"]
+                    prev_reviews = analytics[i]["total_reviews"]
+
+                    i += 1
+
+                grouped_analytics.append(
+                    {
+                        "title": analytics[0]["category__title"],
+                        "prices": average_price,
+                        "orders": all_orders,
+                        "daily_orders": daily_orders,
+                        "products": all_products,
+                        "reviews": all_reviews,
+                        "daily_reviews": daily_reviews,
+                        "shops": all_shops,
+                        "shops_with_sales": shops_with_sales,
+                        "products_with_sales": all_products_with_sales,
+                    }
+                )
+            print("Time taken for Main Categories ", time.time() - start)
+            return Response(grouped_analytics, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

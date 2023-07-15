@@ -10,10 +10,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt import authentication
 
-from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
 from uzum.review.models import PopularSeaches
 from uzum.review.serializers import PopularSearchesSerializer
+from uzum.utils.general import get_today_pretty_fake
 
 from .models import Badge
 from .serializers import BadgeSerializer
@@ -62,13 +63,11 @@ class OngoingBadgesView(APIView):
             # product analytics have many to many relationship with badges
 
             date_str = request.query_params.get("date", None)
-            date_str = date_str if date_str else get_today_pretty()
+            date_str = date_str if date_str else get_today_pretty_fake()
 
             badges = []
 
             recent_product_analytics = ProductAnalytics.objects.filter(date_pretty=date_str)
-
-            print(recent_product_analytics.count())
 
             # Get distinct badges
             badges = Badge.objects.filter(products__in=recent_product_analytics).distinct()
@@ -132,9 +131,7 @@ class BadgeAnalytics(APIView):
     def get(self, request: Request, badge_id: int):
         try:
             badge = Badge.objects.get(badge_id=badge_id)
-            print(Product.objects.all().count())
-            products_count = ProductAnalytics.objects.filter(badges=badge, date_pretty=get_today_pretty()).count()
-            print(products_count)
+            products_count = ProductAnalytics.objects.filter(badges=badge, date_pretty=get_today_pretty_fake()).count()
             last_product_analytics = (
                 ProductAnalytics.objects.filter(badges=badge).order_by("-created_at").first().date_pretty
             )

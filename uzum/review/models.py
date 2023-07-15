@@ -2,7 +2,7 @@ import uuid
 
 from django.db import models
 
-from uzum.product.models import get_today_pretty
+from uzum.utils.general import get_today_pretty
 
 
 class Review(models.Model):

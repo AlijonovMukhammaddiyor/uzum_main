@@ -41,4 +41,6 @@ urlpatterns = [
         name="category-products",
     ),
     path("niches/", views.NicheSlectionView.as_view(), name="niches"),
+    path("growing/", views.GrowingCategoriesView.as_view(), name="growing-categories"),
+    path("main/", views.MainCategoriesAnalyticsView.as_view(), name="growing-categories"),
 ]

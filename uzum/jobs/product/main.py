@@ -1,5 +1,4 @@
 from uzum.jobs.constants import PAGE_SIZE
-from uzum.jobs.product.fetch_details import get_product_details_via_ids
 from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
 
 

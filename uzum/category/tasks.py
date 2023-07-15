@@ -23,10 +23,11 @@ from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.jobs.product.fetch_details import get_product_details_via_ids
 from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
 from uzum.jobs.product.MultiEntry import create_products_from_api
-from uzum.product.models import Product, ProductAnalytics, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics
 from uzum.review.models import PopularSeaches
 from uzum.shop.models import Shop, ShopAnalytics
 from uzum.sku.models import SkuAnalytics
+from uzum.utils.general import get_today_pretty
 
 
 @celery_app.task(

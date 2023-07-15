@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import pytz
 from django.db import connection
-from django.db.models import Avg, CharField, Count, F, FloatField, Max, Min, OuterRef, Subquery, Sum
+from django.db.models import Count, F, Q, Max, Min, OuterRef, Subquery, Sum, IntegerField, CharField
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -17,16 +17,16 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-
+from rest_framework.exceptions import ValidationError
 from uzum.category.models import Category, CategoryAnalytics
 from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
-from uzum.shop.paginations import ShopsPagination
-from uzum.sku.models import SkuAnalytics, get_day_before_pretty
+from uzum.shop.models import Shop, ShopAnalytics
+from uzum.sku.models import SkuAnalytics
+from uzum.utils.general import get_day_before_pretty, get_next_day_pretty, get_today_pretty, get_today_pretty_fake
 
-from .models import Shop, ShopAnalytics, get_today_pretty
 from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer
 
 
@@ -39,12 +39,6 @@ def get_totals(date_pretty):
     return totals
 
 
-def get_next_day_pretty(date_pretty):
-    date = datetime.strptime(date_pretty, "%Y-%m-%d")
-    next_day = date + timedelta(days=1)
-    return next_day.strftime("%Y-%m-%d")
-
-
 class Top5ShopsView(APIView):
     permission_classes = [AllowAny]
     serializer_class = ShopSerializer
@@ -54,7 +48,7 @@ class Top5ShopsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
-            date_pretty = get_today_pretty()
+            date_pretty = get_today_pretty_fake()
             shops = (
                 ShopAnalytics.objects.filter(date_pretty=date_pretty)
                 .order_by("-total_orders")[:5]
@@ -93,20 +87,13 @@ class TreemapShopsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
-            category = CategoryAnalytics.objects.get(
-                date_pretty=get_today_pretty(), category=Category.objects.get(categoryId=1)
-            )
-            total_orders = category.total_orders  # this is total orders of all shops in the market
-            total_products = category.total_products
-            total_reviews = category.total_reviews
-
             shops = (
-                ShopAnalytics.objects.filter(date_pretty=get_today_pretty())
+                ShopAnalytics.objects.filter(date_pretty=get_today_pretty_fake())
                 .order_by("-total_products")
                 .values("shop__title", "shop__link", "total_orders", "total_products", "total_reviews")
             )
 
-            totals = get_totals(get_today_pretty())
+            totals = get_totals(get_today_pretty_fake())
 
             return Response(
                 data={
@@ -145,7 +132,7 @@ class ShopsView(APIView):
 
     def get(self, request: Request, *args, **kwargs):
         try:
-            date_pretty = "2023-07-09"
+            date_pretty = get_today_pretty_fake()
             page_number = int(request.query_params.get("page", 1))
             offset = (page_number - 1) * self.PAGE_SIZE
             column = request.query_params.get("column", "position")
@@ -224,17 +211,11 @@ class ShopsView(APIView):
 
                 # attach shop link to title as title(link)
                 for result in results:
-                    result["shop_title"] = f'{result["shop_title"]} ({result["seller_link"]})'
+                    result["shop_title"] = f'{result["shop_title"]}(({result["seller_link"]}))'
 
             # Create the response data
             data = {
                 "results": results,
-                # "pagination": {
-                #     "total_count": total_count,
-                #     "total_pages": total_pages,
-                #     "page_number": page_number,
-                #     "page_size": self.PAGE_SIZE,
-                # },
                 "count": total_count,
             }
 
@@ -314,7 +295,7 @@ class ShopsOrdersSegmentationView(APIView):
     def get(self, request: Request):
         try:
             start_date_str = request.query_params.get(
-                "start_date", (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+                "start_date", (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")  # default 30 days ago
             )
             start_date = timezone.make_aware(
                 datetime.strptime(start_date_str, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
@@ -421,6 +402,17 @@ class ShopAnalyticsView(APIView):
                 datetime.now() - timedelta(days=int(range) + 1), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                # end date is end of yesterday
+                end_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                # end date is end of today
+                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
+
             if seller_id is None:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -432,11 +424,11 @@ class ShopAnalyticsView(APIView):
                         sa.date_pretty, COUNT(sa_categories.category_id) as category_count
                     FROM shop_shopanalytics sa
                     LEFT JOIN shop_shopanalytics_categories sa_categories ON sa.id = sa_categories.shopanalytics_id
-                    WHERE sa.created_at >= %s AND sa.shop_id = %s
+                    WHERE sa.created_at >= %s AND sa.shop_id = %s AND sa.created_at <= %s
                     GROUP BY sa.id
                     ORDER BY sa.created_at ASC
                     """,
-                    [start_date, seller_id],
+                    [start_date, seller_id, end_date],
                 )
                 columns = [col[0] for col in cursor.description]
                 data = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -458,8 +450,7 @@ class ShopCompetitorsView(APIView):
 
     def get_competitor_shops(self, shop: Shop, N=10):
         try:
-            # date_pretty = get_today_pretty()
-            date_pretty = "2023-07-07"
+            date_pretty = get_today_pretty_fake()
             # Get the shop analytics of the current shop for today's date
             shop_analytics_today = ShopAnalytics.objects.get(shop=shop, date_pretty=date_pretty)
 
@@ -527,12 +518,26 @@ class ShopCompetitorsView(APIView):
                 datetime.now() - timedelta(days=int(range) + 1), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
+            # check if it is before 7 am in Tashkent
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                # end date is end of yesterday
+                end_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                # end date is end of today
+                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
+
             competitor_shops_data = self.get_competitor_shops(shop)
 
             competitors_ids = [data[0] for data in competitor_shops_data]
 
             competitors_analytics = (
-                ShopAnalytics.objects.filter(shop__seller_id__in=competitors_ids, created_at__gte=start_date)
+                ShopAnalytics.objects.filter(
+                    shop__seller_id__in=competitors_ids, created_at__range=[start_date, end_date]
+                )
                 .annotate(category_count=Count("categories"))
                 .values(
                     "id",
@@ -621,15 +626,16 @@ class ShopDailySalesView(APIView):
         try:
             #! TODO: some products are not showing up in the analytics
             print("Shop Daily Sales View")
-            PAGE_SIZE = 100
             start = time.time()
             shop = get_object_or_404(Shop, seller_id=seller_id)
-            today_pretty = get_today_pretty()
-            yesterday_pretty = get_day_before_pretty(today_pretty)
-            date = request.query_params.get("date", yesterday_pretty)
-            page = request.query_params.get("page", 1)
-            start_index = (int(page) - 1) * PAGE_SIZE
-            end_index = int(page) * PAGE_SIZE
+
+            today_pretty = get_today_pretty_fake()
+            date = request.query_params.get("date", None)
+
+            if not date:
+                date = today_pretty
+            else:
+                date = get_next_day_pretty(date)
 
             start_date = timezone.make_aware(
                 datetime.strptime(date, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
@@ -643,24 +649,8 @@ class ShopDailySalesView(APIView):
                     return target - before
                 return target
 
-            # next_day_pretty = get_next_day_pretty(date)
-
-            def annotate_avg_purchase_price(date_pretty, queryset):
-                sku_analytics_subquery = (
-                    SkuAnalytics.objects.filter(sku__product_id=OuterRef("product_id"), date_pretty=date_pretty)
-                    .values("sku__product_id")
-                    .annotate(avg_purchase_price=Avg("purchase_price"))
-                    .values("avg_purchase_price")
-                )
-
-                return queryset.annotate(
-                    average_purchase_price=Subquery(sku_analytics_subquery, output_field=FloatField())
-                )
-
             analytics_date = (
-                annotate_avg_purchase_price(
-                    date, ProductAnalytics.objects.filter(date_pretty=date, product__shop=shop)
-                )
+                ProductAnalytics.objects.filter(date_pretty=date, product__shop=shop)
                 .values(
                     "average_purchase_price",
                     "orders_amount",
@@ -679,38 +669,16 @@ class ShopDailySalesView(APIView):
                 .order_by("-orders_amount")
             )
 
-            def annotate_latest_avg_purchase_price(queryset):
-                latest_date_subquery1 = (
-                    ProductAnalytics.objects.filter(product=OuterRef("sku__product"), created_at__lt=start_date)
-                    .order_by("-created_at")
-                    .values("date_pretty")[:1]
-                )
-
-                latest_date_subquery2 = (
-                    ProductAnalytics.objects.filter(product=OuterRef("product"), created_at__lt=start_date)
-                    .order_by("-created_at")
-                    .values("date_pretty")[:1]
-                )
-
-                sku_analytics_subquery = (
-                    SkuAnalytics.objects.filter(
-                        sku__product=OuterRef("product"),
-                        date_pretty=Subquery(latest_date_subquery1),
-                    )
-                    .values("sku__product__product_id")
-                    .annotate(avg_purchase_price=Avg("purchase_price"))
-                    .values("avg_purchase_price")
-                )
-
-                return queryset.filter(date_pretty=Subquery(latest_date_subquery2, output_field=CharField())).annotate(
-                    average_purchase_price=Subquery(sku_analytics_subquery, output_field=FloatField()),
-                )
-
-            print("before date_pretty")
-            day_before_analytics = annotate_latest_avg_purchase_price(
+            latest_date_subquery = (
                 ProductAnalytics.objects.filter(
-                    product__shop=shop,
+                    product__shop=shop, created_at__lt=start_date, product_id=OuterRef("product_id")
                 )
+                .order_by("-created_at")
+                .values("date_pretty")[:1]
+            )
+
+            day_before_analytics = ProductAnalytics.objects.filter(
+                product__shop=shop, date_pretty=Subquery(latest_date_subquery)
             ).values(
                 "average_purchase_price",
                 "orders_amount",
@@ -727,12 +695,14 @@ class ShopDailySalesView(APIView):
             )
 
             target_analytics = list(analytics_date)
-            print("target_analytics", len(target_analytics))
+
             before_analytics_dict = {i["product__product_id"]: i for i in day_before_analytics}
-            print("before_analytics_dict", len(before_analytics_dict))
+
             print("before date_pretty", day_before_analytics[0]["date_pretty"])
             for item in target_analytics:
                 before_item = before_analytics_dict.get(item["product__product_id"], None)
+                item["product__title"] += f'(({item["product__product_id"]}))'
+                item["product__category__title"] += f'(({item["product__product_id"]}))'
 
                 item["orders"] = {
                     "target": item["orders_amount"],
@@ -802,6 +772,7 @@ class ShopDailySalesView(APIView):
                     if before_item
                     else item["average_purchase_price"],
                 }
+
             if len(target_analytics) > 300:
                 final_res = [
                     entry
@@ -833,6 +804,7 @@ class ShopProductsView(ListAPIView):
     authentication_classes = [JWTAuthentication]
     serializer_class = ProductAnalyticsViewSerializer
     pagination_class = CategoryProductsPagination
+    VALID_FILTER_FIELDS = ["category_title", "product_title"]
 
     def get_queryset(self):
         """
@@ -845,12 +817,31 @@ class ShopProductsView(ListAPIView):
 
         ordering = self.request.query_params.get("order", "desc")
         column = self.request.query_params.get("column", "orders_amount")
+        search_columns = self.request.query_params.get("searches", "")  # default is empty string
+        filters = self.request.query_params.get("filters", "")  # default is empty string
+
+        # Build filter query
+        filter_query = Q()
+        if search_columns and filters:
+            search_columns = search_columns.split(",")
+            filters = filters.split("---")
+
+            if len(search_columns) != len(filters):
+                raise ValidationError({"error": "Invalid search query"})
+
+            for i in range(len(search_columns)):
+                if search_columns[i] not in self.VALID_FILTER_FIELDS:
+                    raise ValidationError({"error": f"Invalid search column: {search_columns[i]}"})
+
+                # filter_query |= Q(**{f"{search_columns[i]}__icontains": filters[i]})
+                # it should be And not Or and case insensitive
+                filter_query &= Q(**{f"{search_columns[i]}__icontains": filters[i]})
 
         order_by_column = column
         if ordering == "desc":
             order_by_column = f"-{column}"
 
-        return ProductAnalyticsView.objects.filter(shop_link=shop.link).order_by(order_by_column)
+        return ProductAnalyticsView.objects.filter(shop_link=shop.link).filter(filter_query).order_by(order_by_column)
 
     def list(self, request, *args, **kwargs):
         start_time = time.time()
@@ -906,7 +897,7 @@ class StoppedProductsView(APIView):
             print("STOPPED PRODUCTS")
             start = time.time()
             query = f"""
-            SELECT p.title, p.photos, pa.*, c.title AS category_title, AVG(ska.purchase_price) AS avg_purchase_price, AVG(ska.full_price) AS avg_full_price
+            SELECT p.title, p.photos, pa.*, c.title AS category_title, c."categoryId" as category_id,  AVG(ska.purchase_price) AS avg_purchase_price, AVG(ska.full_price) AS avg_full_price
             FROM product_product p
             INNER JOIN category_category c ON p.category_id = c."categoryId"
             INNER JOIN (
@@ -921,7 +912,7 @@ class StoppedProductsView(APIView):
             LEFT JOIN sku_sku s ON p.product_id = s.product_id
             LEFT JOIN sku_skuanalytics ska ON s.sku = ska.sku_id AND pa.date_pretty = ska.date_pretty
             WHERE p.shop_id = {seller_id}
-            GROUP BY p.title, pa.id, c.title, p.photos, pa.created_at, pa.date_pretty, pa.product_id, pa.reviews_amount, pa.orders_amount, pa.rating, pa.available_amount, pa.orders_money, pa.position, pa.position_in_category, pa.position_in_shop, pa.average_purchase_price
+            GROUP BY p.title, pa.id, c.title, c."categoryId", p.photos, pa.created_at, pa.date_pretty, pa.product_id, pa.reviews_amount, pa.orders_amount, pa.rating, pa.available_amount, pa.orders_money, pa.position, pa.position_in_category, pa.position_in_shop, pa.average_purchase_price
             """
 
             with connection.cursor() as cursor:
@@ -933,6 +924,11 @@ class StoppedProductsView(APIView):
 
                 # Convert the rows into a list of dictionaries
                 result = [dict(zip(column_names, row)) for row in rows]
+
+            for row in result:
+                row["title"] = row["title"] + f'(({row["product_id"]}))'
+                row["category_title"] = row["category_title"] + f'(({row["category_id"]}))'
+
             print(f"STOPPED PRODUCTS: {time.time() - start} seconds")
             return Response(data=result, status=status.HTTP_200_OK)
 
@@ -1013,58 +1009,77 @@ class ShopCategoryAnalyticsView(APIView):
                 datetime.now() - timedelta(days=range_), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
-            current_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
-                hour=23, minute=59, second=59, microsecond=999999
-            )
+            # if it is before 7 am in Tashkent, it is still yesterday
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                current_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                current_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
 
             dates = [start_date + timedelta(days=i) for i in range((current_date - start_date).days + 1)]
 
-            # shop = Shop.objects.get(pk=seller_id)
-            # category = Category.objects.get(pk=category_id)
-
-            # starting from start_date (included) for the shop in the category:
-            # 1.for each date after start_date,  get the latest product analytics for each product before or at date
-            # 2. get the sum of orders_amount, reviews_amount, and count of products
-            res = []
-            products = Product.objects.filter(shop_id=seller_id, category_id=category_id)
-
-            for date in dates:
-                # Get the latest analytics until the date for each product
-
-                # Aggregate the orders_amount, reviews_amount and count of products for the analytics records
-                data = (
-                    ProductAnalytics.objects.filter(
-                        product_id__in=products,
-                        created_at__lte=date.astimezone(
-                            pytz.timezone("Asia/Tashkent")
-                        ).replace(  # convert to Asia/Tashkent
-                            hour=23, minute=59, second=59, microsecond=999999
-                        ),
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH date_range AS (
+                        SELECT generate_series(%s, %s, interval '1 day')::date AS date
+                    ),
+                    product_list AS (
+                        SELECT product_id
+                        FROM product_product
+                        WHERE shop_id = %s AND category_id = %s
+                    ),
+                    latest_analytics AS (
+                        SELECT
+                            pa.product_id,
+                            pa.orders_amount,
+                            pa.reviews_amount,
+                            dr.date,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY pa.product_id, dr.date
+                                ORDER BY pa.date_pretty::date DESC
+                            ) AS row_number
+                        FROM product_productanalytics AS pa
+                        JOIN product_list AS pl ON pa.product_id = pl.product_id
+                        JOIN date_range AS dr ON pa.date_pretty::date <= dr.date
+                    ),
+                    aggregated_analytics AS (
+                        SELECT
+                            la.date,
+                            SUM(la.orders_amount) AS total_orders,
+                            SUM(la.reviews_amount) AS total_reviews,
+                            COUNT(*) FILTER (WHERE la.row_number = 1) AS total_products
+                        FROM latest_analytics AS la
+                        WHERE la.row_number = 1
+                        GROUP BY la.date
                     )
-                    .order_by("product", "-created_at")
-                    .distinct("product")
-                    .values("orders_amount", "reviews_amount", "product__product_id", "date_pretty")
+                    SELECT
+                        aa.date,
+                        aa.total_orders,
+                        aa.total_reviews,
+                        aa.total_products
+                    FROM aggregated_analytics AS aa
+                    ORDER BY aa.date
+                """,
+                    [start_date, current_date, seller_id, category_id],
                 )
-                total_orders = 0
-                total_reviews = 0
-                products_count = 0
-                for d in data:
-                    total_orders += d["orders_amount"]
-                    total_reviews += d["reviews_amount"]
-                    if d["date_pretty"] == date.strftime("%Y-%m-%d"):
-                        products_count += 1
 
-                res.append(
+                res = [
                     {
-                        "category_id": Category.objects.get(pk=category_id).categoryId,
+                        "category_id": category_id,
                         "date": date,
                         "data": {
                             "orders_amount": total_orders,
-                            "products_count": products_count,
+                            "products_count": total_products,
                             "reviews_amount": total_reviews,
                         },
                     }
-                )
+                    for date, total_orders, total_reviews, total_products in cursor.fetchall()
+                ]
+
             print(f"SHOP CATEGORY ANALYTICS: {time.time() - start} seconds")
             return Response(data=res, status=status.HTTP_200_OK)
 
@@ -1093,10 +1108,32 @@ class ShopProductsByCategoryView(APIView):
             category = Category.objects.get(pk=category_id)
 
             categories = Category.get_descendants(category, include_self=True)
+            latest_product_analytics_orders_amount = Subquery(
+                ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
+                .order_by("-date_pretty")
+                .values("orders_amount")[:1],
+                output_field=IntegerField(),
+            )
+
+            latest_product_analytics_reviews_amount = Subquery(
+                ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
+                .order_by("-date_pretty")
+                .values("reviews_amount")[:1],
+                output_field=IntegerField(),
+            )
+
+            latest_product_analytics_available_amount = Subquery(
+                ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
+                .order_by("-date_pretty")
+                .values("reviews_amount")[:1],
+                output_field=IntegerField(),
+            )
+
             latest_product_analytics_date = Subquery(
                 ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
                 .order_by("-date_pretty")
-                .values("date_pretty")[:1]
+                .values("date_pretty")[:1],
+                output_field=CharField(),
             )
 
             products = (
@@ -1106,8 +1143,16 @@ class ShopProductsByCategoryView(APIView):
                     "title",
                     "photos",
                 )
-                .annotate(latest_product_analytics_date=latest_product_analytics_date)
+                .annotate(
+                    latest_product_analytics_date=latest_product_analytics_date,
+                    latest_product_analytics_orders_amount=latest_product_analytics_orders_amount,
+                    latest_product_analytics_reviews_amount=latest_product_analytics_reviews_amount,
+                    latest_product_analytics_available_amount=latest_product_analytics_available_amount,
+                )
             )
+
+            for product in products:
+                product["title"] = product["title"] + f'(({product["product_id"]}))'
 
             return Response(
                 data={"data": products, "total": len(products)},
@@ -1142,9 +1187,20 @@ class UzumTotalOrders(APIView):
                 datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                # end date is end of yesterday
+                end_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                # end date is end of today
+                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
+
             # Group by date_pretty and calculate the sum of total_orders for each day
             data = (
-                ShopAnalytics.objects.filter(created_at__gte=start_date)
+                ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
                 .values("date_pretty")
                 .annotate(total_orders=Sum("total_orders"))
                 .order_by("date_pretty")
@@ -1168,7 +1224,17 @@ class UzumTotalProducts(APIView):
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
             )
-            product_analytics = ProductAnalytics.objects.filter(created_at__gte=start_date)
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                # end date is end of yesterday
+                end_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                # end date is end of today
+                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
+            product_analytics = ProductAnalytics.objects.filter(created_at__range=[start_date, end_date])
             daily_totals = (
                 product_analytics.values("date_pretty")
                 .annotate(total_products=Count("product__product_id"))
@@ -1191,7 +1257,17 @@ class UzumTotalShops(APIView):
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
             )
-            product_analytics = ShopAnalytics.objects.filter(created_at__gte=start_date)
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                # end date is end of yesterday
+                end_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                # end date is end of today
+                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
+            product_analytics = ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
             daily_totals = (
                 product_analytics.values("date_pretty")
                 .annotate(total_shops=Count("shop__seller_id"))

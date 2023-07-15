@@ -5,7 +5,7 @@ from rest_framework.serializers import ModelSerializer
 
 from uzum.badge.models import Badge
 from uzum.badge.serializers import ProductBadgeSerializer
-from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView, get_today_pretty
+from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.sku.models import Sku, SkuAnalytics
 
 from .models import Category, CategoryAnalytics
@@ -130,6 +130,8 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation["product_title"] = f"{representation['product_title']} (({representation['product_id']}))"
+        representation["shop_title"] = f"{representation['shop_title']} (({representation['shop_link']}))"
+        representation["category_title"] = f"{representation['category_title']} (({representation['category_id']}))"
         return representation
 
 
