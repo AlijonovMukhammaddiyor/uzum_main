@@ -211,6 +211,7 @@ class CheckUserNameAndPhone(APIView):
             username = data.get("username")
             if not phone_number or not username:
                 return Response(status=400, data={"message": "Phone number and username are required"})
+            print(phone_number, username)
             user = User.objects.filter(phone_number=phone_number, username=username).first()
             if user:
                 return Response(status=200, data={"message": "User exists"})

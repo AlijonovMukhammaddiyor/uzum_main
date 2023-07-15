@@ -14,7 +14,15 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["api.shortintroduce.com"])
 
-ALLOWED_HOSTS += ["api.alijonov.com", "localhost", "127.0.0.1", "146.190.84.109", "localhost:3000", "uzanalitika.uz"]
+ALLOWED_HOSTS += [
+    "api.alijonov.com",
+    "localhost",
+    "127.0.0.1",
+    "146.190.84.109",
+    "localhost:3000",
+    "uzanalitika.uz",
+    "www.uzanalitika.uz",
+]
 
 # DATABASES
 # ------------------------------------------------------------------------------
@@ -192,6 +200,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:8000",
     "https://uzanalitika.uz",
+    "https://www.uzanalitika.uz",
 ]
 
 CORS_ORIGIN_WHITELIST = [
@@ -199,6 +208,7 @@ CORS_ORIGIN_WHITELIST = [
     "http://localhost:3000",
     "http://localhost:8000",
     "https://uzanalitika.uz",
+    "https://www.uzanalitika.uz",
     # Add other allowed origins if needed
 ]
 
