@@ -167,7 +167,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             max_age=max_age,
             samesite="None",
             secure=True,
-            domain="uzanalitika.uz",
+            domain=".uzanalitika.uz",
         )
         response.set_cookie(
             key="access",
@@ -176,7 +176,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             samesite="None",
             max_age=max_age_access,
             secure=True,
-            domain="uzanalitika.uz",
+            domain=".uzanalitika.uz",
         )
 
         return response
@@ -220,7 +220,7 @@ class CustomTokenRefreshView(TokenRefreshView):
                 samesite="None",
                 max_age=max_age_access,
                 secure=True,
-                domain="uzanalitika.uz",
+                domain=".uzanalitika.uz",
             )
             # print("new access token set", access_token)
             return response
