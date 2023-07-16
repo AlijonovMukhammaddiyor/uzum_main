@@ -15,6 +15,9 @@ from config.settings.base import env
 from .serializers import UserSerializer
 
 User = get_user_model()
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
@@ -68,4 +71,5 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
         start = time.time()
         serializer = UserSerializer(request.user, context={"request": request})
         print(f"Time taken by current user: {time.time() - start}")
+        logging.info(f"Time taken by current user: {serializer.data}")
         return Response(status=status.HTTP_200_OK, data=serializer.data)
