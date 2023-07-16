@@ -165,14 +165,14 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             value=str(serializer.validated_data["refresh"]),
             httponly=True,
             max_age=max_age,
-            samesite="Lax",
+            samesite="None",
             secure=True,
         )
         response.set_cookie(
             key="access",
             value=str(serializer.validated_data["access"]),
             httponly=False,
-            samesite="Lax",
+            samesite="None",
             max_age=max_age_access,
             secure=True,
         )
