@@ -212,7 +212,7 @@ class CustomTokenRefreshView(TokenRefreshView):
             # Set the new access token as an HttpOnly cookie
             max_age_access = 60 * 14  # 15 minutes
             response.set_cookie(
-                key="access", value=access_token, httponly=False, samesite="None", max_age=max_age_access
+                key="access", value=access_token, httponly=False, samesite="None", max_age=max_age_access, secure=True
             )
             # print("new access token set", access_token)
             return response
