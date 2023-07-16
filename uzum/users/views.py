@@ -166,6 +166,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             httponly=True,
             max_age=max_age,
             samesite="Lax",
+            secure=True,
         )
         response.set_cookie(
             key="access",
@@ -173,6 +174,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             httponly=False,
             samesite="Lax",
             max_age=max_age_access,
+            secure=True,
         )
 
         return response
