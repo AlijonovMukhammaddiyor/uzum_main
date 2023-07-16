@@ -159,7 +159,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
         response = Response()
         max_age = 3600 * 24 * 14  # Two weeks
-        max_age_access = 60 * 15  # 15 minutes
+        max_age_access = 60 * 14  # 15 minutes
         response.set_cookie(
             key="refresh",
             value=str(serializer.validated_data["refresh"]),
@@ -210,9 +210,9 @@ class CustomTokenRefreshView(TokenRefreshView):
             access_token = str(serializer.validated_data["access"])
 
             # Set the new access token as an HttpOnly cookie
-            max_age_access = 60 * 15  # 15 minutes
+            max_age_access = 60 * 14  # 15 minutes
             response.set_cookie(
-                key="access", value=access_token, httponly=False, samesite="Lax", max_age=max_age_access
+                key="access", value=access_token, httponly=False, samesite="None", max_age=max_age_access
             )
             # print("new access token set", access_token)
             return response
