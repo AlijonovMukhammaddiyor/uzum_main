@@ -5,7 +5,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 from itertools import groupby
 from rest_framework.exceptions import ValidationError
-
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
 import numpy as np
 import pandas as pd
 import pytz
@@ -27,6 +28,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.utils import calculate_shop_analytics_in_category
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
+from uzum.review.views import CookieJWTAuthentication
 from uzum.sku.models import SkuAnalytics
 from uzum.utils.general import get_today_pretty, get_today_pretty_fake
 
@@ -744,6 +746,7 @@ class NicheSlectionView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class GrowingCategoriesView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -801,7 +804,7 @@ class GrowingCategoriesView(APIView):
 
 class MainCategoriesAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     allowed_methods = ["GET"]
 
     def get(self, request: Request):
