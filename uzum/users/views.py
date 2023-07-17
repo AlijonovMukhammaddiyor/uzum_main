@@ -158,78 +158,21 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         serializer.is_valid(raise_exception=True)
 
         response = Response()
-        max_age = 3600 * 24 * 14  # Two weeks
-        max_age_access = 60 * 14  # 15 minutes
-        response.set_cookie(
-            key="refresh",
-            value=str(serializer.validated_data["refresh"]),
-            httponly=True,
-            max_age=max_age,
-            samesite="None",
-            secure=True,
-            domain="www.uzanalitika.uz",
-            path="/",
-        )
-        response.set_cookie(
-            key="access",
-            value=str(serializer.validated_data["access"]),
-            httponly=False,
-            samesite="None",
-            max_age=max_age_access,
-            secure=True,
-            domain="www.uzanalitika.uz",
-            path="/",
-        )
 
         return response
 
 
-# class CustomTokenRefreshView(TokenRefreshView):
-#     @extend_schema(tags=["token"], operation_id="refresh_token")
-#     def finalize_response(self, request, response, *args, **kwargs):
-#         if response.data.get("refresh"):
-#             response.set_cookie(
-#                 "refresh_token",
-#                 response.data["refresh"],
-#                 httponly=True,
-#             )
-#             response.set_cookie("access_token", response.data["access"], httponly=False)
-#             del response.data["refresh"]
-#         return super().finalize_response(request, response, *args, **kwargs)
-
-
 class CustomTokenRefreshView(TokenRefreshView):
     @extend_schema(tags=["token"], operation_id="refresh_token")
-    def post(self, request: Request, *args, **kwargs):
-        try:
-            serializer = self.get_serializer(
-                data={
-                    "refresh": request.COOKIES.get("refresh"),
-                }
-            )
-
-            serializer.is_valid(raise_exception=True)
-
-            response = Response(serializer.validated_data)
-            access_token = str(serializer.validated_data["access"])
-
-            # Set the new access token as an HttpOnly cookie
-            max_age_access = 60 * 14  # 15 minutes
+    def finalize_response(self, request, response, *args, **kwargs):
+        if response.data.get("refresh"):
             response.set_cookie(
-                key="access",
-                value=access_token,
-                httponly=False,
-                samesite="None",
-                max_age=max_age_access,
-                secure=True,
-                domain="www.uzanalitika.uz",
-                path="/",
+                "refresh_token",
+                response.data["refresh"],
+                httponly=True,
             )
-            # print("new access token set", access_token)
-            return response
-        except Exception as e:
-            print("Error in CustomTokenRefreshView: ", e)
-            return Response(status=500, data={"message": "Internal server error"})
+            response.set_cookie("access_token", response.data["access"], httponly=False)
+        return super().finalize_response(request, response, *args, **kwargs)
 
 
 class LogoutView(APIView):
