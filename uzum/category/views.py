@@ -1,7 +1,6 @@
 import math
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 from itertools import groupby
 from rest_framework.exceptions import ValidationError
@@ -613,22 +612,34 @@ class CategoryPriceSegmentationView(APIView):
             ]
 
             segments = []
-            with ThreadPoolExecutor(max_workers=segments_count) as executor:
-                futures = []
-                for i in range(len(bins)):
-                    (segment_min_price, segment_max_price) = bins[i]
-                    futures.append(
-                        executor.submit(
-                            self.calculate_segment,
-                            segment_min_price,
-                            segment_max_price,
-                            # start_date,
-                            products,
-                        )
-                    )
+            # with ThreadPoolExecutor(max_workers=segments_count) as executor:
+            #     futures = []
+            #     for i in range(len(bins)):
+            #         (segment_min_price, segment_max_price) = bins[i]
+            #         futures.append(
+            #             executor.submit(
+            #                 self.calculate_segment,
+            #                 segment_min_price,
+            #                 segment_max_price,
+            #                 # start_date,
+            #                 products,
+            #             )
+            #         )
 
-                for future in as_completed(futures):
-                    segments.append(future.result())
+            #     for future in as_completed(futures):
+            #         segments.append(future.result())
+
+            # without threads
+            for i in range(len(bins)):
+                (segment_min_price, segment_max_price) = bins[i]
+                segments.append(
+                    self.calculate_segment(
+                        segment_min_price,
+                        segment_max_price,
+                        # start_date,
+                        products,
+                    )
+                )
 
             print(f"Category Segmentation took {time.time() - start_time} seconds")
             return Response(
