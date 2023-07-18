@@ -38,7 +38,7 @@ urlpatterns += [
     # path("auth-token/", CustomObtainAuthToken.as_view()),
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/logout/", LogoutView.as_view(), name="token_logout"),
-    path("api/token/civuiaubcyvsdcibhsvus/refresh/", CustomTokenRefreshView.as_view(), name="token_refresh"),
+    path("api/token/civuiaubcyvsdcibhsvus/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     path("api/schema/", SpectacularAPIView.as_view(), name="api-schema"),
     path(

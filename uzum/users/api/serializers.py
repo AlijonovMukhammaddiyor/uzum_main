@@ -163,15 +163,17 @@ class UserLoginSerializer(TokenObtainPairSerializer):
         return token
 
 
-class CookieTokenRefreshSerializer(TokenRefreshSerializer):
-    refresh = None
+class CustomTokenRefreshSerializer(TokenRefreshSerializer):
+    refresh = None  # Remove the default refresh field
 
     def validate(self, attrs):
-        attrs["refresh"] = self.context["request"].COOKIES.get("refresh_token")
-        if attrs["refresh"]:
-            return super().validate(attrs)
-        else:
-            raise InvalidToken("No valid token found in cookie 'refresh_token'")
+        refresh = self.context["request"].COOKIES.get("refresh")  # Get the refresh token from cookies
+
+        if refresh is None:
+            raise InvalidToken("No valid token found in cookie")
+
+        attrs["refresh"] = refresh
+        return super().validate(attrs)
 
 
 class CheckUserNameAndPhoneSerializer(serializers.Serializer):
