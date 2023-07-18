@@ -163,16 +163,18 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class CustomTokenRefreshView(TokenRefreshView):
-    @extend_schema(tags=["token"], operation_id="refresh_token")
-    def finalize_response(self, request, response, *args, **kwargs):
-        if response.data.get("refresh"):
-            response.set_cookie(
-                "refresh_token",
-                response.data["refresh"],
-                httponly=True,
-            )
-            response.set_cookie("access_token", response.data["access"], httponly=False)
-        return super().finalize_response(request, response, *args, **kwargs)
+    serializer_class = UserLoginSerializer
+
+    @extend_schema(tags=["token"], operation_id="login")
+    def post(self, request, *args, **kwargs):
+        print("request.data: ", request.data)
+        serializer = self.get_serializer(data=request.data)
+
+        serializer.is_valid(raise_exception=True)
+
+        response = Response()
+
+        return response
 
 
 class LogoutView(APIView):
