@@ -507,6 +507,10 @@ class SubcategoriesView(APIView):
                 )
                 children_analytics = dictfetchall(cursor)
 
+            # for each category: title += "((category_id))"
+            for child in children_analytics:
+                child["category_title"] += f"(({child['category_id']}))"
+
             print("children_analytics", time.time() - start)
             return Response(
                 status=status.HTTP_200_OK,
