@@ -1,4 +1,5 @@
 import uuid
+import numpy as np
 
 import pandas as pd
 from django.core.cache import cache
@@ -241,10 +242,15 @@ class ProductAnalytics(models.Model):
         # Set date_pretty as index (required for rolling function)
         sales_df = sales_df.set_index("date_pretty").sort_index()
 
-        # Group by product and calculate the 7-day and 30-day EMA of sales
-        sales_df["ema_ratio"] = sales_df.groupby("product__product_id")["orders_amount"].transform(
-            lambda x: x.ewm(span=7).mean() / x.ewm(span=30).mean()
-        )
+        for span in [3, 5, 7, 30]:
+            sales_df[f"ema_{span}_days"] = sales_df.groupby("product__product_id")["orders_amount"].transform(
+                lambda x: x.ewm(span=span).mean()
+            )
+
+        sales_df["trend_3_to_7"] = sales_df["ema_3_days"] / sales_df["ema_7_days"]
+        sales_df["trend_5_to_7"] = sales_df["ema_5_days"] / sales_df["ema_7_days"]
+        sales_df["trend_3_to_30"] = sales_df["ema_3_days"] / sales_df["ema_30_days"]
+        sales_df["trend_5_to_30"] = sales_df["ema_5_days"] / sales_df["ema_30_days"]
 
         # Reset index (to allow the next operations)
         sales_df = sales_df.reset_index()
@@ -255,8 +261,18 @@ class ProductAnalytics(models.Model):
         # Only consider products with total sales greater than a certain threshold
         sales_df = sales_df[sales_df["orders_amount"] > 200]
 
+        weights = [0.4, 0.3, 0.2, 0.1]  # adjust these weights as needed
+        sales_df["score"] = sales_df[
+            [
+                "trend_3_to_7",
+                "trend_5_to_7",
+                "trend_3_to_30",
+                "trend_5_to_30",
+            ]
+        ].apply(lambda x: np.average(x, weights=weights), axis=1)
+
         # Sort products by EMA ratio in descending order and take the top 100
-        top_growing_products = sales_df.sort_values("ema_ratio", ascending=False).head(100)
+        top_growing_products = sales_df.sort_values("score", ascending=False).head(100)
 
         # Return the list of top growing product IDs
         top_growing_products = top_growing_products.index.tolist()

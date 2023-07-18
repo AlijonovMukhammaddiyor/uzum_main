@@ -1276,7 +1276,17 @@ class UzumTotalShops(APIView):
                 .values("date_pretty", "total_shops")
                 .order_by("date_pretty")
             )
-            return Response(daily_totals, status=status.HTTP_200_OK)
+
+            daily_accounts_totals = (
+                product_analytics.values("date_pretty")
+                .annotate(total_accounts=Count("shop__account_id", distinct=True))
+                .values("date_pretty", "total_accounts")
+                .order_by("date_pretty")
+            )
+
+            return Response(
+                {"shops": list(daily_totals), "accounts": list(daily_accounts_totals)}, status=status.HTTP_200_OK
+            )
         except Exception as e:
             print(e)
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
