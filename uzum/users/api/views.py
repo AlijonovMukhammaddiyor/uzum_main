@@ -1,4 +1,5 @@
 import time
+import traceback
 
 from django.contrib.auth import get_user_model
 from django.http import HttpRequest, HttpResponseBadRequest
@@ -43,20 +44,25 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
             return self.queryset.none()
 
     def create(self, request, *args, **kwargs):
-        # Check if the verification token cookie is present
-        # ! uncomment below after deploying
-        # if "verification_token" not in request.COOKIES:
-        #     return HttpResponseBadRequest("Missing verification token")
+        try:
+            # Check if the verification token cookie is present
+            # ! uncomment below after deploying
+            # if "verification_token" not in request.COOKIES:
+            #     return HttpResponseBadRequest("Missing verification token")
 
-        # # Retrieve the verification token from the cookie
-        # verification_token = request.COOKIES["verification_token"]
+            # # Retrieve the verification token from the cookie
+            # verification_token = request.COOKIES["verification_token"]
 
-        # # Verify the token against your validation logic
-        # if not env("VERIFICATION_TOKEN") == verification_token:
-        #     return HttpResponseBadRequest("Invalid verification token")
+            # # Verify the token against your validation logic
+            # if not env("VERIFICATION_TOKEN") == verification_token:
+            #     return HttpResponseBadRequest("Invalid verification token")
 
-        # Continue with the user creation logic
-        return super().create(request, *args, **kwargs)
+            # Continue with the user creation logic
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            print("Error in create: ", e)
+            traceback.print_exc()
+            return HttpResponseBadRequest("Error in create")
 
     @action(detail=False)
     def me(self, request: HttpRequest):
@@ -68,8 +74,8 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
         Returns:
             _type_: _description_
         """
-        start = time.time()
+        # start = time.time()
         serializer = UserSerializer(request.user, context={"request": request})
-        print(f"Time taken by current user: {time.time() - start}")
-        logging.info(f"Time taken by current user: {serializer.data}")
+        # print(f"Time taken by current user: {time.time() - start}")
+        # logging.info(f"Time taken by current user: {serializer.data}")
         return Response(status=status.HTTP_200_OK, data=serializer.data)

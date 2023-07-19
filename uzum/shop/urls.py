@@ -37,4 +37,5 @@ urlpatterns = [
         "category/<int:seller_id>/<int:category_id>/", views.ShopCategoryAnalyticsView.as_view(), name="shop-products"
     ),
     path("top5/", views.Top5ShopsView.as_view(), name="top-shops"),
+    path("yesterday-tops/", views.YesterdayTopsView.as_view(), name="yesterday-tops"),
 ]

@@ -5,11 +5,13 @@ from datetime import datetime, timedelta
 
 import pytz
 from django.db import connection
-from django.db.models import Count, F, Q, Max, Min, OuterRef, Subquery, Sum, IntegerField, CharField
+from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -17,7 +19,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.exceptions import ValidationError
+
 from uzum.category.models import Category, CategoryAnalytics
 from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.serializers import ProductAnalyticsViewSerializer
@@ -25,7 +27,6 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
 from uzum.review.views import CookieJWTAuthentication
 from uzum.shop.models import Shop, ShopAnalytics
-from uzum.sku.models import SkuAnalytics
 from uzum.utils.general import get_day_before_pretty, get_next_day_pretty, get_today_pretty, get_today_pretty_fake
 
 from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer
@@ -461,6 +462,9 @@ class ShopCompetitorsView(APIView):
             # Convert to a list of string to be used in raw SQL query
             shop_categories_ids_str = ",".join(map(str, shop_categories_ids))
 
+            if not shop_categories_ids_str:
+                return []
+
             # Get current shop's average purchase price and position
             current_shop_avg_purchase_price = shop_analytics_today.average_purchase_price
             current_shop_position = shop_analytics_today.position
@@ -699,7 +703,6 @@ class ShopDailySalesView(APIView):
 
             before_analytics_dict = {i["product__product_id"]: i for i in day_before_analytics}
 
-            print("before date_pretty", day_before_analytics[0]["date_pretty"])
             for item in target_analytics:
                 before_item = before_analytics_dict.get(item["product__product_id"], None)
                 item["product__title"] += f'(({item["product__product_id"]}))'
@@ -1287,6 +1290,112 @@ class UzumTotalShops(APIView):
             return Response(
                 {"shops": list(daily_totals), "accounts": list(daily_accounts_totals)}, status=status.HTTP_200_OK
             )
+        except Exception as e:
+            print(e)
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class YesterdayTopsView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request: Request):
+        """
+        Return top 20 shops which had themost orders yesterday
+        """
+        try:
+            date_pretty = get_today_pretty_fake()
+            yesterday_pretty = get_day_before_pretty(date_pretty)
+
+            def dictfetchall(cursor):
+                "Returns all rows from a cursor as a dict"
+                desc = cursor.description
+                return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
+
+            # yesterday_analytics = ShopAnalytics.objects.filter(
+            #     date_pretty=yesterday_pretty, shop_id=OuterRef("shop_id")
+            # ).values("total_orders", "total_reviews")
+
+            # today_analytics = (
+            #     ShopAnalytics.objects.filter(date_pretty=date_pretty)
+            #     .annotate(
+            #         yesterday_total_orders=Subquery(
+            #             yesterday_analytics.values("total_orders")[:1], output_field=IntegerField()
+            #         ),
+            #         yesterday_total_reviews=Subquery(
+            #             yesterday_analytics.values("total_reviews")[:1], output_field=IntegerField()
+            #         ),
+            #     )
+            #     .annotate(
+            #         diff_orders=F("total_orders") - Coalesce("yesterday_total_orders", 100000),
+            #         diff_reviews=F("total_reviews") - Coalesce("yesterday_total_reviews", 100000),
+            #     )
+            # )
+
+            # top_20 = today_analytics.order_by("-diff_orders", "-diff_reviews")[:1000]
+
+            # response = {
+            #     "top_20_shops": [
+            #         {
+            #             "seller_id": shop.shop.seller_id,
+            #             "title": shop.shop.title,
+            #             "diff_orders": shop.diff_orders,
+            #             "diff_reviews": shop.diff_reviews,
+            #         }
+            #         for shop in top_20
+            #     ]
+            # }
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        today.shop_id,
+                        shop.title,
+                        today.total_orders - COALESCE(yesterday.total_orders, 100000) as diff_orders,
+                        today.total_reviews - COALESCE(yesterday.total_reviews, 100000) as diff_reviews
+                    FROM
+                        (
+                        SELECT
+                            shop_id,
+                            total_orders,
+                            total_reviews
+                        FROM
+                            shop_shopanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as today
+                    LEFT JOIN
+                        (
+                        SELECT
+                            shop_id,
+                            total_orders,
+                            total_reviews
+                        FROM
+                            shop_shopanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as yesterday
+                    ON
+                        today.shop_id = yesterday.shop_id
+                    INNER JOIN
+                        shop_shop as shop
+                    ON
+                        today.shop_id = shop.seller_id
+                    ORDER BY
+                        diff_orders DESC,
+                        diff_reviews DESC
+                    LIMIT 500
+                """,
+                    [date_pretty, yesterday_pretty],
+                )
+                res = dictfetchall(cursor)
+                # column_names = [column[0] for column in cursor.description]
+                # result = [dict(zip(column_names, row)) for row in rows]
+
+            return Response(res, status=status.HTTP_200_OK)
+
         except Exception as e:
             print(e)
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

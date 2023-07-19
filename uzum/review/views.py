@@ -1,10 +1,10 @@
 # from django.shortcuts import render
 
 # Create your views here.
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.http import HttpRequest
-from rest_framework.authentication import CSRFCheck
 from rest_framework import exceptions
+from rest_framework.authentication import CSRFCheck
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 def enforce_csrf(request, get_response):

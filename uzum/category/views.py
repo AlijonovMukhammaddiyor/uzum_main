@@ -3,19 +3,20 @@ import time
 import traceback
 from datetime import date, datetime, timedelta
 from itertools import groupby
-from rest_framework.exceptions import ValidationError
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_protect
+
 import numpy as np
 import pandas as pd
 import pytz
 from django.core.cache import cache
 from django.db import connection, transaction
-from django.db.models import Avg, Case, Count, F, FloatField, OuterRef, Subquery, Sum, When, Q
+from django.db.models import Avg, Case, Count, F, FloatField, OuterRef, Q, Subquery, Sum, When
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -203,10 +204,7 @@ class CategoryTopProductsView(ListAPIView):
         }
 
     def get(self, request, category_id: int):
-        start_time = time.time()
-        print("CATEGORY TOP PRODUCTS")
         products = self.get_products(category_id)
-        print(f"CATEGORY TOP PRODUCTS: {time.time() - start_time} seconds")
         return Response(status=status.HTTP_200_OK, data=products)
 
 
@@ -348,19 +346,15 @@ class CategoryProductsPeriodComparisonView(APIView):
             _type_: _description_
         """
         try:
-            start_time = time.time()
-
             category = Category.objects.get(categoryId=category_id)
             category_products = self.get_category_products_comparison(category)
 
             paginator = self.pagination_class()  # new lines
 
             page = paginator.paginate_queryset(category_products, request)
-            print(f"CATEGORY PRODUCTS: {time.time() - start_time} seconds")
             if page is not None:
                 return paginator.get_paginated_response(page)
 
-            print("Page is None")
             return Response(
                 status=status.HTTP_200_OK,
                 data={
