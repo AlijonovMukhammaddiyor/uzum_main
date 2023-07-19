@@ -216,14 +216,6 @@ class ProductAnalytics(models.Model):
 
     @staticmethod
     def set_top_growing_products():
-        def calculate_last_week_sales(x):
-            print(x["orders_amount"].iloc[-1])
-            if len(x) >= 8:
-                print(x["orders_amount"].iloc[-1], x["orders_amount"].iloc[-8])
-                return x["orders_amount"].iloc[-1] - x["orders_amount"].iloc[-8]
-            elif len(x) > 1:
-                return x["orders_amount"].iloc[-1]
-
         # Set date range (last 30 days)
         end_date = pd.to_datetime(get_today_pretty())
         start_date = end_date - pd.DateOffset(days=30)

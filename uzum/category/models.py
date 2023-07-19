@@ -370,7 +370,9 @@ class CategoryAnalytics(models.Model):
     @staticmethod
     def set_top_growing_categories_ema():
         # Set date range (last 50 days)
-        end_date = pd.to_datetime("2023-07-13")
+        end_date = timezone.make_aware(
+            datetime.strptime(get_today_pretty(), "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+        ).replace(hour=23, minute=59, second=59, microsecond=0)
         start_date = end_date - pd.DateOffset(days=50)
 
         # Retrieve category sales data for the last 50 days
@@ -407,7 +409,7 @@ class CategoryAnalytics(models.Model):
         sales_df = sales_df.groupby("category__categoryId").last()
 
         # Only consider categories with total orders greater than 100
-        sales_df = sales_df[sales_df["total_orders"] > 100]
+        sales_df = sales_df[sales_df["total_orders"] > 200]
 
         # Calculate score as the mean of trend indicators
         weights = [0.4, 0.3, 0.2, 0.1, 0.05]  # adjust these weights as needed

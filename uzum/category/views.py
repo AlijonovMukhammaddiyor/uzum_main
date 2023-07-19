@@ -486,9 +486,7 @@ class SubcategoriesView(APIView):
                 main_analytics = dictfetchall(cursor)
 
             # Get children_analytics using raw SQL
-            print("children", len(children))
             ids = [child.categoryId for child in children]
-            print("ids", ids)
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -768,7 +766,7 @@ class GrowingCategoriesView(APIView):
             start = time.time()
 
             start_date = timezone.make_aware(
-                datetime.combine(date.today() - timedelta(days=30), datetime.min.time()),
+                datetime.combine(date.today() - timedelta(days=50), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
