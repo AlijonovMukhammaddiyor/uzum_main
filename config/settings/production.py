@@ -22,6 +22,7 @@ ALLOWED_HOSTS += [
     "localhost:3000",
     "uzanalitika.uz",
     "www.uzanalitika.uz",
+    "uzumanalitika.com",
     "207.154.218.194",
 ]
 
@@ -202,6 +203,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "https://uzanalitika.uz",
     "https://www.uzanalitika.uz",
+    "https://www.uzumanalitika.com",
 ]
 
 CORS_ORIGIN_WHITELIST = [
@@ -210,6 +212,7 @@ CORS_ORIGIN_WHITELIST = [
     "http://localhost:8000",
     "https://uzanalitika.uz",
     "https://www.uzanalitika.uz",
+    "https://www.uzumanalitika.com"
     # Add other allowed origins if needed
 ]
 
@@ -219,6 +222,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "https://uzanalitika.uz",
     "https://www.uzanalitika.uz",
+    "https://www.uzumanalitika.com"
     # Add other allowed origins if needed
 ]
 
