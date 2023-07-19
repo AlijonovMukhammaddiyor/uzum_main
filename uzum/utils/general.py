@@ -61,3 +61,20 @@ def get_next_day_pretty(date_pretty):
     date = datetime.datetime.strptime(date_pretty, "%Y-%m-%d").astimezone(pytz.timezone("Asia/Tashkent")).date()
     next_day = date + datetime.timedelta(days=1)
     return next_day.strftime("%Y-%m-%d")
+
+
+def get_start_date():
+    # return the beginning of may 19 in Asia/Tashkent timezone
+    return datetime.datetime(2019, 5, 19, tzinfo=pytz.timezone("Asia/Tashkent")).replace(hour=0, minute=0, second=0)
+
+
+def get_end_of_day(date: datetime.datetime):
+    return date.replace(hour=23, minute=59, second=59)
+
+
+def get_start_of_day(date: datetime.datetime):
+    return date.replace(hour=0, minute=0, second=0)
+
+
+def date_in_Tashkent(date: datetime.datetime):
+    return date.astimezone(pytz.timezone("Asia/Tashkent"))

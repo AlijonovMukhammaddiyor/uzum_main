@@ -15,10 +15,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt import authentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from twilio.base.exceptions import TwilioRestException
 from twilio.rest import Client
-from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from config.settings.base import env
 from uzum.users.api.serializers import (

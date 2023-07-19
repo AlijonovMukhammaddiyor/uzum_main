@@ -99,7 +99,6 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict):
         # Extract the password from the data
         password = validated_data.pop("password", None)
-
         if not password:
             raise ValueError("Password is required.")
 
@@ -114,8 +113,6 @@ class UserSerializer(serializers.ModelSerializer):
 
         referred_by = get_referred_by(referred_by_code)
 
-        print("referred_by", referred_by)
-
         # Add the generated referral code to the user data.
         validated_data["referral_code"] = referral_code
         validated_data["referred_by"] = referred_by
@@ -125,13 +122,11 @@ class UserSerializer(serializers.ModelSerializer):
         validated_data["fingerprint"] = validated_data.get("fingerprint", "")
         # Create the user instance.
         user = User.objects.create(**validated_data)
-
         user.set_password(password)
         user.save()
 
         create_referral(referred_by, user)
         # before returning the user, we need to remove the password from the validated data
-
         return {
             "id": user.id,
             "username": user.username,
