@@ -29,8 +29,8 @@ from uzum.users.api.serializers import (
 )
 
 # disable twilio info logs
-twilio_logger = logging.getLogger("twilio.http_client")
-twilio_logger.setLevel(logging.WARNING)
+# twilio_logger = logging.getLogger("twilio.http_client")
+# twilio_logger.setLevel(logging.WARNING)
 
 
 User = get_user_model()
@@ -39,7 +39,7 @@ client = Client(env("TWILIO_ACCOUNT_SID"), env("TWILIO_AUTH_TOKEN"))
 verify = client.verify.services(env("TWILIO_VERIFY_SERVICE_SID"))
 
 # Disable twilio logs
-logging.getLogger("twilio").setLevel(logging.INFO)
+# logging.getLogger("twilio").setLevel(logging.INFO)
 
 
 class VerificationSendView(APIView):
@@ -56,15 +56,12 @@ class VerificationSendView(APIView):
             if not phone_number:
                 return Response(status=400, data={"message": "Phone number is required"})
 
-            if is_register:
-                users = User.objects.filter(phone_number=phone_number)
+            # if is_register:
+            #     users = User.objects.filter(phone_number=phone_number)
 
-                if users.exists():
-                    return Response(status=400, data={"message": "Phone number already exists"})
-
-            # Calculate the expiration time (e.g., 5 minutes from now)
-            expiration_time = timezone.now() + timedelta(minutes=5)
-
+            #     if users.exists():
+            #         return Response(status=400, data={"message": "Phone number already exists"})
+            print("phone_number: ", phone_number)
             verify.verifications.create(
                 to=phone_number,
                 channel="sms",
@@ -73,6 +70,7 @@ class VerificationSendView(APIView):
             return Response(status=200, data={"message": "Verification code sent successfully"})
         except Exception as e:
             print("Error in PhoneVerificationView: ", e)
+
             return Response(status=500, data={"message": "Internal server error"})
 
 
