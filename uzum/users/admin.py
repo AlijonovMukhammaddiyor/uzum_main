@@ -12,7 +12,7 @@ class CustomUserAdmin(auth_admin.UserAdmin):
     add_form = UserAdminCreationForm
     form = UserAdminChangeForm
     model = User
-    list_display = ("username", "phone_number", "email", "is_staff", "is_developer")
+    list_display = ("username", "phone_number", "email", "is_staff", "is_developer", "is_pro", "is_proplus")
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),
@@ -20,4 +20,5 @@ class CustomUserAdmin(auth_admin.UserAdmin):
         ("Additional Info", {"fields": ("fingerprint", "referred_by", "referral_code", "shop", "is_developer")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
+        ("Subscription", {"fields": ("is_pro", "is_proplus")}),
     )

@@ -2,13 +2,14 @@ import time
 import traceback
 from datetime import date, datetime, timedelta
 from itertools import groupby
+import numpy as np
 
 import pandas as pd
 import pytz
 import requests
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Avg, Count, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Avg, Count, Prefetch, Q, Sum
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -32,9 +33,10 @@ from uzum.product.serializers import (
     ExtendedProductSerializer,
     ProductSerializer,
 )
-from uzum.review.views import CookieJWTAuthentication
+
 from uzum.sku.models import SkuAnalytics
-from uzum.utils.general import get_day_before_pretty, get_today_pretty, get_today_pretty_fake
+from uzum.users.models import User
+from uzum.utils.general import check_user, get_today_pretty_fake
 
 
 class ProductView(APIView):
@@ -45,6 +47,9 @@ class ProductView(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request, product_id: int):
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
             product = Product.objects.get(product_id=product_id)
 
             return Response(
@@ -80,94 +85,88 @@ class Top5ProductsView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ProductsSegmentationView(APIView):
+class AllProductsPriceSegmentationView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
+    # replace the below with your actual serializer
+    # serializer_class = ProductAnalyticsSerializer
+    queryset = ProductAnalyticsView.objects.all()
     allowed_methods = ["GET"]
+    pagination_class = PageNumberPagination
 
-    @extend_schema(tags=["Product"])
+    @staticmethod
+    def calculate_segment(segment_min_price, segment_max_price, products):
+        segment_products = products.filter(avg_purchase_price__range=(segment_min_price, segment_max_price))
+
+        segment_analytics = segment_products.aggregate(
+            total_products=Count("product_id", distinct=True),
+            total_shops=Count("shop_link", distinct=True),
+            total_orders=Sum("orders_amount"),
+            total_reviews=Sum("reviews_amount"),
+            average_rating=Avg("rating"),
+            avg_purchase_price=Avg("avg_purchase_price"),
+        )
+
+        return {
+            "from": segment_min_price,
+            "to": segment_max_price,
+            **segment_analytics,
+        }
+
     def get(self, request: Request):
         try:
-            max_price = request.query_params.get("max_price", None)
-            if max_price is not None:
-                max_price = float(max_price)
-            else:
-                max_price = 1000000000
-            min_price = request.query_params.get("min_price", None)
-            if min_price is not None:
-                min_price = float(min_price)
-            else:
-                min_price = 0
+            start_time = time.time()
+            # if check_user(request) is None:
+            #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
 
-            start_date_str = request.query_params.get("start_date", None)
-            if start_date_str is None:
-                date_pretty = get_today_pretty()
-            else:
-                date_pretty = start_date_str
+            segments_count = request.query_params.get("segments_count", 15)
+            segments_count = int(segments_count)
 
-            segments_count = int(request.query_params.get("segments_count", 20))
-            sku_analytics = SkuAnalytics.objects.filter(
-                date_pretty=date_pretty, purchase_price__gte=min_price, purchase_price__lte=max_price
-            )
+            products = ProductAnalyticsView.objects.all()
 
-            if not sku_analytics.exists():
-                date_pretty = get_day_before_pretty(date_pretty)
-                sku_analytics = SkuAnalytics.objects.filter(
-                    date_pretty=date_pretty, purchase_price__gte=min_price, purchase_price__lte=max_price
-                )
+            df = pd.DataFrame(list(products.values("product_id", "avg_purchase_price")))
+            distinct_prices_count = df["avg_purchase_price"].nunique()
+            segments_count = min(segments_count, distinct_prices_count)
+            products_per_segment = len(df) // segments_count
+            df = df.sort_values("avg_purchase_price")
 
-            if not sku_analytics.exists():
-                return Response({"error": "No data for today and yesterday"}, status=status.HTTP_404_NOT_FOUND)
+            bins = []
+            start_idx = 0
+            for i in range(segments_count):
+                end_idx = start_idx + products_per_segment
+                if i < len(df) % segments_count:
+                    end_idx += 1
+                min_price = df.iloc[start_idx]["avg_purchase_price"]
+                max_price = df.iloc[end_idx - 1]["avg_purchase_price"]
+                bins.append((min_price, max_price))
+                start_idx = end_idx
 
-            # product_analytics = ProductAnalytics.objects.filter(date_pretty=date_pretty).only(
-            #     "product__product_id", "orders_amount"
-            # )
-
-            purchase_prices = sku_analytics.values("sku__product__product_id").annotate(
-                avg_purchase_price=Avg("purchase_price"),
-                orders_amount=Subquery(
-                    ProductAnalytics.objects.filter(
-                        product__product_id=OuterRef("sku__product__product_id"), date_pretty=date_pretty
-                    ).values("orders_amount")[:1]
-                ),
-            )
-
-            # Create a DataFrame from queryset
-            df = pd.DataFrame(purchase_prices)
-
-            # Generate bins with pandas qcut
-            df["segment"], bins = pd.qcut(
-                df["avg_purchase_price"], segments_count, labels=False, retbins=True, duplicates="drop"
-            )
-
-            # Count number of products in each segment
-            segment_counts = df.groupby("segment")["sku__product__product_id"].count().sort_index()
-
-            # Calculate total number of orders for each segment
-            segment_orders = df.groupby("segment")["orders_amount"].sum().sort_index()
-
-            # Generate response data
-            response_data = [
-                {
-                    "segment": i,
-                    "min": bins[i],
-                    "max": bins[i + 1],
-                    "count": segment_counts[i],
-                    "orders": segment_orders[i],
-                }
-                for i in range(len(bins) - 1)
+            bins = [
+                (np.floor(min_price / 1000) * 1000, np.ceil(max_price / 1000) * 1000) for min_price, max_price in bins
             ]
 
-            total = 0
+            segments = []
+            for i in range(len(bins)):
+                (segment_min_price, segment_max_price) = bins[i]
+                segments.append(
+                    self.calculate_segment(
+                        segment_min_price,
+                        segment_max_price,
+                        products,
+                    )
+                )
 
-            for i in range(len(response_data)):
-                total += response_data[i]["orders"]
-
-            return Response({"data": response_data}, status=status.HTTP_200_OK)
+            print(f"All Products Segmentation took {time.time() - start_time} seconds")
+            return Response(
+                status=status.HTTP_200_OK,
+                data={
+                    "data": segments,
+                },
+            )
         except Exception as e:
             print(e)
             traceback.print_exc()
-            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CurrentProductView(APIView):
@@ -178,6 +177,8 @@ class CurrentProductView(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request, product_id: str):
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
             if product_id is None:
                 return Response({"error": "product_id is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -276,20 +277,20 @@ class SingleProductAnalyticsView(APIView):
     def get(self, request: Request, product_id: str):
         try:
             start = time.time()
-            print("SingleProductAnalyticsView")
-            start_date_str = request.query_params.get("start_date", None)
 
-            if not start_date_str:
-                # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
-                start_date = timezone.make_aware(
-                    datetime.combine(date.today() - timedelta(days=48), datetime.min.time()),
-                    timezone=pytz.timezone("Asia/Tashkent"),
-                )
-            else:
-                start_date = timezone.make_aware(
-                    datetime.combine(datetime.strptime(start_date_str, "%Y-%m-%d"), datetime.min.time()),
-                    timezone=pytz.timezone("Asia/Tashkent"),
-                )
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
+            print("SingleProductAnalyticsView")
+            user: User = request.user
+            is_proplus = user.is_proplus
+            days = 60 if is_proplus else 30
+
+            # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
+            start_date = timezone.make_aware(
+                datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),
+                timezone=pytz.timezone("Asia/Tashkent"),
+            )
 
             if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
                 end_date = timezone.make_aware(
@@ -374,12 +375,18 @@ class SimilarProductsViewByUzum(APIView):
     def get(self, request: Request, product_id: str):
         try:
             start = time.time()
+            user = check_user(request)
+            if user is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
+            is_proplus = user.is_proplus
+            days = 60 if is_proplus else 3
 
             productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
             productIds.append(product_id)
 
             start_date = timezone.make_aware(
-                datetime.combine(date.today() - timedelta(days=45), datetime.min.time()),
+                datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
             )
 
@@ -471,6 +478,9 @@ class ProductReviews(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request, product_id: str):
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
             reviews = ProductReviews.fetch_reviews_from_uzum(product_id)
             #         reviews = ProductReviews.fetch_reviews_from_uzum(product_id)
 
@@ -529,6 +539,10 @@ class NewProductsView(APIView):
     def get(self, request: Request):
         try:
             print("Start NewProductsView")
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            elif not request.user.is_proplus:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
             column = request.query_params.get("column", "orders_amount")  # default is 'orders_amount'
             order = request.query_params.get("order", "desc")  # default is 'desc'
@@ -626,6 +640,10 @@ class GrowingProductsView(APIView):
     def get(self, request: Request):
         try:
             print("Start GrowingProductsView")
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            elif not request.user.is_proplus:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
             search_columns = request.query_params.get("searches", "")  # default is empty string
             filters = request.query_params.get("filters", "")  # default is empty string

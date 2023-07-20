@@ -11,8 +11,9 @@ urlpatterns = [
     path("<int:product_id>/", views.ProductView.as_view(), name="all-products"),
     path("current/<int:product_id>/", views.CurrentProductView.as_view(), name="current-product"),
     path(
-        "segmentation",
-        cache_page(seconds_until_midnight())(views.ProductsSegmentationView.as_view()),
+        "segments/",
+        cache_page(seconds_until_midnight())(views.AllProductsPriceSegmentationView.as_view()),
+        # views.AllProductsPriceSegmentationView.as_view(),
         name="segmentation",
     ),
     path(

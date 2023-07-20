@@ -14,7 +14,7 @@ from uzum.sku.models import SkuAnalytics
 
 def seconds_until_midnight():
     """Get the number of seconds until midnight."""
-    now = timezone.now()
+    now = timezone.make_aware(datetime.datetime.now(), timezone=pytz.timezone("Asia/Tashkent"))
     midnight = now.replace(hour=23, minute=59, second=59, microsecond=999999)
     return (midnight - now).seconds
 

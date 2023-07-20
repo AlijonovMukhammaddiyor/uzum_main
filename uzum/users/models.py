@@ -16,9 +16,6 @@ class User(AbstractUser):
     check forms.SignupForm and forms.SocialSignupForms accordingly.
     """
 
-    # first_name = models.CharField(_("First name"), max_length=30, blank=True)
-    # last_name = models.CharField(_("Last name"), max_length=150, blank=True)
-
     phone_number = models.CharField(max_length=20, blank=True, unique=True)
     # is_verified = models.BooleanField(default=False)
     email = models.EmailField(_("Email address"), blank=True, unique=False)
@@ -29,7 +26,9 @@ class User(AbstractUser):
 
     shop = models.ForeignKey("shop.Shop", null=True, blank=True, on_delete=models.SET_NULL)
 
-    is_developer = models.BooleanField(default=False)
+    is_developer = models.BooleanField(default=False, null=True, blank=True)
+    is_proplus = models.BooleanField(default=False, null=True, blank=True)
+    is_pro = models.BooleanField(default=False, null=True, blank=True)
 
     def get_absolute_url(self) -> str:
         """Get URL for user's detail view.
