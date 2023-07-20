@@ -1,3 +1,4 @@
+import traceback
 import uuid
 
 from django.contrib.auth import get_user_model
@@ -96,43 +97,49 @@ class UserSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data: dict):
-        # Extract the password from the data
-        password = validated_data.pop("password", None)
-        if not password:
-            raise ValueError("Password is required.")
+        try:
+            # Extract the password from the data
+            password = validated_data.pop("password", None)
+            print("validated_data: ", validated_data)
+            if not password:
+                raise ValueError("Password is required.")
 
-        if not password:
-            raise ValueError("Password is required.")
+            if not password:
+                raise ValueError("Password is required.")
 
-        # Generate a unique referral code. This will generate a random string of length 6.
-        referral_code = get_random_string(6, validated_data["username"], validated_data["phone_number"])
+            # Generate a unique referral code. This will generate a random string of length 6.
+            referral_code = get_random_string(6, validated_data["username"], validated_data["phone_number"])
+            # replace space with underscore
+            validated_data["username"] = validated_data["username"].replace(" ", "_")
+            context = self.context["request"].data
+            referred_by_code = context.get("referred_by_code")
+            referred_by = get_referred_by(referred_by_code)
 
-        context = self.context["request"].data
-        referred_by_code = context.get("referred_by_code")
+            # Add the generated referral code to the user data.
+            validated_data["referral_code"] = referral_code
+            validated_data["referred_by"] = referred_by
+            shop_id = self.context["request"].data.get("shop")
+            validated_data["shop"] = get_shop(shop_id)
+            validated_data["is_staff"] = validated_data.get("is_staff", False)
+            validated_data["fingerprint"] = validated_data.get("fingerprint", "")
+            # Create the user instance.
+            user = User.objects.create(**validated_data)
+            user.set_password(password)
+            user.save()
 
-        referred_by = get_referred_by(referred_by_code)
-
-        # Add the generated referral code to the user data.
-        validated_data["referral_code"] = referral_code
-        validated_data["referred_by"] = referred_by
-        shop_id = self.context["request"].data.get("shop")
-        validated_data["shop"] = get_shop(shop_id)
-        validated_data["is_staff"] = validated_data.get("is_staff", False)
-        validated_data["fingerprint"] = validated_data.get("fingerprint", "")
-        # Create the user instance.
-        user = User.objects.create(**validated_data)
-        user.set_password(password)
-        user.save()
-
-        create_referral(referred_by, user)
-        # before returning the user, we need to remove the password from the validated data
-        return {
-            "id": user.id,
-            "username": user.username,
-            "phone_number": user.phone_number,
-            "email": user.email,
-            "referral_code": user.referral_code,
-        }
+            create_referral(referred_by, user)
+            # before returning the user, we need to remove the password from the validated data
+            return {
+                "id": user.id,
+                "username": user.username,
+                "phone_number": user.phone_number,
+                "email": user.email,
+                "referral_code": user.referral_code,
+            }
+        except Exception as e:
+            print("Error in create: ", e)
+            traceback.print_exc()
+            return None
 
 
 class UserLoginSerializer(TokenObtainPairSerializer):
