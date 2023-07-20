@@ -5,8 +5,6 @@ from corsheaders.defaults import default_headers
 from .base import *  # noqa
 from .base import env
 
-print("Settings: production.py")
-
 # GENERAL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#secret-key

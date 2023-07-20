@@ -3,6 +3,8 @@ import datetime
 import pytz
 from rest_framework.request import Request
 
+from uzum.users.models import User
+
 
 def decode_request(request: Request, method: str) -> dict:
     """
@@ -78,3 +80,16 @@ def get_start_of_day(date: datetime.datetime):
 
 def date_in_Tashkent(date: datetime.datetime):
     return date.astimezone(pytz.timezone("Asia/Tashkent"))
+
+
+def check_user(request: Request):
+    try:
+        user: User = request.user
+        if request.user.is_authenticated:
+            if user.is_pro or user.is_proplus:
+                return user
+
+        return None
+    except Exception as e:
+        print("Error in check_user: ", e)
+        return None

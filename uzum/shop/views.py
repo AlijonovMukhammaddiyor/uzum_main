@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import pytz
 from django.db import connection
 from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
-from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -19,15 +18,20 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-
-from uzum.category.models import Category, CategoryAnalytics
+from uzum.users.models import User
+from uzum.category.models import Category
 from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
 from uzum.review.views import CookieJWTAuthentication
 from uzum.shop.models import Shop, ShopAnalytics
-from uzum.utils.general import get_day_before_pretty, get_next_day_pretty, get_today_pretty, get_today_pretty_fake
+from uzum.utils.general import (
+    check_user,
+    get_day_before_pretty,
+    get_next_day_pretty,
+    get_today_pretty_fake,
+)
 
 from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer
 
@@ -72,6 +76,8 @@ class CurrentShopView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request, link: str):
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             shop = Shop.objects.get(link=link)
             serializer = ShopSerializer(shop)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -89,6 +95,8 @@ class TreemapShopsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             shops = (
                 ShopAnalytics.objects.filter(date_pretty=get_today_pretty_fake())
                 .order_by("-total_products")
@@ -114,6 +122,7 @@ class TreemapShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# free
 class ShopsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -296,6 +305,8 @@ class ShopsOrdersSegmentationView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start_date_str = request.query_params.get(
                 "start_date", (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")  # default 30 days ago
             )
@@ -377,6 +388,8 @@ class ShopsProductsSegmentation(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             segments = self.shops_segmentation(request)
 
             return Response(data={"data": segments}, status=status.HTTP_200_OK)
@@ -397,11 +410,13 @@ class ShopAnalyticsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request, seller_id: int):
         try:
-            range = request.query_params.get("range", 15)
-            start = time.time()
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            user: User = request.user
+            days = 60 if user.is_proplus else 30
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=int(range) + 1), timezone=pytz.timezone("Asia/Tashkent")
+                datetime.now() - timedelta(days=days + 1), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
@@ -512,7 +527,8 @@ class ShopCompetitorsView(APIView):
         try:
             if seller_id is None:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
-
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             print("Shop Competitors View")
             start = time.time()
             shop = get_object_or_404(Shop, seller_id=seller_id)
@@ -629,7 +645,9 @@ class ShopDailySalesView(APIView):
         Get Productanalytics of a shop at a specific date and next day
         """
         try:
-            #! TODO: some products are not showing up in the analytics
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
             print("Shop Daily Sales View")
             start = time.time()
             shop = get_object_or_404(Shop, seller_id=seller_id)
@@ -645,6 +663,19 @@ class ShopDailySalesView(APIView):
             start_date = timezone.make_aware(
                 datetime.strptime(date, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            user: User = request.user
+
+            # check if start date is before 30 days
+            if start_date < timezone.make_aware(
+                datetime.now() - timedelta(days=30), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=0, minute=0, second=0, microsecond=0):
+                if user.is_proplus:
+                    pass
+                else:
+                    start_date = timezone.make_aware(
+                        datetime.now() - timedelta(days=30), timezone=pytz.timezone("Asia/Tashkent")
+                    ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             def calculate_diff(target, before):
                 """
@@ -850,6 +881,8 @@ class ShopProductsView(ListAPIView):
     def list(self, request, *args, **kwargs):
         start_time = time.time()
         print("Shop PRODUCTS")
+        if check_user(request) is None:
+            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
         response = super().list(request, *args, **kwargs)
         print(f"Shop PRODUCTS: {time.time() - start_time} seconds")
         return response
@@ -865,6 +898,8 @@ class ShopTopProductsView(APIView):
         This view should return a list of all the products for
         the category as determined by the category portion of the URL.
         """
+        if check_user(request) is None:
+            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
         seller_id = self.kwargs["seller_id"]
         shop = Shop.objects.get(seller_id=seller_id)
 
@@ -899,6 +934,8 @@ class StoppedProductsView(APIView):
         try:
             # Write the raw SQL query
             print("STOPPED PRODUCTS")
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
             query = f"""
             SELECT p.title, p.photos, pa.*, c.title AS category_title, c."categoryId" as category_id,  AVG(ska.purchase_price) AS avg_purchase_price, AVG(ska.full_price) AS avg_full_price
@@ -959,6 +996,8 @@ class ShopCategoriesView(APIView):
         """
         try:
             print("SHOP CATEGORIES")
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
             query = f"""
             SELECT c."categoryId", c.title, COUNT(p.product_id) AS products_amount, SUM(pa.orders_amount) AS orders_amount, SUM(pa.reviews_amount) AS reviews_amount
@@ -1007,10 +1046,13 @@ class ShopCategoryAnalyticsView(APIView):
 
         try:
             start = time.time()
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             print("SHOP CATEGORY ANALYTICS")
-            range_ = int(request.query_params.get("range", 15))
+            user: User = request.user
+            days = 60 if user.is_proplus else 30
             start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=range_), timezone=pytz.timezone("Asia/Tashkent")
+                datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
             # if it is before 7 am in Tashkent, it is still yesterday
@@ -1108,6 +1150,9 @@ class ShopProductsByCategoryView(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
             shop = Shop.objects.get(pk=seller_id)
             category = Category.objects.get(pk=category_id)
 
@@ -1187,8 +1232,10 @@ class UzumTotalOrders(APIView):
             _type_: _description_
         """
         try:
+            user: User = request.user
+            days = 60 if user.is_proplus else 30
             start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
+                datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
@@ -1225,8 +1272,10 @@ class UzumTotalProducts(APIView):
 
     def get(self, request):
         try:
+            user: User = request.user
+            days = 60 if user.is_proplus else 30
             start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
+                datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
@@ -1257,10 +1306,12 @@ class UzumTotalShops(APIView):
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
+            user: User = request.user
+            days = 60 if user.is_proplus else 30
             start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=45), timezone=pytz.timezone("Asia/Tashkent")
+                datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
             if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
                 # end date is end of yesterday

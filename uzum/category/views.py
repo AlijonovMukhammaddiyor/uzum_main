@@ -30,7 +30,8 @@ from uzum.category.utils import calculate_shop_analytics_in_category
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.review.views import CookieJWTAuthentication
 from uzum.sku.models import SkuAnalytics
-from uzum.utils.general import get_today_pretty, get_today_pretty_fake
+from uzum.users.models import User
+from uzum.utils.general import get_today_pretty_fake, check_user
 
 from .models import Category, CategoryAnalytics
 from .serializers import CategoryAnalyticsSeralizer, CategorySerializer, ProductAnalyticsViewSerializer
@@ -154,6 +155,10 @@ class CategoryProductsView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         start_time = time.time()
+
+        if check_user(request) is None:
+            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
         print("CATEGORY PRODUCTS")
         response = super().list(request, *args, **kwargs)
         print(f"CATEGORY PRODUCTS: {time.time() - start_time} seconds")
@@ -204,6 +209,8 @@ class CategoryTopProductsView(ListAPIView):
         }
 
     def get(self, request, category_id: int):
+        if check_user(request) is None:
+            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
         products = self.get_products(category_id)
         return Response(status=status.HTTP_200_OK, data=products)
 
@@ -226,7 +233,7 @@ class CategoryProductsPeriodComparisonView(APIView):
             four_weeks_ago_date = timezone.now() - timedelta(weeks=4)
             four_weeks_and_day_ago_date = timezone.now() - timedelta(weeks=4, days=1)
 
-            date_pretty = get_today_pretty()
+            date_pretty = get_today_pretty_fake()
 
             today_analytics = ProductAnalytics.objects.filter(product=OuterRef("pk"), date_pretty=date_pretty)
             week_ago_analytics = ProductAnalytics.objects.filter(
@@ -346,6 +353,8 @@ class CategoryProductsPeriodComparisonView(APIView):
             _type_: _description_
         """
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             category = Category.objects.get(categoryId=category_id)
             category_products = self.get_category_products_comparison(category)
 
@@ -417,7 +426,11 @@ class CategoryDailyAnalyticsView(APIView):
             }]
         """
         try:
-            range = request.query_params.get("range", 15)
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
+            user: User = request.user
+            range = 30 if user.is_pro else 60
             start = time.time()
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
@@ -463,6 +476,9 @@ class SubcategoriesView(APIView):
     def get(self, request: Request, category_id):
         try:
             start = time.time()
+
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
 
             category = Category.objects.get(categoryId=category_id)
             children = category.children.all()
@@ -557,6 +573,8 @@ class CategoryPriceSegmentationView(APIView):
     def get(self, request: Request, category_id):
         try:
             start_time = time.time()
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             # range_count = request.query_params.get("range", 15)
             segments_count = request.query_params.get("segments_count", 15)
 
@@ -675,6 +693,8 @@ class CategoryShopsView(APIView):
     def get(self, request: Request, category_id):
         try:
             start_time = time.time()
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             category = Category.objects.get(categoryId=category_id)
 
             if category.descendants:
@@ -743,6 +763,8 @@ class NicheSlectionView(APIView):
             _type_: _description_
         """
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             term = request.query_params.get("term")
 
             categories = Category.objects.filter(title__icontains=term).values("categoryId", "title")
@@ -763,6 +785,10 @@ class GrowingCategoriesView(APIView):
     def get(self, request: Request):
         try:
             print("Start GrowingProductsView")
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            elif not request.user.is_proplus:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
 
             start_date = timezone.make_aware(
@@ -816,9 +842,19 @@ class MainCategoriesAnalyticsView(APIView):
 
     def get(self, request: Request):
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            elif not request.user.is_proplus:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
             start = time.time()
+
+            user: User = request.user
+
+            days = 30 if user.is_pro else 60
+
             start_date = timezone.make_aware(
-                datetime.combine(date.today() - timedelta(days=45), datetime.min.time()),
+                datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 

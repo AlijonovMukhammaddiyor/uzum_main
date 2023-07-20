@@ -69,15 +69,14 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            "id",
             "username",
             "phone_number",
-            "fingerprint",
-            "referred_by",
             "referral_code",
             "password",
             "email",
             "is_staff",
+            "is_proplus",
+            "is_pro",
             # "shop",
         ]
 
