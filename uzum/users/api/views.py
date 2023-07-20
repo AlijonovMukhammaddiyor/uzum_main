@@ -10,7 +10,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework_simplejwt.authentication import JWTAuthentication
-
+from django.db import IntegrityError
+from rest_framework.exceptions import ValidationError
 from config.settings.base import env
 
 from .serializers import UserSerializer
@@ -59,10 +60,31 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
 
             # Continue with the user creation logic
             return super().create(request, *args, **kwargs)
+        except IntegrityError as e:
+            field_errors = str(e.args[1]).split(",")
+            error_message = ""
+
+            if "phone_number" in field_errors[0]:
+                error_message = "A user with this phone number already exists."
+            elif "username" in field_errors[0]:
+                error_message = "A user with this username already exists."
+
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": error_message})
+        except ValidationError as e:
+            error_message = ""
+            error_details = e.detail  # This should be a dictionary with the error details.
+
+            if "phone_number" in error_details:
+                error_message = "A user with this phone number already exists."
+            elif "username" in error_details:
+                error_message = "A user with this username already exists."
+
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": error_message})
         except Exception as e:
             print("Error in create: ", e)
             traceback.print_exc()
-            return HttpResponseBadRequest("Error in create")
+            # send error message
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": str(e)})
 
     @action(detail=False)
     def me(self, request: HttpRequest):
