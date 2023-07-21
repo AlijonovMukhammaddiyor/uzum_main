@@ -5,8 +5,23 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-
+from django.utils import timezone
+from celery import shared_task
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from uzum.payment.models import Payment
+
+
+@shared_task
+def end_user_trial(username):
+    print("end_user_trial called")
+    user_profile = User.objects.get(username=username)
+    if user_profile.is_paid:
+        return
+    user_profile.is_pro = False
+    user_profile.is_proplus = False
+    user_profile.is_paid = False
+    user_profile.save()
 
 
 class User(AbstractUser):
@@ -29,6 +44,9 @@ class User(AbstractUser):
     is_developer = models.BooleanField(default=False, null=True, blank=True)
     is_proplus = models.BooleanField(default=False, null=True, blank=True)
     is_pro = models.BooleanField(default=False, null=True, blank=True)
+    # 1 day, trial ends
+    trial_end = models.DateTimeField(default=timezone.now() + timedelta(days=1), null=True, blank=True)
+    is_paid = models.BooleanField(default=False, null=True, blank=True)
 
     def get_absolute_url(self) -> str:
         """Get URL for user's detail view.
@@ -59,3 +77,12 @@ class User(AbstractUser):
             # The user has no payments yet, calculate next date based on registration date
             next_payment_date = self.date_joined + timedelta(days=1)
         return next_payment_date
+
+
+@receiver(post_save, sender=User)
+def start_trial(sender, instance: User, created, **kwargs):
+    if created:
+        print("registering for ", instance.username)
+        # new user created, create a user profile for them
+        instance.is_pro = True
+        end_user_trial.apply_async((instance.username,), eta=timezone.now() + timedelta(days=1))
