@@ -128,7 +128,11 @@ def update_uzum_data(args=None, **kwargs):
 
     print("Updating Category Analytics...")
     start = time.time()
-    CategoryAnalytics.update_analytics(date_pretty)
+    # CategoryAnalytics.update_analytics(date_pretty)
+    CategoryAnalytics.update_totals_for_date(date_pretty)
+    CategoryAnalytics.update_totals_for_shops_and_products(date_pretty)
+    CategoryAnalytics.update_totals_with_sale(date_pretty)
+    CategoryAnalytics.set_average_purchase_price(date_pretty)
     print(f"Category Analytics updated in {time.time() - start} seconds")
 
     print("ShopAnalytics updating...")
