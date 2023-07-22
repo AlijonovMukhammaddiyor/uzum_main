@@ -379,8 +379,9 @@ class SimilarProductsViewByUzum(APIView):
             if user is None:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
 
-            is_proplus = user.is_proplus
-            days = 60 if is_proplus else 3
+            # is_proplus = user.is_proplus
+            # days = 60 if is_proplus else 3
+            days = 60
 
             productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
             productIds.append(product_id)
