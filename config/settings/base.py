@@ -364,7 +364,12 @@ SPECTACULAR_SETTINGS = {
 CELERY_BEAT_SCHEDULE = {
     "update_data": {
         "task": "update_uzum_data",
-        "schedule": crontab(minute=5, hour=0, day_of_week="*"),
+        "schedule": crontab(minute=1, hour=0, day_of_week="*"),
+        "args": (),
+    },
+    "update_trials": {
+        "task": "update_user_trials",
+        "schedule": crontab(minute=0, hour=6, day_of_week="*"),
         "args": (),
     },
 }
