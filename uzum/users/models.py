@@ -31,7 +31,7 @@ class User(AbstractUser):
 
     is_developer = models.BooleanField(default=False, null=True, blank=True)
     is_proplus = models.BooleanField(default=False, null=True, blank=True)
-    is_pro = models.BooleanField(default=False, null=True, blank=True)
+    is_pro = models.BooleanField(default=True, null=True, blank=True)
     # 1 day, trial ends
     trial_end = models.DateTimeField(default=timezone.now() + timedelta(days=1), null=True, blank=True)
     is_paid = models.BooleanField(default=False, null=True, blank=True)

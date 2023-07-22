@@ -37,6 +37,34 @@ from .models import Category, CategoryAnalytics
 from .serializers import CategoryAnalyticsSeralizer, CategorySerializer, ProductAnalyticsViewSerializer
 
 
+class CurrentCategoryView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = CategorySerializer
+    queryset = Category.objects.all()
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Category"])
+    def get(self, request: Request, category_id: int):
+        try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
+            user: User = request.user
+
+            category = get_object_or_404(Category, pk=category_id)
+            if not category:
+                return Response(status=status.HTTP_404_NOT_FOUND, data={"message": "Category not found"})
+
+            serializer = CategorySerializer(category)
+            return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class CategoryTreeView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
