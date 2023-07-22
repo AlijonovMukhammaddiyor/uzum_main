@@ -9,6 +9,7 @@ from . import views
 app_name = "category"
 urlpatterns = [
     path("", cache_page(seconds_until_midnight())(views.CategoryTreeView.as_view()), name="all-categories"),
+    path("current/<int:category_id>/", views.CurrentCategoryView.as_view(), name="current-categories"),
     path(
         "products/<int:category_id>/",
         views.CategoryProductsView.as_view(),
