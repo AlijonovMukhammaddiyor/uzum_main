@@ -78,6 +78,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_staff",
             "is_proplus",
             "is_pro",
+            "is_paid",
             # "shop",
         ]
 
