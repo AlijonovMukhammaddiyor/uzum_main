@@ -124,15 +124,20 @@ async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids:
                         print("Error in concurrentRequestsForIds inner:", res)
                         failed_ids.append(data[index + idx])
                     else:
-                        res_data = res.json()
-                        if "errors" not in res_data:
-                            products = res_data["data"]["makeSearch"]["items"]
-                            for product in products:
-                                product_ids.append(product["catalogCard"]["productId"])
-                        else:
-                            print("Error in concurrentRequestsForIds B:", res_data, data[index + idx])
-                            p = data[index + idx]
+                        try:
+                            res_data = res.json()
+                            if "errors" not in res_data:
+                                products = res_data["data"]["makeSearch"]["items"]
+                                for product in products:
+                                    product_ids.append(product["catalogCard"]["productId"])
+                            else:
+                                print("Error in concurrentRequestsForIds B:", res_data, data[index + idx])
+                                p = data[index + idx]
+                                failed_ids.append(data[index + idx])
+                        except Exception as e:
+                            print("Error in concurrentRequestsForIds C:", e, data[index + idx])
                             failed_ids.append(data[index + idx])
+                            traceback.print_exc()
 
                 index += PRODUCTIDS_CONCURRENT_REQUESTS
 
