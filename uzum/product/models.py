@@ -87,7 +87,7 @@ class ProductAnalytics(models.Model):
                             pa.id,
                             RANK() OVER (
                                 PARTITION BY p.shop_id
-                                ORDER BY pa.orders_amount DESC
+                                ORDER BY pa.orders_money DESC
                             ) as rank
                         FROM
                             product_productanalytics pa
@@ -114,7 +114,7 @@ class ProductAnalytics(models.Model):
                             pa.id,
                             RANK() OVER (
                                 PARTITION BY p.category_id
-                                ORDER BY pa.orders_amount DESC
+                                ORDER BY pa.orders_money DESC
                             ) as rank
                         FROM
                             product_productanalytics pa
@@ -140,7 +140,7 @@ class ProductAnalytics(models.Model):
                         SELECT
                             pa.id,
                             RANK() OVER (
-                                ORDER BY pa.orders_amount DESC
+                                ORDER BY pa.orders_money DESC
                             ) as rank
                         FROM
                             product_productanalytics pa

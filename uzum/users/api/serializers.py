@@ -84,15 +84,12 @@ class UserSerializer(serializers.ModelSerializer):
 
         extra_kwargs = {
             "url": {"view_name": "api:user-detail", "lookup_field": "username"},
-            # state that referral_code is not required when receiving data
             "referral_code": {"required": False},
             "username": {"required": True, "max_length": 255},
-            # required fields
-            "phone_number": {"required": True, "max_length": 20},
+            "phone_number": {"required": False, "max_length": 20},
             "fingerprint": {"required": False},
             "email": {"required": False, "max_length": 255},
             "password": {"required": False},
-            # "shop": {"required": False},
             "referred_by": {"required": False},
             "is_staff": {"required": False},
         }
@@ -105,11 +102,8 @@ class UserSerializer(serializers.ModelSerializer):
             if not password:
                 raise ValueError("Password is required.")
 
-            if not password:
-                raise ValueError("Password is required.")
-
             # Generate a unique referral code. This will generate a random string of length 6.
-            referral_code = get_random_string(6, validated_data["username"], validated_data["phone_number"])
+            referral_code = get_random_string(6, validated_data["username"], validated_data["username"])
             # replace space with underscore
             validated_data["username"] = validated_data["username"].replace(" ", "_")
             context = self.context["request"].data
@@ -133,8 +127,6 @@ class UserSerializer(serializers.ModelSerializer):
             return {
                 "id": user.id,
                 "username": user.username,
-                "phone_number": user.phone_number,
-                "email": user.email,
                 "referral_code": user.referral_code,
             }
         except Exception as e:

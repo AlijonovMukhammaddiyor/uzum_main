@@ -27,7 +27,7 @@ class User(AbstractUser):
     check forms.SignupForm and forms.SocialSignupForms accordingly.
     """
 
-    phone_number = models.CharField(max_length=20, blank=True, unique=True)
+    phone_number = models.CharField(max_length=20, blank=True, unique=False, null=True)
     # is_verified = models.BooleanField(default=False)
     email = models.EmailField(_("Email address"), blank=True, unique=False)
     fingerprint = models.CharField(max_length=255, blank=True)  # unique fingerprint of the user's device

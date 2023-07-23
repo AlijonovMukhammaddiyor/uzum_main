@@ -77,7 +77,7 @@ class ShopAnalytics(models.Model):
                     UPDATE shop_shopanalytics AS sa
                     SET position = sa_new.rank
                     FROM (
-                        SELECT sa_inner.id, RANK() OVER (ORDER BY sa_inner.total_orders DESC) as rank
+                        SELECT sa_inner.id, RANK() OVER (ORDER BY sa_inner.total_revenue DESC) as rank
                         FROM shop_shopanalytics as sa_inner
                         WHERE sa_inner.date_pretty = %s
                     ) AS sa_new
