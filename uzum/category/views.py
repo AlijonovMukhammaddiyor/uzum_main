@@ -459,6 +459,7 @@ class CategoryDailyAnalyticsView(APIView):
 
             user: User = request.user
             range = 30 if user.is_pro else 60
+
             start = time.time()
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(

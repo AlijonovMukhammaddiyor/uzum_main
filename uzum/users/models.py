@@ -9,7 +9,12 @@ from django.utils import timezone
 from celery import shared_task
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+import pytz
 from uzum.payment.models import Payment
+
+
+def get_current_time():
+    return timezone.make_aware(timezone.now(), pytz.timezone("Asia/Tashkent")) + timedelta(days=1)
 
 
 class User(AbstractUser):
@@ -33,7 +38,7 @@ class User(AbstractUser):
     is_proplus = models.BooleanField(default=False, null=True, blank=True)
     is_pro = models.BooleanField(default=True, null=True, blank=True)
     # 1 day, trial ends
-    trial_end = models.DateTimeField(default=timezone.now() + timedelta(days=1), null=True, blank=True)
+    trial_end = models.DateTimeField(default=get_current_time, null=True, blank=True)
     is_paid = models.BooleanField(default=False, null=True, blank=True)
 
     def get_absolute_url(self) -> str:

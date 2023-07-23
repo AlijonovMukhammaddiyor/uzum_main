@@ -4,8 +4,10 @@ import numpy as np
 import pandas as pd
 from django.core.cache import cache
 from django.db import connection, models
-
+from django.utils import timezone
 from uzum.utils.general import get_day_before_pretty, get_today_pretty
+from datetime import datetime
+import pytz
 
 
 class Product(models.Model):
@@ -61,7 +63,7 @@ class ProductAnalytics(models.Model):
     reviews_amount = models.IntegerField(default=0)
     rating = models.FloatField(default=0)
     orders_amount = models.IntegerField(default=0, db_index=True)
-    orders_money = models.IntegerField(default=0)
+    orders_money = models.FloatField(default=0.0)
 
     campaigns = models.ManyToManyField(
         "campaign.Campaign",
@@ -271,6 +273,57 @@ class ProductAnalytics(models.Model):
         # set to cache with tieout 1 day
         print("setting top_growing_products to cache", len(top_growing_products), top_growing_products)
         cache.set("top_growing_products", top_growing_products, timeout=None)
+
+    @staticmethod
+    def set_orders_money(date_pretty: str):
+        try:
+            # Convert date_pretty to a timezone-aware datetime object
+            date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH latest_pa AS (
+                        SELECT DISTINCT ON (product_id) *
+                        FROM product_productanalytics
+                        WHERE created_at < %s
+                        ORDER BY product_id, created_at DESC
+                    ),
+                    today_pa AS (
+                        SELECT *
+                        FROM product_productanalytics
+                        WHERE created_at = %s
+                    ),
+                    order_difference AS (
+                        SELECT
+                            today_pa.product_id,
+                            (today_pa.orders_amount - COALESCE(latest_pa.orders_amount, 0)) AS delta_orders,
+                            COALESCE(latest_pa.orders_money, 0) AS latest_orders_money
+                        FROM
+                            today_pa
+                            LEFT JOIN latest_pa ON today_pa.product_id = latest_pa.product_id
+                    ),
+                    delta_orders_money AS (
+                        SELECT
+                            order_difference.product_id,
+                            (order_difference.latest_orders_money + (order_difference.delta_orders * today_pa.average_purchase_price)) / 1000.0 AS new_orders_money
+                        FROM
+                            order_difference
+                            JOIN today_pa ON order_difference.product_id = today_pa.product_id
+                        WHERE today_pa.average_purchase_price IS NOT NULL
+                    )
+                    UPDATE product_productanalytics
+                    SET orders_money = COALESCE(delta_orders_money.new_orders_money, 0)
+                    FROM delta_orders_money
+                    WHERE product_productanalytics.product_id = delta_orders_money.product_id
+                    AND product_productanalytics.created_at = %s
+                    """,
+                    [date, date, date],
+                )
+        except Exception as e:
+            print(e)
 
 
 class ProductAnalyticsView(models.Model):
