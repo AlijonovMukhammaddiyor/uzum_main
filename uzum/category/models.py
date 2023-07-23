@@ -128,7 +128,9 @@ class CategoryAnalytics(models.Model):
     )
 
     total_orders = models.IntegerField(null=True, blank=True)  # total orders of category so far
-    total_orders_amount = models.IntegerField(null=True, blank=True)  # total orders amount of category so far
+    total_orders_amount = models.FloatField(
+        null=True, blank=True, default=0.0
+    )  # total orders amount of category so far
 
     total_reviews = models.IntegerField(null=True, blank=True)  # so far
     average_product_rating = models.FloatField(null=True, blank=True)  # so far
@@ -214,7 +216,7 @@ class CategoryAnalytics(models.Model):
                 cursor.execute(
                     """
                     WITH latest_pa AS (
-                    SELECT DISTINCT ON (pa.product_id) pa.product_id, pa.orders_amount, pa.reviews_amount, pa.rating
+                    SELECT DISTINCT ON (pa.product_id) pa.product_id, pa.orders_amount, pa.reviews_amount, pa.rating, pa.orders_money
                     FROM product_productanalytics pa
                     WHERE pa.created_at <= %s
                     ORDER BY pa.product_id, pa.created_at DESC
@@ -224,7 +226,8 @@ class CategoryAnalytics(models.Model):
                         c."categoryId" AS categoryid,
                         COALESCE(SUM(lpa.orders_amount), 0) as total_orders,
                         COALESCE(SUM(lpa.reviews_amount), 0) as total_reviews,
-                        COALESCE(AVG(NULLIF(lpa.rating, 0)), 0) as average_rating
+                        COALESCE(AVG(NULLIF(lpa.rating, 0)), 0) as average_rating,
+                        COALESCE(SUM(lpa.orders_money), 0) as total_orders_amount
                     FROM
                         category_category c
                         LEFT JOIN product_product p ON p.category_id = ANY(
@@ -239,7 +242,8 @@ class CategoryAnalytics(models.Model):
                 SET
                     total_orders = aggs.total_orders,
                     total_reviews = aggs.total_reviews,
-                    average_product_rating = aggs.average_rating
+                    average_product_rating = aggs.average_rating,
+                    total_orders_amount = aggs.total_orders_amount
                 FROM
                     aggs
                 WHERE

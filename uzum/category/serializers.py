@@ -37,6 +37,7 @@ class CategoryAnalyticsSeralizer(ModelSerializer):
         fields = [
             "total_products",
             "total_orders",
+            "total_orders_amount",
             "total_reviews",
             "average_product_rating",
             "total_shops",
@@ -67,6 +68,7 @@ class CategoryProductsSerializer(ModelSerializer):
         model = ProductAnalytics
         fields = [
             "orders_amount",
+            "orders_money",
             "position_in_category",
             "product_id",
             "reviews_amount",
@@ -114,6 +116,7 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
             "shop_link",
             "product_available_amount",
             "orders_amount",
+            "orders_money",
             "reviews_amount",
             "rating",
             "position_in_category",
