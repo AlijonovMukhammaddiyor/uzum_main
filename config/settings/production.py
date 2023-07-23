@@ -219,6 +219,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:8000",
     "https://uzanalitika.uz",
+    "https://api.alijonov.com",
     "https://www.uzanalitika.uz",
     "https://www.uzumanalitika.com"
     # Add other allowed origins if needed

@@ -11,6 +11,9 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 import pytz
 from uzum.payment.models import Payment
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+from config.settings.base import env
 
 
 def get_current_time():
@@ -72,10 +75,30 @@ class User(AbstractUser):
         return next_payment_date
 
 
-# @receiver(post_save, sender=User)
-# def start_trial(sender, instance: User, created, **kwargs):
-#     if created:
-#         print("registering for ", instance.username)
-#         # new user created, create a user profile for them
-#         instance.is_pro = True
-#         end_user_trial.apply_async((instance.username,), eta=timezone.now() + timedelta(days=1))
+@receiver(post_save, sender=User)
+def start_trial(sender, instance: User, created, **kwargs):
+    if created:
+        channel_id = "C05K0MK0VG8"
+        slack_token = env("SLACK_BOT_TOKEN")
+        client = WebClient(token=slack_token)
+        block = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"Username - {instance.username}\nNumber - {instance.phone_number}",
+                },
+            }
+        ]
+
+        try:
+            # Call the conversations.list method using the WebClient
+            client.chat_postMessage(
+                channel=channel_id,
+                text="New user signed up\n",
+                blocks=block
+                # You could also use a blocks[] array to send richer content
+            )
+
+        except SlackApiError as e:
+            print(f"Error: {e}")

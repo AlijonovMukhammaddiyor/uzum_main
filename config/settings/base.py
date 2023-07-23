@@ -367,11 +367,11 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute=1, hour=0, day_of_week="*"),
         "args": (),
     },
-    "update_trials": {
-        "task": "update_user_trials",
-        "schedule": crontab(minute=0, hour=6, day_of_week="*"),
-        "args": (),
-    },
+    # "update_trials": {
+    #     "task": "update_user_trials",
+    #     "schedule": crontab(minute=0, hour=6, day_of_week="*"),
+    #     "args": (),
+    # },
 }
 
 SESSION_CACHE_ALIAS = "default"
