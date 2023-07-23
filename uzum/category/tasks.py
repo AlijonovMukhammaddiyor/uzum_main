@@ -43,6 +43,7 @@ def update_uzum_data(args=None, **kwargs):
 
     # 1. Get all categories which have less than N products
     categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
+
     product_ids: list[int] = []
     async_to_sync(get_all_product_ids_from_uzum)(
         categories_filtered,
@@ -50,106 +51,108 @@ def update_uzum_data(args=None, **kwargs):
         page_size=PAGE_SIZE,
     )
 
-    product_ids = list(set(product_ids))
+    print(f"Total product ids: {len(product_ids)}")
 
-    product_campaigns, product_associations, shop_association = update_or_create_campaigns()
+    # product_ids = list(set(product_ids))
 
-    shop_analytics_done = {}
+    # product_campaigns, product_associations, shop_association = update_or_create_campaigns()
 
-    BATCH_SIZE = 10_000
+    # shop_analytics_done = {}
 
-    for i in range(0, len(product_ids), BATCH_SIZE):
-        products_api: list[dict] = []
-        print(f"{i}/{len(product_ids)}")
-        async_to_sync(get_product_details_via_ids)(product_ids[i : i + BATCH_SIZE], products_api)
-        create_products_from_api(products_api, product_campaigns, shop_analytics_done)
-        time.sleep(30)
-        del products_api
+    # BATCH_SIZE = 10_000
 
-    time.sleep(600)
+    # for i in range(0, len(product_ids), BATCH_SIZE):
+    #     products_api: list[dict] = []
+    #     print(f"{i}/{len(product_ids)}")
+    #     async_to_sync(get_product_details_via_ids)(product_ids[i : i + BATCH_SIZE], products_api)
+    #     create_products_from_api(products_api, product_campaigns, shop_analytics_done)
+    #     time.sleep(30)
+    #     del products_api
 
-    # fetch_product_ids()
+    # time.sleep(600)
 
-    time.sleep(30)
+    # # fetch_product_ids()
 
-    print("Setting banners...", product_associations, shop_association)
-    print(product_associations, shop_association)
-    bulk_remove_duplicate_product_analytics(date_pretty)
+    # time.sleep(30)
 
-    for product_id, banners in product_associations.items():
-        try:
-            product = Product.objects.get(product_id=product_id)
-            product_analytics = ProductAnalytics.objects.filter(product=product, date_pretty=get_today_pretty())
+    # print("Setting banners...", product_associations, shop_association)
+    # print(product_associations, shop_association)
+    # bulk_remove_duplicate_product_analytics(date_pretty)
 
-            if len(product_analytics) > 0:
-                # get the most recently created analytics
-                product_analytics = product_analytics.order_by("-created_at").first()
+    # for product_id, banners in product_associations.items():
+    #     try:
+    #         product = Product.objects.get(product_id=product_id)
+    #         product_analytics = ProductAnalytics.objects.filter(product=product, date_pretty=get_today_pretty())
 
-            product_analytics.banners.set(banners)
-            product_analytics.save()
+    #         if len(product_analytics) > 0:
+    #             # get the most recently created analytics
+    #             product_analytics = product_analytics.order_by("-created_at").first()
 
-            print(f"Product {product.title} banners set")
-        except Exception as e:
-            print("Error in setting banner(s): ", e)
+    #         product_analytics.banners.set(banners)
+    #         product_analytics.save()
 
-    for link, banners in shop_association.items():
-        try:
-            shop_an = ShopAnalytics.objects.filter(shop=Shop.objects.get(link=link), date_pretty=get_today_pretty())
+    #         print(f"Product {product.title} banners set")
+    #     except Exception as e:
+    #         print("Error in setting banner(s): ", e)
 
-            if len(shop_an) > 0:
-                shop_an = shop_an.order_by("-created_at").first()
+    # for link, banners in shop_association.items():
+    #     try:
+    #         shop_an = ShopAnalytics.objects.filter(shop=Shop.objects.get(link=link), date_pretty=get_today_pretty())
 
-            if len(shop_an) == 0:
-                continue
-            target = shop_an.order_by("-created_at").first()  # get most recently created analytics
-            target.banners.set(banners)
-            target.save()
+    #         if len(shop_an) > 0:
+    #             shop_an = shop_an.order_by("-created_at").first()
 
-            print(f"Shop {link} banner(s) set")
-        except Exception as e:
-            print("Error in setting shop banner(s): ", e)
+    #         if len(shop_an) == 0:
+    #             continue
+    #         target = shop_an.order_by("-created_at").first()  # get most recently created analytics
+    #         target.banners.set(banners)
+    #         target.save()
 
-    create_todays_searches()
+    #         print(f"Shop {link} banner(s) set")
+    #     except Exception as e:
+    #         print("Error in setting shop banner(s): ", e)
 
-    bulk_remove_duplicate_product_analytics(date_pretty)
-    bulk_remove_duplicate_shop_analytics(date_pretty)
-    bulk_remove_duplicate_sku_analytics(date_pretty)
+    # create_todays_searches()
 
-    print("Updating Category Descendants...")
-    start = time.time()
-    Category.update_descendants()
-    print(f"Category Descendants updated in {time.time() - start} seconds")
+    # bulk_remove_duplicate_product_analytics(date_pretty)
+    # bulk_remove_duplicate_shop_analytics(date_pretty)
+    # bulk_remove_duplicate_sku_analytics(date_pretty)
 
-    print("Updating ProductAnalytics positions...")
-    start = time.time()
-    ProductAnalytics.set_positions(date_pretty)
-    ProductAnalytics.update_average_purchase_price(date_pretty)
-    print(f"ProductAnalytics positions updated in {time.time() - start} seconds")
+    # print("Updating Category Descendants...")
+    # start = time.time()
+    # Category.update_descendants()
+    # print(f"Category Descendants updated in {time.time() - start} seconds")
 
-    print("Updating Category Analytics...")
-    start = time.time()
-    CategoryAnalytics.update_analytics(date_pretty)
-    # CategoryAnalytics.update_totals_for_date(date_pretty)
-    # CategoryAnalytics.update_totals_for_shops_and_products(date_pretty)
-    # CategoryAnalytics.update_totals_with_sale(date_pretty)
-    # CategoryAnalytics.set_average_purchase_price(date_pretty)
-    print(f"Category Analytics updated in {time.time() - start} seconds")
+    # print("Updating ProductAnalytics positions...")
+    # start = time.time()
+    # ProductAnalytics.set_positions(date_pretty)
+    # ProductAnalytics.update_average_purchase_price(date_pretty)
+    # print(f"ProductAnalytics positions updated in {time.time() - start} seconds")
 
-    print("ShopAnalytics updating...")
-    start = time.time()
-    ShopAnalytics.update_analytics(date_pretty)
-    print(f"ShopAnalytics updated in {time.time() - start} seconds")
+    # print("Updating Category Analytics...")
+    # start = time.time()
+    # CategoryAnalytics.update_analytics(date_pretty)
+    # # CategoryAnalytics.update_totals_for_date(date_pretty)
+    # # CategoryAnalytics.update_totals_for_shops_and_products(date_pretty)
+    # # CategoryAnalytics.update_totals_with_sale(date_pretty)
+    # # CategoryAnalytics.set_average_purchase_price(date_pretty)
+    # print(f"Category Analytics updated in {time.time() - start} seconds")
 
-    print("Creating Materialized View...")
-    start = time.time()
-    create_materialized_view(date_pretty)
-    print(f"Materialized View created in {time.time() - start} seconds")
+    # print("ShopAnalytics updating...")
+    # start = time.time()
+    # ShopAnalytics.update_analytics(date_pretty)
+    # print(f"ShopAnalytics updated in {time.time() - start} seconds")
 
-    print("Setting top products...")
-    ProductAnalytics.set_top_growing_products()
+    # print("Creating Materialized View...")
+    # start = time.time()
+    # create_materialized_view(date_pretty)
+    # print(f"Materialized View created in {time.time() - start} seconds")
 
-    print("Setting top categories...")
-    CategoryAnalytics.set_top_growing_categories_ema()
+    # print("Setting top products...")
+    # ProductAnalytics.set_top_growing_products()
+
+    # print("Setting top categories...")
+    # CategoryAnalytics.set_top_growing_categories_ema()
     # asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
     return True
