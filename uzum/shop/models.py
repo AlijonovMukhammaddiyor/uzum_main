@@ -1,8 +1,9 @@
+from datetime import datetime
 import uuid
-
+import pytz
 from django.apps import apps
 from django.db import connection, models
-
+from django.utils import timezone
 from uzum.utils.general import get_today_pretty
 
 
@@ -159,3 +160,41 @@ class ShopAnalytics(models.Model):
 
         except Exception as e:
             print("Error in set_categories: ", e)
+
+    @staticmethod
+    def set_total_revenue(date_pretty: str = get_today_pretty()):
+        try:
+            # Convert date_pretty to a timezone-aware datetime object
+            date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=23, minute=59, second=59, microsecond=0)
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH latest_pa AS (
+                        SELECT DISTINCT ON (product_id) *
+                        FROM product_productanalytics
+                        WHERE created_at < %s
+                        ORDER BY product_id, created_at DESC
+                    ),
+                    shop_revenue AS (
+                        SELECT
+                            product_product.shop_id,
+                            SUM(latest_pa.orders_money) AS total_revenue
+                        FROM
+                            latest_pa
+                            JOIN product_product ON latest_pa.product_id = product_product.product_id
+                        GROUP BY
+                            product_product.shop_id
+                    )
+                    UPDATE shop_shopanalytics
+                    SET total_revenue = shop_revenue.total_revenue
+                    FROM shop_revenue
+                    WHERE shop_shopanalytics.shop_id = shop_revenue.shop_id
+                    AND shop_shopanalytics.date_pretty = %s
+                    """,
+                    [date, date_pretty],
+                )
+        except Exception as e:
+            print(e, "Error in set_total_revenue")
