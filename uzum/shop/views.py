@@ -136,6 +136,7 @@ class ShopsView(APIView):
         "average_purchase_price",
         "average_order_price",
         "rating",
+        "total_revenue",
         "num_categories",
     ]
     VALID_ORDERS = ["asc", "desc"]
@@ -201,12 +202,12 @@ class ShopsView(APIView):
                 # Then fetch the data
                 cursor.execute(
                     f"""
-                    SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews,
+                    SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
                         sa.average_purchase_price, sa.average_order_price, sa.rating,
                         sa.date_pretty,
                         COUNT(DISTINCT sac.category_id) as num_categories,
                         s.title as shop_title, s.link as seller_link,
-                        ROW_NUMBER() OVER (ORDER BY sa.total_orders DESC) as position
+                        ROW_NUMBER() OVER (ORDER BY sa.total_revenue DESC) as position
                     FROM shop_shopanalytics sa
                     JOIN shop_shop s ON sa.shop_id = s.seller_id
                     LEFT JOIN shop_shopanalytics_categories sac ON sa.id = sac.shopanalytics_id
@@ -436,7 +437,7 @@ class ShopAnalyticsView(APIView):
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews,
+                    SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
                         sa.average_purchase_price, sa.average_order_price, sa.rating, sa.position,
                         sa.date_pretty, COUNT(sa_categories.category_id) as category_count
                     FROM shop_shopanalytics sa
@@ -910,13 +911,16 @@ class ShopTopProductsView(APIView):
 
         orders_products = products.order_by("-orders_amount")[:n]
         reviews_products = products.order_by("-reviews_amount")[:n]
+        revenue_products = products.order_by("-orders_money")[:n]
 
         return Response(
             data={
                 "orders_products": ProductAnalyticsViewSerializer(orders_products, many=True).data,
                 "reviews_products": ProductAnalyticsViewSerializer(reviews_products, many=True).data,
+                "revenue_products": ProductAnalyticsViewSerializer(revenue_products, many=True).data,
                 "total_orders": latest_analytics.total_orders,
                 "total_reviews": latest_analytics.total_reviews,
+                "total_revenue": latest_analytics.total_revenue,
             },
             status=status.HTTP_200_OK,
         )
@@ -1254,6 +1258,54 @@ class UzumTotalOrders(APIView):
                 ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
                 .values("date_pretty")
                 .annotate(total_orders=Sum("total_orders"))
+                .order_by("date_pretty")
+            )
+
+            return Response(list(data), status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UzumTotalRevenue(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request):
+        """
+        For everyday, sum all orders in all shopanalytics
+        Args:
+            request (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        try:
+            user: User = request.user
+            days = 60 if user.is_proplus else 30
+            start_date = timezone.make_aware(
+                datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                # end date is end of yesterday
+                end_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                # end date is end of today
+                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
+
+            # Group by date_pretty and calculate the sum of total_orders for each day
+            data = (
+                ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
+                .values("date_pretty")
+                .annotate(total_revenue=Sum("total_revenue"))
                 .order_by("date_pretty")
             )
 

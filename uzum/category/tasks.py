@@ -153,7 +153,6 @@ def update_uzum_data(args=None, **kwargs):
 
     print("Setting top categories...")
     CategoryAnalytics.set_top_growing_categories_ema()
-    asyncio.create_task(create_and_update_products())
     print("Uzum data updated...")
     return True
 

@@ -30,13 +30,14 @@ def get_today_pretty():
 
 def get_today_pretty_fake():
     # check if it is 7:00 AM in Tashkent
-    if datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).hour >= 7:
-        return datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
-    else:
-        # if not, return yesterday
-        return (datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")) - datetime.timedelta(days=1)).strftime(
-            "%Y-%m-%d"
-        )
+    return "2023-07-22"
+    # if datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).hour >= 7:
+    #     return datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
+    # else:
+    #     # if not, return yesterday
+    #     return (datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")) - datetime.timedelta(days=1)).strftime(
+    #         "%Y-%m-%d"
+    #     )
 
 
 def get_day_before_pretty(date_pretty: str):

@@ -13,6 +13,5 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='categoryanalytics',
             name='total_orders_amount',
-            field=models.FloatField(blank=True, default=0.0, null=True),
-        ),
-    ]
+            ),
+        ]

@@ -219,8 +219,9 @@ class CategoryTopProductsView(ListAPIView):
         descendant_ids.append(category_id)
 
         total_orders = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).aggregate(
-            Sum("orders_amount")
-        )["orders_amount__sum"]
+            Sum("orders_amount"),
+            Sum("orders_money"),
+        )
 
         descendants_count = CategoryAnalytics.objects.filter(
             category__in=descendants, date_pretty=get_today_pretty_fake()
@@ -229,9 +230,10 @@ class CategoryTopProductsView(ListAPIView):
         # return ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by("-orders_amount")[:5]
         return {
             "products": ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
-            .order_by("-orders_amount")[:10]
-            .values("product_id", "product_title", "orders_amount"),
-            "total_orders": total_orders,
+            .order_by("-orders_money")[:10]
+            .values("product_id", "product_title", "orders_money"),
+            "total_orders": total_orders["orders_amount__sum"],
+            "total_revenue": total_orders["orders_money__sum"],
             "descendants": descendants_count - 1,
             "total_products": ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).count(),
         }
@@ -740,6 +742,7 @@ class CategoryShopsView(APIView):
                     total_orders=Sum("orders_amount"),
                     total_products=Count("product_id", distinct=True),
                     total_reviews=Sum("reviews_amount"),
+                    total_revenue=Sum("orders_money"),
                     average_product_rating=Avg(
                         Case(
                             When(rating__gt=0, then=F("rating")),  # only consider rating when it's greater than 0
