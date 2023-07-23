@@ -14,7 +14,7 @@ from uzum.payment.models import Payment
 
 
 def get_current_time():
-    return timezone.make_aware(timezone.now(), pytz.timezone("Asia/Tashkent")) + timedelta(days=1)
+    return timezone.now() + timedelta(days=1)
 
 
 class User(AbstractUser):

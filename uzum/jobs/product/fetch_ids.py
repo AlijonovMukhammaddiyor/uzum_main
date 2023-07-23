@@ -136,37 +136,6 @@ async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids:
 
                 index += PRODUCTIDS_CONCURRENT_REQUESTS
 
-                # with ThreadPoolExecutor(max_workers=PRODUCTIDS_CONCURRENT_REQUESTS) as executor:
-                #     futures = {
-                #         executor.submit(
-                #             make_request_product_ids,
-                #             products_payload(
-                #                 promise["offset"],
-                #                 promise["pageSize"],
-                #                 promise["categoryId"],
-                #             ),
-                #             session=session,
-                #         ): promise
-                #         for promise in data[index : index + PRODUCTIDS_CONCURRENT_REQUESTS]
-                #     }
-                #     for future in as_completed(futures):
-                #         promise = futures[future]
-                #         try:
-                #             res = future.result()
-                #             res_data = res.json()
-                #             if "errors" not in res_data:
-                #                 products = res_data["data"]["makeSearch"]["items"]
-                #                 for product in products:
-                #                     product_ids.append(product["catalogCard"]["productId"])
-                #             else:
-                #                 failed_ids.append(promise["categoryId"])
-
-                #         except Exception as e:
-                #             print("Error in concurrentRequestsForIds inner: ", e, promise)
-                #             failed_ids.append(promise)
-
-                # index += PRODUCTIDS_CONCURRENT_REQUESTS
-
     except Exception as e:
         print("Error in concurrentRequestsForIds: ", e)
         traceback.print_exc()

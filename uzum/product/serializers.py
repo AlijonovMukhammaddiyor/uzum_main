@@ -49,6 +49,7 @@ class CurrentProductSerializer(serializers.ModelSerializer):
             "position_in_shop",
             "position",
             "available_amount",
+            "orders_money",
         )[:1]
 
     def get_sku_analytics(self, obj):
@@ -98,6 +99,7 @@ class ProductAnalyticsSerializer(serializers.ModelSerializer):
             "created_at",
             "date_pretty",
             "orders_amount",
+            "orders_money",
             "reviews_amount",
             "rating",
             "available_amount",

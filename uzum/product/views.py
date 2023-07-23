@@ -401,6 +401,7 @@ class SimilarProductsViewByUzum(APIView):
                     "average_purchase_price",
                     "rating",
                     "orders_amount",
+                    "orders_money",
                     "reviews_amount",
                     "product__created_at",
                     "available_amount",

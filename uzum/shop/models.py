@@ -36,6 +36,7 @@ class ShopAnalytics(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     total_products = models.IntegerField(default=0)
     total_orders = models.IntegerField(default=0, db_index=True)
+    total_revenue = models.FloatField(default=0, null=True, blank=True)
     total_reviews = models.IntegerField(default=0)
     average_purchase_price = models.FloatField(default=0, null=True, blank=True)
     average_order_price = models.FloatField(default=0, null=True, blank=True)
