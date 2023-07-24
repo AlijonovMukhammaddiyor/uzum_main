@@ -2,7 +2,7 @@
 from django.urls import path
 from django.views.decorators.cache import cache_page
 
-from uzum.category.utils import seconds_until_midnight
+from uzum.category.utils import seconds_until_next
 
 from . import views
 
@@ -13,12 +13,12 @@ urlpatterns = [
     path("treemap/", views.TreemapShopsView.as_view(), name="all-shops"),
     path(
         "segmentation/orders/",
-        cache_page(seconds_until_midnight())(views.ShopsOrdersSegmentationView.as_view()),
+        cache_page(seconds_until_next())(views.ShopsOrdersSegmentationView.as_view()),
         name="all-shops",
     ),
     path(
         "segmentation/products/",
-        cache_page(seconds_until_midnight())(views.ShopsProductsSegmentation.as_view()),
+        cache_page(seconds_until_next())(views.ShopsProductsSegmentation.as_view()),
         name="all-shops",
     ),
     path("analytics/<int:seller_id>/", views.ShopAnalyticsView.as_view(), name="all-shops"),

@@ -12,11 +12,20 @@ from uzum.shop.models import Shop, ShopAnalytics
 from uzum.sku.models import SkuAnalytics
 
 
-def seconds_until_midnight():
+def seconds_until_next():
     """Get the number of seconds until midnight."""
     now = timezone.make_aware(datetime.datetime.now(), timezone=pytz.timezone("Asia/Tashkent"))
-    midnight = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-    return (midnight - now).seconds
+    current_hour = now.hour
+    # if it is after 7 am in Tashkent, then return the number of seconds until next day 7 am
+    if current_hour >= 7:
+        tomorrow = now + datetime.timedelta(days=1)
+        midnight = tomorrow.replace(hour=7, minute=0, second=0, microsecond=0)
+        return (midnight - now).seconds
+
+    # if it is before 7 am in Tashkent, then return the number of seconds until 7 am
+    else:
+        midnight = now.replace(hour=7, minute=0, second=0, microsecond=0)
+        return (midnight - now).seconds
 
 
 def get_date_pretty(date: datetime.datetime):

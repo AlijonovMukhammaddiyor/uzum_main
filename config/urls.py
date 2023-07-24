@@ -8,13 +8,11 @@ from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
-from uzum.category.utils import seconds_until_midnight
-from uzum.shop.views import UzumTotalOrders, UzumTotalProducts, UzumTotalShops, UzumTotalRevenue
+from uzum.category.utils import seconds_until_next
+from uzum.shop.views import UzumTotalOrders, UzumTotalProducts, UzumTotalShops, UzumTotalRevenue, UzumTotalReviews
 from uzum.users.views import (
     CheckUserNameAndPhone,
     CodeVerificationView,
-    CustomTokenObtainPairView,
-    CustomTokenRefreshView,
     LogoutView,
     PasswordRenewView,
     VerificationSendView,
@@ -59,14 +57,15 @@ urlpatterns += [
     path("api/newpassword/", view=PasswordRenewView.as_view(), name="check_username"),
     path("api/code/", view=VerificationSendView.as_view(), name="check_username"),
     path("api/verify/", view=CodeVerificationView.as_view(), name="check_username"),
-    path("api/uzum/orders/", view=(UzumTotalOrders.as_view()), name="uzum_orders"),
+    path("api/uzum/orders/", cache_page(seconds_until_next())(UzumTotalOrders.as_view()), name="uzum_orders"),
     path(
         "api/uzum/products/",
-        view=(UzumTotalProducts.as_view()),
+        cache_page(seconds_until_next())(UzumTotalProducts.as_view()),
         name="uzum_products",
     ),
-    path("api/uzum/sellers/", view=(UzumTotalShops.as_view()), name="uzum_products"),
-    path("api/uzum/revenue/", view=(UzumTotalRevenue.as_view()), name="uzum_reveue"),
+    path("api/uzum/sellers/", cache_page(seconds_until_next())(UzumTotalShops.as_view()), name="uzum_products"),
+    path("api/uzum/revenue/", cache_page(seconds_until_next())(UzumTotalRevenue.as_view()), name="uzum_reveue"),
+    path("api/uzum/reviews/", cache_page(seconds_until_next())(UzumTotalReviews.as_view()), name="uzum_reveue"),
 ]
 
 if settings.DEBUG:
