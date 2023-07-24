@@ -2,13 +2,13 @@
 from django.urls import path
 from django.views.decorators.cache import cache_page
 
-from uzum.category.utils import seconds_until_midnight
+from uzum.category.utils import seconds_until_next
 
 from . import views
 
 app_name = "category"
 urlpatterns = [
-    path("", cache_page(seconds_until_midnight())(views.CategoryTreeView.as_view()), name="all-categories"),
+    path("", cache_page(seconds_until_next())(views.CategoryTreeView.as_view()), name="all-categories"),
     path("current/<int:category_id>/", views.CurrentCategoryView.as_view(), name="current-categories"),
     path(
         "products/<int:category_id>/",
@@ -22,7 +22,7 @@ urlpatterns = [
     ),
     path(
         "products/comparison/<int:category_id>/",
-        cache_page(seconds_until_midnight())(views.CategoryProductsPeriodComparisonView.as_view()),
+        cache_page(seconds_until_next())(views.CategoryProductsPeriodComparisonView.as_view()),
         name="category-products",
     ),
     path(

@@ -1268,6 +1268,53 @@ class UzumTotalOrders(APIView):
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class UzumTotalReviews(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request):
+        """
+        For everyday, sum all orders in all shopanalytics
+        Args:
+            request (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        try:
+            user: User = request.user
+            days = 60 if user.is_proplus else 30
+            start_date = timezone.make_aware(
+                datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                # end date is end of yesterday
+                end_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                # end date is end of today
+                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
+
+            # Group by date_pretty and calculate the sum of total_orders for each day
+            data = (
+                ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
+                .values("date_pretty")
+                .annotate(total_reviews=Sum("total_reviews"))
+                .order_by("date_pretty")
+            )
+
+            return Response(list(data), status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class UzumTotalRevenue(APIView):
     permission_classes = [IsAuthenticated]
@@ -1351,6 +1398,8 @@ class UzumTotalProducts(APIView):
         except Exception as e:
             print(e)
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 
 class UzumTotalShops(APIView):
@@ -1502,3 +1551,4 @@ class YesterdayTopsView(APIView):
         except Exception as e:
             print(e)
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

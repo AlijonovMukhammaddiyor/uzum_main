@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.decorators.cache import cache_page
 
-from uzum.category.utils import seconds_until_midnight
+from uzum.category.utils import seconds_until_next
 
 from . import views
 
@@ -12,7 +12,7 @@ urlpatterns = [
     path("current/<int:product_id>/", views.CurrentProductView.as_view(), name="current-product"),
     path(
         "segments/",
-        cache_page(seconds_until_midnight())(views.AllProductsPriceSegmentationView.as_view()),
+        cache_page(seconds_until_next())(views.AllProductsPriceSegmentationView.as_view()),
         # views.AllProductsPriceSegmentationView.as_view(),
         name="segmentation",
     ),

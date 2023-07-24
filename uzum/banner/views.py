@@ -12,13 +12,12 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from uzum.banner.models import Banner
 from uzum.banner.serializers import BannerSerializer
 
-# from uzum.category.utils import seconds_until_midnight
+# from uzum.category.utils import seconds_until_next
 from uzum.product.models import Product, ProductAnalytics
 from uzum.product.serializers import ProductAnalyticsSerializer
 from uzum.utils.general import get_day_before_pretty, get_today_pretty_fake
 
 
-# @method_decorator(cache_page(seconds_until_midnight()), name="get")
 class BannersView(APIView):
     """
     Get all banners with product analytics
@@ -49,7 +48,6 @@ class BannersView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# @method_decorator(cache_page(seconds_until_midnight()), name="get")
 class OngoingBannersView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
