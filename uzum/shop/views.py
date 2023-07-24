@@ -1163,28 +1163,35 @@ class ShopProductsByCategoryView(APIView):
             categories = Category.get_descendants(category, include_self=True)
             latest_product_analytics_orders_amount = Subquery(
                 ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
-                .order_by("-date_pretty")
+                .order_by("-created_at")
                 .values("orders_amount")[:1],
                 output_field=IntegerField(),
             )
 
             latest_product_analytics_reviews_amount = Subquery(
                 ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
-                .order_by("-date_pretty")
+                .order_by("-created_at")
                 .values("reviews_amount")[:1],
                 output_field=IntegerField(),
             )
 
             latest_product_analytics_available_amount = Subquery(
                 ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
-                .order_by("-date_pretty")
-                .values("reviews_amount")[:1],
+                .order_by("-created_at")
+                .values("available_amount")[:1],
                 output_field=IntegerField(),
+            )
+
+            latest_product_analytics_money = Subquery(
+                ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
+                .order_by("-created_at")
+                .values("orders_money")[:1],
+                output_field=CharField(),
             )
 
             latest_product_analytics_date = Subquery(
                 ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
-                .order_by("-date_pretty")
+                .order_by("-created_at")
                 .values("date_pretty")[:1],
                 output_field=CharField(),
             )
@@ -1201,6 +1208,7 @@ class ShopProductsByCategoryView(APIView):
                     latest_product_analytics_orders_amount=latest_product_analytics_orders_amount,
                     latest_product_analytics_reviews_amount=latest_product_analytics_reviews_amount,
                     latest_product_analytics_available_amount=latest_product_analytics_available_amount,
+                    latest_product_analytics_money=latest_product_analytics_money,
                 )
             )
 
@@ -1267,6 +1275,7 @@ class UzumTotalOrders(APIView):
             print(e)
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class UzumTotalReviews(APIView):
     permission_classes = [IsAuthenticated]
@@ -1398,8 +1407,6 @@ class UzumTotalProducts(APIView):
         except Exception as e:
             print(e)
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 
 
 class UzumTotalShops(APIView):
@@ -1551,4 +1558,3 @@ class YesterdayTopsView(APIView):
         except Exception as e:
             print(e)
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
