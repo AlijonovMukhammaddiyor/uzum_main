@@ -123,38 +123,38 @@ def update_uzum_data(args=None, **kwargs):
     Category.update_descendants()
     print(f"Category Descendants updated in {time.time() - start} seconds")
 
-    print("Updating ProductAnalytics positions...")
+    print("Updating Analytics...")
     start = time.time()
-    ProductAnalytics.set_positions(date_pretty)
-    ProductAnalytics.update_average_purchase_price(date_pretty)
-    print(f"ProductAnalytics positions updated in {time.time() - start} seconds")
-
-    print("Updating Category Analytics...")
-    start = time.time()
-    CategoryAnalytics.update_analytics(date_pretty)
-    # CategoryAnalytics.update_totals_for_date(date_pretty)
-    # CategoryAnalytics.update_totals_for_shops_and_products(date_pretty)
-    # CategoryAnalytics.update_totals_with_sale(date_pretty)
-    # CategoryAnalytics.set_average_purchase_price(date_pretty)
-    print(f"Category Analytics updated in {time.time() - start} seconds")
-
-    print("ShopAnalytics updating...")
-    start = time.time()
-    ShopAnalytics.update_analytics(date_pretty)
-    print(f"ShopAnalytics updated in {time.time() - start} seconds")
+    update_analytics(date_pretty)
+    print(f"Analytics updated in {time.time() - start} seconds")
 
     print("Creating Materialized View...")
     start = time.time()
     create_materialized_view(date_pretty)
     print(f"Materialized View created in {time.time() - start} seconds")
 
-    print("Setting top products...")
-    ProductAnalytics.set_top_growing_products()
+    print("Updating category tree...")
+    update_category_tree()
 
-    print("Setting top categories...")
-    CategoryAnalytics.set_top_growing_categories_ema()
+    update_category_tree_with_data()
     print("Uzum data updated...")
     return True
+
+
+def update_analytics(date_pretty: str):
+    try:
+        start = time.time()
+        ProductAnalytics.update_analytics(date_pretty)
+        print(f"ProductAnalytics updated in {time.time() - start} seconds")
+        start = time.time()
+        ShopAnalytics.update_analytics(date_pretty)
+        print(f"ShopAnalytics updated in {time.time() - start} seconds")
+        start = time.time()
+        CategoryAnalytics.update_analytics(date_pretty)
+        print(f"CategoryAnalytics updated in {time.time() - start} seconds")
+    except Exception as e:
+        print("Error in update_analytics:", e)
+        traceback.print_exc()
 
 
 def fetch_failed_products(product_ids: list[int]):
@@ -348,6 +348,117 @@ def update_category_tree():
     # store in cache
     cache.set("category_tree", category_tree, timeout=60 * 60 * 48)  # 48 hours
     return category_tree
+
+
+def update_category_tree_with_data():
+    categories = Category.objects.values("categoryId", "title", "parent_id")
+
+    # first create a dictionary mapping ids to category data
+    category_dict = {category["categoryId"]: category for category in categories}
+
+    # then build a mapping from parent_id to a list of its children
+    children_map = {}
+    for category in categories:
+        children_map.setdefault(category["parent_id"], []).append(category)
+
+    # get analytics data
+    analytics_data = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty()).values(
+        "category_id",
+        "category__title",
+        "total_orders_amount",
+        "total_orders",
+        "total_products",
+        "total_reviews",
+        "total_shops",
+    )
+
+    min_max_data = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty(), category__children=None).values(
+        "category_id",
+        "category__title",
+        "total_orders_amount",
+        "total_orders",
+        "total_products",
+        "total_reviews",
+        "total_shops",
+    )
+
+    # get min and max values for each type of analytics
+    min_max = {
+        "total_orders_amount": {
+            "min": min([data["total_orders_amount"] for data in min_max_data]),
+            "max": max([data["total_orders_amount"] for data in min_max_data]),
+        },
+        "total_orders": {
+            "min": min([data["total_orders"] for data in min_max_data]),
+            "max": max([data["total_orders"] for data in min_max_data]),
+        },
+        "total_reviews": {
+            "min": min([data["total_reviews"] for data in min_max_data]),
+            "max": max([data["total_reviews"] for data in min_max_data]),
+        },
+        "total_shops": {
+            "min": min([data["total_shops"] for data in min_max_data]),
+            "max": max([data["total_shops"] for data in min_max_data]),
+        },
+        "total_products": {
+            "min": min([data["total_products"] for data in min_max_data]),
+            "max": max([data["total_products"] for data in min_max_data]),
+        },
+    }
+
+    # create a dictionary mapping category_id to analytics data
+    analytics_dict = {data["category_id"]: data for data in analytics_data}
+
+    # recursive function to build the tree
+    def build_tree(category_id, type):
+        category = category_dict[category_id]
+        analytics = analytics_dict.get(category_id, {})
+        children = children_map.get(category_id, [])
+        res = {
+            "categoryId": category_id,
+            "title": category["title"],
+            "analytics": analytics.get(type, 0),
+            "children": [build_tree(child["categoryId"], type) for child in children],
+        }
+
+        # if children is empty remove it
+        if len(res["children"]) == 0:
+            del res["children"]
+        return res
+
+    # build the tree starting from the root
+    category_tree_revenue = build_tree(1, type="total_orders_amount")
+    category_tree_orders = build_tree(1, type="total_orders")
+    category_tree_reviews = build_tree(1, type="total_reviews")
+    category_tree_shops = build_tree(1, type="total_shops")
+    category_tree_products = build_tree(1, type="total_products")
+
+    # store in cache
+    # cache.set("category_tree_data", category_tree, timeout=60 * 60 * 48)  # 48 hours
+    cache.set(
+        "category_tree_revenue",
+        {"data": category_tree_revenue, "min_max": min_max["total_orders_amount"]},
+        timeout=60 * 60 * 48,
+    )  # 48 hours
+
+    cache.set(
+        "category_tree_orders",
+        {"data": category_tree_orders, "min_max": min_max["total_orders"]},
+        timeout=60 * 60 * 48,
+    )  # 48 hours
+    cache.set(
+        "category_tree_reviews",
+        {"data": category_tree_reviews, "min_max": min_max["total_reviews"]},
+        timeout=60 * 60 * 48,
+    )  # 48 hours
+    cache.set(
+        "category_tree_shops", {"data": category_tree_shops, "min_max": min_max["total_shops"]}, timeout=60 * 60 * 48
+    )  # 48 hours
+    cache.set(
+        "category_tree_products",
+        {"data": category_tree_products, "min_max": min_max["total_products"]},
+        timeout=60 * 60 * 48,
+    )  # 48 hours
 
 
 # psql -h db-postgresql-blr1-80747-do-user-14120836-0.b.db.ondigitalocean.com -d defaultdb -U doadmin -p 25060

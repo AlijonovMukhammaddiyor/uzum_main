@@ -491,7 +491,8 @@ class ShopCompetitorsView(APIView):
                     sa.average_purchase_price, sa.position,
                     ABS(sa.average_purchase_price - {current_shop_avg_purchase_price}) as price_difference,
                     ABS(sa.position - {current_shop_position}) as position_difference,
-                    STRING_AGG(DISTINCT c.title, ', ') as common_categories_titles
+                    STRING_AGG(DISTINCT c.title, ', ') as common_categories_titles,
+                    STRING_AGG(DISTINCT c."categoryId"::text, ', ') as common_categories_ids
                 FROM
                     shop_shopanalytics as sa
                 JOIN
@@ -533,57 +534,13 @@ class ShopCompetitorsView(APIView):
             print("Shop Competitors View")
             start = time.time()
             shop = get_object_or_404(Shop, seller_id=seller_id)
-            range = request.query_params.get("range", 15)
-            print(shop.title)
-            # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
+            days = 60 if request.user.is_proplus else 30
+            print(days, request.user)
             start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=int(range) + 1), timezone=pytz.timezone("Asia/Tashkent")
+                datetime.now() - timedelta(days=int(days) + 1), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
-            # check if it is before 7 am in Tashkent
-            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
-                # end date is end of yesterday
-                end_date = timezone.make_aware(
-                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
-                ).replace(hour=23, minute=59, second=59, microsecond=999999)
-            else:
-                # end date is end of today
-                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
-                    hour=23, minute=59, second=59, microsecond=999999
-                )
-
             competitor_shops_data = self.get_competitor_shops(shop)
-
-            competitors_ids = [data[0] for data in competitor_shops_data]
-
-            competitors_analytics = (
-                ShopAnalytics.objects.filter(
-                    shop__seller_id__in=competitors_ids, created_at__range=[start_date, end_date]
-                )
-                .annotate(category_count=Count("categories"))
-                .values(
-                    "id",
-                    "total_products",
-                    "total_orders",
-                    "total_reviews",
-                    "average_purchase_price",
-                    "average_order_price",
-                    "rating",
-                    "position",
-                    "date_pretty",
-                    "category_count",
-                    "shop__seller_id",
-                )
-            )
-
-            # preparing a dict for easy lookup
-            competitors_analytics_dict = {}
-            for analytics in competitors_analytics:
-                competitor_id = analytics.pop("shop__seller_id")
-                if competitor_id in competitors_analytics_dict:
-                    competitors_analytics_dict[competitor_id].append(analytics)
-                else:
-                    competitors_analytics_dict[competitor_id] = [analytics]
 
             competitors_data = []
             for (
@@ -596,18 +553,19 @@ class ShopCompetitorsView(APIView):
                 price_difference,
                 position_difference,
                 common_categories_titles,
+                common_categories_ids,
             ) in competitor_shops_data:
                 competitors_data.append(
                     {
                         "title": title,
                         "link": link,
+                        "shop_id": shop_id,
                         "common_categories_count": common_categories_count,
                         "common_categories_titles": common_categories_titles.split(","),
-                        "analytics": competitors_analytics_dict.get(shop_id, []),
+                        "common_categories_ids": common_categories_ids.split(","),  # convert to list
                     }
                 )
 
-            # Get shop's own analytics
             shop_analytics = (
                 ShopAnalytics.objects.filter(shop=shop, created_at__gte=start_date)
                 .annotate(category_count=Count("categories"))
@@ -622,6 +580,7 @@ class ShopCompetitorsView(APIView):
                     "position",
                     "date_pretty",
                     "category_count",
+                    "total_revenue",
                 )
             )
             shop_analytics_data = list(shop_analytics)
@@ -1069,7 +1028,22 @@ class ShopCategoryAnalyticsView(APIView):
                     hour=23, minute=59, second=59, microsecond=999999
                 )
 
-            dates = [start_date + timedelta(days=i) for i in range((current_date - start_date).days + 1)]
+            if category_id == 1:
+                # return shop analytics for dates between start_date and current_date
+                sa = (
+                    ShopAnalytics.objects.filter(shop_id=seller_id, created_at__gte=start_date)
+                    .order_by("created_at")
+                    .values(
+                        "date_pretty",
+                        "total_orders",
+                        "total_reviews",
+                        "total_products",
+                        "total_revenue",
+                        "average_purchase_price",
+                    )
+                )
+
+                return Response(data=sa, status=status.HTTP_200_OK)
 
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -1087,6 +1061,8 @@ class ShopCategoryAnalyticsView(APIView):
                             pa.product_id,
                             pa.orders_amount,
                             pa.reviews_amount,
+                            pa.orders_money,
+                            pa.average_purchase_price,
                             dr.date,
                             ROW_NUMBER() OVER (
                                 PARTITION BY pa.product_id, dr.date
@@ -1101,6 +1077,8 @@ class ShopCategoryAnalyticsView(APIView):
                             la.date,
                             SUM(la.orders_amount) AS total_orders,
                             SUM(la.reviews_amount) AS total_reviews,
+                            SUM(la.orders_money) AS total_revenue,
+                            AVG(la.average_purchase_price) AS average_purchase_price,
                             COUNT(*) FILTER (WHERE la.row_number = 1) AS total_products
                         FROM latest_analytics AS la
                         WHERE la.row_number = 1
@@ -1110,7 +1088,9 @@ class ShopCategoryAnalyticsView(APIView):
                         aa.date,
                         aa.total_orders,
                         aa.total_reviews,
-                        aa.total_products
+                        aa.total_products,
+                        aa.total_revenue,
+                        aa.average_purchase_price
                     FROM aggregated_analytics AS aa
                     ORDER BY aa.date
                 """,
@@ -1120,14 +1100,14 @@ class ShopCategoryAnalyticsView(APIView):
                 res = [
                     {
                         "category_id": category_id,
-                        "date": date,
-                        "data": {
-                            "orders_amount": total_orders,
-                            "products_count": total_products,
-                            "reviews_amount": total_reviews,
-                        },
+                        "date_pretty": date.strftime("%Y-%m-%d"),
+                        "total_orders": total_orders,
+                        "total_products": total_products,
+                        "total_revenue": total_revenue,
+                        "total_reviews": total_reviews,
+                        "average_purchase_price": average_purchase_price,
                     }
-                    for date, total_orders, total_reviews, total_products in cursor.fetchall()
+                    for date, total_orders, total_reviews, total_products, total_revenue, average_purchase_price in cursor.fetchall()
                 ]
 
             print(f"SHOP CATEGORY ANALYTICS: {time.time() - start} seconds")
@@ -1472,54 +1452,22 @@ class YesterdayTopsView(APIView):
                 desc = cursor.description
                 return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
 
-            # yesterday_analytics = ShopAnalytics.objects.filter(
-            #     date_pretty=yesterday_pretty, shop_id=OuterRef("shop_id")
-            # ).values("total_orders", "total_reviews")
-
-            # today_analytics = (
-            #     ShopAnalytics.objects.filter(date_pretty=date_pretty)
-            #     .annotate(
-            #         yesterday_total_orders=Subquery(
-            #             yesterday_analytics.values("total_orders")[:1], output_field=IntegerField()
-            #         ),
-            #         yesterday_total_reviews=Subquery(
-            #             yesterday_analytics.values("total_reviews")[:1], output_field=IntegerField()
-            #         ),
-            #     )
-            #     .annotate(
-            #         diff_orders=F("total_orders") - Coalesce("yesterday_total_orders", 100000),
-            #         diff_reviews=F("total_reviews") - Coalesce("yesterday_total_reviews", 100000),
-            #     )
-            # )
-
-            # top_20 = today_analytics.order_by("-diff_orders", "-diff_reviews")[:1000]
-
-            # response = {
-            #     "top_20_shops": [
-            #         {
-            #             "seller_id": shop.shop.seller_id,
-            #             "title": shop.shop.title,
-            #             "diff_orders": shop.diff_orders,
-            #             "diff_reviews": shop.diff_reviews,
-            #         }
-            #         for shop in top_20
-            #     ]
-            # }
-
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     SELECT
                         today.shop_id,
                         shop.title,
-                        today.total_orders - COALESCE(yesterday.total_orders, 100000) as diff_orders,
-                        today.total_reviews - COALESCE(yesterday.total_reviews, 100000) as diff_reviews
+                        today.total_orders - COALESCE(yesterday.total_orders, 10000000) as diff_orders,
+                        today.total_reviews - COALESCE(yesterday.total_reviews, 10000000) as diff_reviews,
+                        today.total_revenue - COALESCE(yesterday.total_revenue, 10000000000) as diff_revenue
                     FROM
                         (
                         SELECT
                             shop_id,
                             total_orders,
-                            total_reviews
+                            total_reviews,
+                            total_revenue
                         FROM
                             shop_shopanalytics
                         WHERE
@@ -1530,7 +1478,8 @@ class YesterdayTopsView(APIView):
                         SELECT
                             shop_id,
                             total_orders,
-                            total_reviews
+                            total_reviews,
+                            total_revenue
                         FROM
                             shop_shopanalytics
                         WHERE
@@ -1543,9 +1492,10 @@ class YesterdayTopsView(APIView):
                     ON
                         today.shop_id = shop.seller_id
                     ORDER BY
+                        diff_revenue DESC,
                         diff_orders DESC,
                         diff_reviews DESC
-                    LIMIT 500
+                    LIMIT 20
                 """,
                     [date_pretty, yesterday_pretty],
                 )

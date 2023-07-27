@@ -214,6 +214,7 @@ class ProductsView(ListAPIView):
         "rating",
         "position_in_category",
         "avg_purchase_price",
+        "orders_money",
     ]
     VALID_FILTER_FIELDS = ["product_title", "shop_title", "category_title"]
 
@@ -222,7 +223,7 @@ class ProductsView(ListAPIView):
         try:
             # Get query parameters
             start = time.time()
-            column = self.request.query_params.get("column", "orders_amount")  # default is 'orders_amount'
+            column = self.request.query_params.get("column", "orders_money")  # default is 'orders_amount'
             order = self.request.query_params.get("order", "desc")  # default is 'asc'
             search_columns = self.request.query_params.get("searches", "")  # default is empty string
             filters = self.request.query_params.get("filters", "")  # default is empty string
