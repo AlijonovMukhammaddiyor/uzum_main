@@ -103,6 +103,7 @@ class AllProductsPriceSegmentationView(APIView):
             total_shops=Count("shop_link", distinct=True),
             total_orders=Sum("orders_amount"),
             total_reviews=Sum("reviews_amount"),
+            total_revenue=Sum("orders_money"),
             average_rating=Avg("rating"),
             avg_purchase_price=Avg("avg_purchase_price"),
         )
