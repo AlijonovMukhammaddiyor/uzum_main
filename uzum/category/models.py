@@ -275,10 +275,7 @@ class CategoryAnalytics(models.Model):
                             category_category c
                             INNER JOIN product_productanalytics pa ON pa.date_pretty = %s
                             INNER JOIN product_product p ON pa.product_id = p.product_id AND p.category_id = ANY(
-                                CASE
-                                    WHEN c.descendants IS NULL THEN ARRAY[c."categoryId"]::integer[]
-                                    ELSE ARRAY[c."categoryId"] || string_to_array(c.descendants, ',')::integer[]
-                                END
+                             ARRAY[c."categoryId"] || CASE WHEN c.descendants IS NOT NULL THEN string_to_array(c.descendants, ',')::integer[] ELSE ARRAY[]::integer[] END
                             )
                         GROUP BY
                             c."categoryId"
