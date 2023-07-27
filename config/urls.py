@@ -57,15 +57,15 @@ urlpatterns += [
     path("api/newpassword/", view=PasswordRenewView.as_view(), name="check_username"),
     path("api/code/", view=VerificationSendView.as_view(), name="check_username"),
     path("api/verify/", view=CodeVerificationView.as_view(), name="check_username"),
-    path("api/uzum/orders/", cache_page(seconds_until_next())(UzumTotalOrders.as_view()), name="uzum_orders"),
+    path("api/uzum/orders/", (UzumTotalOrders.as_view()), name="uzum_orders"),
     path(
         "api/uzum/products/",
-        cache_page(seconds_until_next())(UzumTotalProducts.as_view()),
+        (UzumTotalProducts.as_view()),
         name="uzum_products",
     ),
-    path("api/uzum/sellers/", cache_page(seconds_until_next())(UzumTotalShops.as_view()), name="uzum_products"),
-    path("api/uzum/revenue/", cache_page(seconds_until_next())(UzumTotalRevenue.as_view()), name="uzum_reveue"),
-    path("api/uzum/reviews/", cache_page(seconds_until_next())(UzumTotalReviews.as_view()), name="uzum_reveue"),
+    path("api/uzum/sellers/", (UzumTotalShops.as_view()), name="uzum_products"),
+    path("api/uzum/revenue/", (UzumTotalRevenue.as_view()), name="uzum_reveue"),
+    path("api/uzum/reviews/", (UzumTotalReviews.as_view()), name="uzum_reveue"),
 ]
 
 if settings.DEBUG:
