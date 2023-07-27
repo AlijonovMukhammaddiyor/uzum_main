@@ -127,22 +127,24 @@ class CategoryAnalytics(models.Model):
         default=get_today_pretty,
     )
 
-    total_orders = models.IntegerField(null=True, blank=True)  # total orders of category so far
+    total_orders = models.IntegerField(null=True, blank=True, default=0)  # total orders of category so far
     total_orders_amount = models.FloatField(
         null=True, blank=True, default=0.0
     )  # total orders amount of category so far
 
-    total_reviews = models.IntegerField(null=True, blank=True)  # so far
-    average_product_rating = models.FloatField(null=True, blank=True)  # so far
+    total_reviews = models.IntegerField(null=True, blank=True, default=0)  # so far
+    average_product_rating = models.FloatField(null=True, blank=True, default=0.0)  # so far
 
-    total_shops = models.IntegerField(null=True, blank=True)  # current
+    total_shops = models.IntegerField(null=True, blank=True, default=0)  # current
 
-    total_shops_with_sales = models.IntegerField(null=True, blank=True)  # between yesterday and today
-    total_products_with_sales = models.IntegerField(null=True, blank=True)  # between yesterday and today
+    total_shops_with_sales = models.IntegerField(null=True, blank=True, default=0)  # between yesterday and today
+    total_products_with_sales = models.IntegerField(null=True, blank=True, default=0)  # between yesterday and today
 
-    average_purchase_price = models.FloatField(null=True, blank=True)  # average price of all products in category
+    average_purchase_price = models.FloatField(
+        null=True, blank=True, default=0
+    )  # average price of all products in category
     average_order_price = models.FloatField(
-        null=True, blank=True
+        null=True, blank=True, default=0
     )  # average price of all orders in category between yesterday and today
 
     def __str__(self):
@@ -364,10 +366,11 @@ class CategoryAnalytics(models.Model):
     @staticmethod
     def update_analytics(date_pretty=get_today_pretty()):
         try:
-            CategoryAnalytics.update_totals_for_date(date_pretty)
-            CategoryAnalytics.update_totals_for_shops_and_products(date_pretty)
-            CategoryAnalytics.update_totals_with_sale(date_pretty)
             CategoryAnalytics.set_average_purchase_price(date_pretty)
+            CategoryAnalytics.update_totals_for_shops_and_products(date_pretty)
+            CategoryAnalytics.update_totals_for_date(date_pretty)
+            CategoryAnalytics.update_totals_with_sale(date_pretty)
+            CategoryAnalytics.set_top_growing_categories_ema()
         except Exception as e:
             print(e, "Error in update_analytics")
 

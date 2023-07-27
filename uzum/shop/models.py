@@ -64,6 +64,7 @@ class ShopAnalytics(models.Model):
     @staticmethod
     def update_analytics(date_pretty: str = get_today_pretty()):
         ShopAnalytics.set_total_products(date_pretty)
+        ShopAnalytics.set_total_revenue(date_pretty)
         ShopAnalytics.set_shop_positions(date_pretty)
         ShopAnalytics.set_average_price(date_pretty)
         ShopAnalytics.set_categories(date_pretty)

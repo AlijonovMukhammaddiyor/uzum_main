@@ -65,6 +65,31 @@ class CurrentCategoryView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class AllCategoriesSegmentation(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = CategoryAnalyticsSeralizer
+
+    def get(self, request: Request):
+        try:
+            # pass
+            # get all category analytics with date_pretty = today which do not have children
+
+            data = {
+                "revenue": cache.get("category_tree_revenue"),
+                "orders": cache.get("category_tree_orders"),
+                "products": cache.get("category_tree_products"),
+                "reviews": cache.get("category_tree_reviews"),
+                "shops": cache.get("category_tree_shops"),
+            }
+
+            return Response(status=status.HTTP_200_OK, data=data)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class CategoryTreeView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -218,10 +243,16 @@ class CategoryTopProductsView(ListAPIView):
         # Add the parent category ID to the list
         descendant_ids.append(category_id)
 
-        total_orders = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).aggregate(
-            Sum("orders_amount"),
-            Sum("orders_money"),
-        )
+        ca = CategoryAnalytics.objects.filter(category=category, date_pretty=get_today_pretty_fake()).first()
+
+        if ca is None:
+            total_orders = 0
+            total_revenue = 0
+            total_products = 0
+        else:
+            total_orders = ca.total_orders
+            total_revenue = ca.total_orders_amount
+            total_products = ca.total_products
 
         descendants_count = CategoryAnalytics.objects.filter(
             category__in=descendants, date_pretty=get_today_pretty_fake()
@@ -232,10 +263,10 @@ class CategoryTopProductsView(ListAPIView):
             "products": ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
             .order_by("-orders_money")[:10]
             .values("product_id", "product_title", "orders_money"),
-            "total_orders": total_orders["orders_amount__sum"],
-            "total_revenue": total_orders["orders_money__sum"],
+            "total_orders": total_orders,
+            "total_revenue": total_revenue,
             "descendants": descendants_count - 1,
-            "total_products": ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).count(),
+            "total_products": total_products,
         }
 
     def get(self, request, category_id: int):
@@ -590,6 +621,7 @@ class CategoryPriceSegmentationView(APIView):
             total_shops=Count("shop_link", distinct=True),
             total_orders=Sum("orders_amount"),
             total_reviews=Sum("reviews_amount"),
+            total_revenue=Sum("orders_money"),
             average_rating=Avg("rating"),
             avg_purchase_price=Avg("avg_purchase_price"),
         )
@@ -624,7 +656,6 @@ class CategoryPriceSegmentationView(APIView):
             # Add the parent category ID to the list
             descendant_ids.append(category_id)
             products = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
-            start = time.time()
             df = pd.DataFrame(list(products.values("product_id", "avg_purchase_price")))
 
             # Calculate the number of distinct average purchase prices

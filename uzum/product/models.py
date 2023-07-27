@@ -1,3 +1,4 @@
+import traceback
 import uuid
 
 import numpy as np
@@ -107,6 +108,7 @@ class ProductAnalytics(models.Model):
                 """
                 )
 
+            with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
                     WITH ranked_products AS (
@@ -134,6 +136,7 @@ class ProductAnalytics(models.Model):
                 """
                 )
 
+            with connection.cursor() as cursor:
                 cursor.execute(
                     f"""
                     WITH ranked_products AS (
@@ -334,7 +337,10 @@ class ProductAnalytics(models.Model):
                             WHERE today_pa.average_purchase_price IS NOT NULL
                         )
                         UPDATE product_productanalytics
-                        SET orders_money = COALESCE(delta_orders_money.new_orders_money, 0)
+                        SET orders_money = CASE
+                            WHEN COALESCE(delta_orders_money.new_orders_money, 0) < 0 THEN 0
+                            ELSE COALESCE(delta_orders_money.new_orders_money, 0)
+                        END
                         FROM delta_orders_money
                         WHERE product_productanalytics.product_id = delta_orders_money.product_id
                         AND product_productanalytics.date_pretty = %s
@@ -343,6 +349,17 @@ class ProductAnalytics(models.Model):
                     )
         except Exception as e:
             print(e)
+
+    @staticmethod
+    def update_analytics(date_pretty: str):
+        try:
+            ProductAnalytics.update_average_purchase_price(date_pretty)
+            ProductAnalytics.set_orders_money(date_pretty)
+            ProductAnalytics.set_positions(date_pretty)
+            ProductAnalytics.set_top_growing_products()
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 
 class ProductAnalyticsView(models.Model):
