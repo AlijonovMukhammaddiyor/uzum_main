@@ -222,7 +222,7 @@ class ProductAnalytics(models.Model):
     @staticmethod
     def set_top_growing_products():
         # Set date range (last 30 days)
-        end_date = pd.to_datetime(get_today_pretty())
+        end_date = pd.to_datetime(get_today_pretty()).astimezone(pytz.timezone("Asia/Tashkent"))
         start_date = end_date - pd.DateOffset(days=30)
 
         # Retrieve product sales data for the last 30 days
