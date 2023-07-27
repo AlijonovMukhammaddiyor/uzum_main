@@ -335,10 +335,7 @@ class CategoryAnalytics(models.Model):
                         FROM
                             category_category
                             LEFT JOIN product_product ON product_product.category_id = ANY (
-                                CASE
-                                    WHEN category_category.descendants IS NULL THEN ARRAY[category_category."categoryId"]::integer[]
-                                    ELSE ARRAY[category_category."categoryId"] || string_to_array(category_category.descendants, ',')::integer[]
-                                END
+                                ARRAY[category_category."categoryId"] || CASE WHEN category_category.descendants IS NOT NULL THEN string_to_array(category_category.descendants, ',')::integer[] ELSE ARRAY[]::integer[] END
                             )
                             LEFT JOIN order_difference ON order_difference.product_id = product_product.product_id
                         GROUP BY
