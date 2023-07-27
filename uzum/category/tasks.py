@@ -114,6 +114,7 @@ def update_uzum_data(args=None, **kwargs):
 
     create_todays_searches()
 
+    bulk_remove_duplicate_category_analytics(date_pretty)
     bulk_remove_duplicate_product_analytics(date_pretty)
     bulk_remove_duplicate_shop_analytics(date_pretty)
     bulk_remove_duplicate_sku_analytics(date_pretty)
