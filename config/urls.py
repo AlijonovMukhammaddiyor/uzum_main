@@ -60,7 +60,7 @@ urlpatterns += [
     path("api/uzum/orders/", (UzumTotalOrders.as_view()), name="uzum_orders"),
     path(
         "api/uzum/products/",
-        (UzumTotalProducts.as_view()),
+        cache_page(seconds_until_next())(UzumTotalProducts.as_view()),
         name="uzum_products",
     ),
     path("api/uzum/sellers/", (UzumTotalShops.as_view()), name="uzum_products"),
