@@ -25,12 +25,6 @@ class CategorySerializer(ModelSerializer):
         fields = "__all__"
 
 
-class SimpleCategorySerializer(ModelSerializer):
-    class Meta:
-        model = Category
-        fields = ["categoryId", "title"]
-
-
 class CategoryAnalyticsSeralizer(ModelSerializer):
     class Meta:
         model = CategoryAnalytics
@@ -55,50 +49,6 @@ class CategoryProductAnalyticsSerializer(serializers.ModelSerializer):
         fields = ["orders_amount", "reviews_amount", "available_amount"]
 
 
-class CategoryProductsSerializer(ModelSerializer):
-    title = serializers.CharField(source="product.title")
-    product_id = serializers.IntegerField(source="product.product_id")
-    shop_title = serializers.CharField(source="product.shop.title")
-    photos = serializers.CharField(source="product.photos")
-    skus = serializers.SerializerMethodField()
-    sku_count = serializers.SerializerMethodField()
-    badges = ProductBadgeSerializer(source="badges.all", read_only=True, many=True)  # new line
-
-    class Meta:
-        model = ProductAnalytics
-        fields = [
-            "orders_amount",
-            "orders_money",
-            "position_in_category",
-            "product_id",
-            "reviews_amount",
-            "available_amount",
-            "title",
-            "shop_title",
-            "skus",
-            "sku_count",
-            "photos",
-            "badges",
-        ]
-
-    def get_skus(self, obj):
-        # Serialize each SKU's latest price.
-        return [
-            {
-                sku.sku: {
-                    "purchase_price": sku.todays_analytics[0].purchase_price if sku.todays_analytics else None,
-                    "full_price": sku.todays_analytics[0].full_price if sku.todays_analytics else None,
-                }
-                if sku.todays_analytics
-                else None
-            }
-            for sku in obj.product.skus.all()
-        ]
-
-    def get_sku_count(self, obj):
-        return obj.product.skus.count()
-
-
 class CategoryProductsSkusSerializer(serializers.ModelSerializer):
     class Meta:
         model = SkuAnalytics
@@ -111,6 +61,7 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
         fields = [
             "product_id",
             "product_title",
+            "product_title_ru",
             "product_characteristics",
             "shop_title",
             "shop_link",
@@ -127,6 +78,7 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
             "photos",
             "category_id",
             "category_title",
+            "category_title_ru",
             "avg_purchase_price",
         ]
 
@@ -135,6 +87,12 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
         representation["product_title"] = f"{representation['product_title']} (({representation['product_id']}))"
         representation["shop_title"] = f"{representation['shop_title']} (({representation['shop_link']}))"
         representation["category_title"] = f"{representation['category_title']} (({representation['category_id']}))"
+
+        representation["product_title_ru"] = f"{representation['product_title_ru']} (({representation['product_id']}))"
+        representation[
+            "category_title_ru"
+        ] = f"{representation['category_title_ru']} (({representation['category_id']}))"
+
         return representation
 
 

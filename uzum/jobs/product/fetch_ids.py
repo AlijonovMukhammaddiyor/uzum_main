@@ -8,6 +8,7 @@ import httpx
 
 from uzum.jobs.constants import (
     CATEGORIES_HEADER,
+    CATEGORIES_HEADER_RU,
     MAX_OFFSET,
     MAX_PAGE_SIZE,
     PRODUCTIDS_CONCURRENT_REQUESTS,
@@ -22,7 +23,7 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
-async def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids, page_size: int):
+async def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids, page_size: int, is_ru: bool = False):
     try:
         print("\n\nStarting getAllProductIdsFromUzum...")
         start_time = time.time()
@@ -58,28 +59,32 @@ async def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids
         print(f"Total number of requests: {len(promises)}")
 
         failed_ids = []
-        await concurrent_requests_for_ids(promises, 0, product_ids, failed_ids)
+        await concurrent_requests_for_ids(promises, 0, product_ids, failed_ids, is_ru)
         if len(failed_ids) > 0:
             failed_again_ids = []
             print(f"Failed Ids length: {len(failed_ids)}")
-            await concurrent_requests_for_ids(failed_ids, 0, product_ids, failed_again_ids)
+            await concurrent_requests_for_ids(failed_ids, 0, product_ids, failed_again_ids, is_ru)
             time.sleep(10)
             if len(failed_again_ids) > 0:
                 final_failed_ids = []
-                await concurrent_requests_for_ids(failed_again_ids, 0, product_ids, final_failed_ids)
+                await concurrent_requests_for_ids(failed_again_ids, 0, product_ids, final_failed_ids, is_ru)
                 time.sleep(10)
                 if len(final_failed_ids) > 0:
                     ff_failed_ids = []
-                    await concurrent_requests_for_ids(final_failed_ids, 0, product_ids, ff_failed_ids)
+                    await concurrent_requests_for_ids(final_failed_ids, 0, product_ids, ff_failed_ids, is_ru)
                     time.sleep(20)
                     if len(ff_failed_ids) > 0:
                         fff_failed_ids = []
-                        await concurrent_requests_for_ids(ff_failed_ids, 0, product_ids, fff_failed_ids)
+                        await concurrent_requests_for_ids(ff_failed_ids, 0, product_ids, fff_failed_ids, is_ru)
 
                 print(f"Total number of failed product ids: { len(fff_failed_ids)}")
+        if not is_ru:
+            print(f"Total number of product ids: {len(product_ids)}")
+            print(f"Total number of unique product ids: {len(set(product_ids))}")
+        else:
+            print(f"Total number of product ids: {len(product_ids)}")
+            print(f"Total number of unique product ids: {len(set([p['productId'] for p in product_ids]))}")
 
-        print(f"Total number of product ids: {len(product_ids)}")
-        print(f"Total number of unique product ids: {len(set(product_ids))}")
         print(
             f"Total time taken by get_all_product_ids_from_uzum: {time.time() - start_time}",
         )
@@ -90,7 +95,9 @@ async def get_all_product_ids_from_uzum(categories_dict: list[dict], product_ids
         return None
 
 
-async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids: list[int], failed_ids: list[int]):
+async def concurrent_requests_for_ids(
+    data: list[dict], index: int, product_ids: list[int], failed_ids: list[int], is_ru: bool = False
+):
     try:
         index = 0
         start_time = time.time()
@@ -111,8 +118,10 @@ async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids:
                             promise["offset"],
                             promise["pageSize"],
                             promise["categoryId"],
+                            is_ru=is_ru,
                         ),
                         client=client,
+                        is_ru=is_ru,
                     )
                     for promise in data[index : index + PRODUCTIDS_CONCURRENT_REQUESTS]
                 ]
@@ -129,7 +138,14 @@ async def concurrent_requests_for_ids(data: list[dict], index: int, product_ids:
                             if "errors" not in res_data:
                                 products = res_data["data"]["makeSearch"]["items"]
                                 for product in products:
-                                    product_ids.append(product["catalogCard"]["productId"])
+                                    product_ids.append(
+                                        product["catalogCard"]["productId"]
+                                    ) if not is_ru else product_ids.append(
+                                        {
+                                            "productId": product["catalogCard"]["productId"],
+                                            "title": product["catalogCard"]["title"],
+                                        }
+                                    )
                             else:
                                 print("Error in concurrentRequestsForIds B:", res_data, data[index + idx])
                                 p = data[index + idx]
@@ -152,6 +168,7 @@ async def make_request_product_ids(
     retries=3,
     backoff_factor=0.3,
     client=None,
+    is_ru: bool = False,
 ):
     for i in range(retries):
         try:
@@ -159,7 +176,7 @@ async def make_request_product_ids(
                 PRODUCTS_URL,
                 json=data,
                 headers={
-                    **CATEGORIES_HEADER,
+                    **(CATEGORIES_HEADER if not is_ru else CATEGORIES_HEADER_RU),
                     "User-Agent": get_random_user_agent(),
                     "x-iid": generateUUID(),
                 },

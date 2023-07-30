@@ -13,6 +13,7 @@ class CurrentProductSerializer(serializers.ModelSerializer):
     shop_title = serializers.CharField(source="shop.title", read_only=True)
     shop_link = serializers.CharField(source="shop.link", read_only=True)
     category_title = serializers.CharField(source="category.title", read_only=True)
+    category_title_ru = serializers.CharField(source="category.title_ru", read_only=True)
     category_id = serializers.IntegerField(source="category.categoryId", read_only=True)
 
     class Meta:
@@ -20,6 +21,7 @@ class CurrentProductSerializer(serializers.ModelSerializer):
         fields = [
             "product_id",
             "title",
+            "title_ru",
             "description",
             "adult",
             "characteristics",
@@ -32,6 +34,7 @@ class CurrentProductSerializer(serializers.ModelSerializer):
             "shop_title",
             "shop_link",
             "category_title",
+            "category_title_ru",
             "category_id",
         ]
 
@@ -125,6 +128,7 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
             "product_id",
             "created_at",
             "title",
+            "title_ru",
             "description",
             "adult",
             "bonus_product",

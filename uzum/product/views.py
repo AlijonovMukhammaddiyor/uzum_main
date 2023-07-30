@@ -55,6 +55,7 @@ class ProductView(APIView):
             return Response(
                 {
                     "title": product.title,
+                    "title_ru": product.title_ru,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -77,7 +78,7 @@ class Top5ProductsView(APIView):
             products = (
                 ProductAnalytics.objects.filter(date_pretty=date_pretty)
                 .order_by("-orders_amount")[:5]
-                .values("product__title", "orders_amount")
+                .values("product__title", "orders_amount", "product__title_ru")
             )
             return Response(products, status=status.HTTP_200_OK)
         except Exception as e:
@@ -217,7 +218,7 @@ class ProductsView(ListAPIView):
         "avg_purchase_price",
         "orders_money",
     ]
-    VALID_FILTER_FIELDS = ["product_title", "shop_title", "category_title"]
+    VALID_FILTER_FIELDS = ["product_title", "product_title_ru", "shop_title", "category_title", "category_title_ru"]
 
     @extend_schema(tags=["Product"])
     def get_queryset(self):
@@ -400,6 +401,7 @@ class SimilarProductsViewByUzum(APIView):
                 .values(
                     "product__product_id",
                     "product__title",
+                    "product__title_ru",
                     "average_purchase_price",
                     "rating",
                     "orders_amount",
@@ -408,6 +410,7 @@ class SimilarProductsViewByUzum(APIView):
                     "product__created_at",
                     "available_amount",
                     "product__category__title",
+                    "product__category__title_ru",
                     "position",
                     "position_in_category",
                     "date_pretty",
@@ -422,6 +425,9 @@ class SimilarProductsViewByUzum(APIView):
                 product["product__category__title"] += f"(({product['product__category__categoryId']}))"
                 product["product__shop__title"] += f"(({product['product__shop__link']}))"
                 product["product__title"] += f"(({product['product__product_id']}))"
+
+                product["product__title_ru"] += f"(({product['product__product_id']}))"
+                product["product__category__title_ru"] += f"(({product['product__category__categoryId']}))"
 
             # group by product__product_id
             grouped_analytics = []
@@ -537,7 +543,13 @@ class NewProductsView(APIView):
         "position_in_category",
         "average_purchase_price",
     ]
-    VALID_FILTER_FIELDS = ["product__title", "product__shop__title", "product__category__title"]
+    VALID_FILTER_FIELDS = [
+        "product__title",
+        "product__title_ru",
+        "product__shop__title",
+        "product__category__title",
+        "product__category__title_ru",
+    ]
 
     @extend_schema(tags=["Product"])
     def get(self, request: Request):
@@ -591,10 +603,12 @@ class NewProductsView(APIView):
                 .values(
                     "product__product_id",
                     "product__title",
+                    "product__title_ru",
                     "product__created_at",
                     "product__photos",
                     "product__category__categoryId",
                     "product__category__title",
+                    "product__category__title_ru",
                     "product__shop__link",
                     "product__shop__title",
                     "average_purchase_price",
@@ -619,6 +633,9 @@ class NewProductsView(APIView):
                 product["product__shop__title"] += f"(({product['product__shop__link']}))"
                 product["product__title"] += f"(({product['product__product_id']}))"
 
+                product["product__title_ru"] += f"(({product['product__product_id']}))"
+                product["product__category__title_ru"] += f"(({product['product__category__categoryId']}))"
+
             # Get the total count of matching products
             print("Time taken for NewProductsView", time.time() - start)
             return Response(
@@ -639,7 +656,13 @@ class GrowingProductsView(APIView):
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
     pagination_class = ExamplePagination
-    VALID_FILTER_FIELDS = ["product__title", "product__shop__title", "product__category__title"]
+    VALID_FILTER_FIELDS = [
+        "product__title",
+        "product__title_ru",
+        "product__shop__title",
+        "product__category__title",
+        "product__category__title_ru",
+    ]
 
     @extend_schema(tags=["Product"])
     def get(self, request: Request):
@@ -684,10 +707,12 @@ class GrowingProductsView(APIView):
                 .values(
                     "product__product_id",
                     "product__title",
+                    "product__title_ru",
                     "product__created_at",
                     "product__photos",
                     "product__category__categoryId",
                     "product__category__title",
+                    "product__category__title_ru",
                     "product__shop__link",
                     "product__shop__title",
                     "average_purchase_price",

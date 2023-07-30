@@ -16,6 +16,7 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     title = models.TextField(db_index=True)
+    title_ru = models.TextField(default=None, null=True, blank=True, db_index=True)
     description = models.TextField(default=None, null=True, blank=True)
     adult = models.BooleanField(default=False)
     bonus_product = models.BooleanField(default=False)
@@ -365,6 +366,7 @@ class ProductAnalytics(models.Model):
 class ProductAnalyticsView(models.Model):
     product_id = models.IntegerField(primary_key=True)
     product_title = models.CharField(max_length=255)
+    product_title_ru = models.CharField(max_length=255, null=True, blank=True)
     product_characteristics = models.TextField(blank=True, null=True)
     orders_amount = models.IntegerField()
     product_available_amount = models.IntegerField()

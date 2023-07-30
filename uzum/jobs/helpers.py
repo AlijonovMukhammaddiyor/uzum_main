@@ -41,10 +41,30 @@ def getReviewsUrl(productId: str, pageSize: int, page: int) -> str:
     return f"https://api.uzum.uz/api/product/{int(productId)}/reviews?amount={pageSize}&page={page}"
 
 
-def products_payload(offset: int, limit: int, categoryId: str, showAdultContent: str = "TRUE") -> dict:
+def products_payload(
+    offset: int, limit: int, categoryId: str, showAdultContent: str = "TRUE", is_ru: bool = False
+) -> dict:
     return {
         "operationName": "getMakeSearch",
-        "query": "query getMakeSearch( $queryInput: MakeSearchQueryInput!) {makeSearch(query: $queryInput) {items { catalogCard { productId } } } }",
+        "query": "query getMakeSearch( $queryInput: MakeSearchQueryInput!) {makeSearch(query: $queryInput) {items { catalogCard { productId } } } }"
+        if not is_ru
+        else "query getMakeSearch( $queryInput: MakeSearchQueryInput!) {makeSearch(query: $queryInput) {items { catalogCard { productId, title } } } }",
+        "variables": {
+            "queryInput": {
+                "categoryId": categoryId,
+                "filters": [],
+                "pagination": {"offset": offset, "limit": limit},
+                "showAdultContent": showAdultContent,
+                "sort": "BY_RELEVANCE_DESC",
+            }
+        },
+    }
+
+
+def products_title_ru_payload(offset: int, limit: int, categoryId: str, showAdultContent: str = "TRUE") -> dict:
+    return {
+        "operationName": "getMakeSearch",
+        "query": "query getMakeSearch( $queryInput: MakeSearchQueryInput!) {makeSearch(query: $queryInput) {items { catalogCard { productId, title } } } }",
         "variables": {
             "queryInput": {
                 "categoryId": categoryId,

@@ -14,6 +14,7 @@ from uzum.utils.general import get_day_before_pretty, get_today_pretty
 class Category(models.Model):
     categoryId = models.IntegerField(unique=True, null=False, blank=False, primary_key=True)
     title = models.CharField(max_length=1024)
+    title_ru = models.CharField(max_length=1024, null=True, blank=True)
     seo = models.TextField(blank=True, null=True)
     adult = models.BooleanField(default=False, db_index=True)
     parent = models.ForeignKey(

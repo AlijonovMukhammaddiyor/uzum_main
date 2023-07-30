@@ -1,11 +1,13 @@
 import traceback
 from datetime import datetime
+from django.db.models import Case, When, Value
+from django.db import transaction
 
 import pytz
 import requests
 
 from uzum.category.models import Category, CategoryAnalytics
-from uzum.jobs.constants import CATEGORIES_HEADER, CATEGORIES_PAYLOAD, CATEGORIES_URL
+from uzum.jobs.constants import CATEGORIES_HEADER, CATEGORIES_HEADER_RU, CATEGORIES_PAYLOAD, CATEGORIES_URL
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 
 
@@ -29,6 +31,50 @@ def get_categories_tree():
 
     except Exception as e:
         print("Error in get_categories_tree: ", e)
+        traceback.print_exc()
+        return None
+
+
+def get_categories_tree_ru():
+    try:
+        tree = requests.post(
+            CATEGORIES_URL,
+            json=CATEGORIES_PAYLOAD,
+            headers={
+                **CATEGORIES_HEADER_RU,
+                "User-Agent": get_random_user_agent(),
+                "x-iid": generateUUID(),
+                "Content-Type": "application/json",
+            },
+        )
+        if tree.status_code == 200:
+            return tree.json().get("data").get("makeSearch").get("categoryTree")
+        else:
+            print(f"Error in get_categories_tree: {tree.status_code} - {tree.text}")
+            return None
+
+    except Exception as e:
+        print("Error in get_categories_tree: ", e)
+        traceback.print_exc()
+        return None
+
+
+def add_russian_titles():
+    try:
+        tree = get_categories_tree_ru()
+        res = {}
+        for i, category in enumerate(tree):
+            res[category["category"]["id"]] = category["category"]["title"]
+
+        whens = [When(categoryId=k, then=Value(v)) for k, v in res.items()]
+
+        # print(whens)
+
+        with transaction.atomic():
+            Category.objects.filter(categoryId__in=res.keys()).update(title_ru=Case(*whens))
+
+    except Exception as e:
+        print("Error in add_russian_titles: ", e)
         traceback.print_exc()
         return None
 
