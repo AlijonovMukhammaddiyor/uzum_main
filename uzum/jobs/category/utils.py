@@ -114,6 +114,10 @@ def prepare_categories_for_bulk_create(
                     if current_id == category["category"]["parent"]["id"]:
                         raise Exception("Category cannot be its own parent")
                         return None
+                else:
+                    # if parent changed
+                    print(f"{category['category']['id']} - {parent.categoryId} parent changed")
+                    cat_parents.append((current_id, category["category"]["parent"]["id"]))
 
             else:
                 new_cats.append(

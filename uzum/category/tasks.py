@@ -18,7 +18,11 @@ from uzum.category.models import Category, CategoryAnalytics
 from uzum.jobs.campaign.main import update_or_create_campaigns
 from uzum.jobs.campaign.utils import associate_with_shop_or_product
 from uzum.jobs.category.main import create_and_update_categories
-from uzum.jobs.category.MultiEntry import get_categories_with_less_than_n_products
+from uzum.jobs.category.MultiEntry import (
+    get_categories_with_less_than_n_products,
+    get_categories_with_less_than_n_products_for_russian_title,
+)
+from uzum.jobs.category.utils import get_categories_tree
 from uzum.jobs.constants import CATEGORIES_HEADER, MAX_ID_COUNT, PAGE_SIZE, POPULAR_SEARCHES_PAYLOAD
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.jobs.product.fetch_details import get_product_details_via_ids
@@ -161,8 +165,15 @@ def update_analytics(date_pretty: str):
 
 def add_product_russian_titles():
     try:
-        categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
-        product_ids: list[int] = []  # it is [{productId: int, title: str}]
+        tree = get_categories_tree()
+        cat_totals = {}  # mapping from id to total products given in api response
+
+        for i, category in enumerate(tree):
+            cat_totals[category["category"]["id"]] = category["total"]
+
+        print("MAX_ID_COUNT: ", MAX_ID_COUNT)
+        categories_filtered = get_categories_with_less_than_n_products_for_russian_title(MAX_ID_COUNT, cat_totals)
+        product_ids: list[dict] = []  # it is [{productId: int, title: str}]
 
         async_to_sync(get_all_product_ids_from_uzum)(
             categories_filtered,
@@ -171,11 +182,42 @@ def add_product_russian_titles():
             is_ru=True,
         )
 
-        whens = [When(product_id=product["productId"], then=Value(product["title"])) for product in product_ids]
-        ids = [product["productId"] for product in product_ids]
+        # remove duplcate product ids
+        product_ids_dict = {d["productId"]: d["title"] for d in product_ids}
+        product_ids = [{"productId": k, "title": v} for k, v in product_ids_dict.items()]
+        print(f"Total product ids: {len(product_ids)}")
 
-        with transaction.atomic():
-            Product.objects.filter(product_id__in=ids).update(title_ru=Case(*whens))
+        with connection.cursor() as cursor:
+            # Create mapping table
+            cursor.execute(
+                """
+                DROP TABLE IF EXISTS product_id_title_mapping;
+                CREATE TABLE product_id_title_mapping (
+                    product_id INT PRIMARY KEY,
+                    new_title TEXT
+                );
+            """
+            )
+
+            # Insert product id and new title mapping into the table
+            for product in product_ids:
+                cursor.execute(
+                    """
+                    INSERT INTO product_id_title_mapping (product_id, new_title)
+                    VALUES (%s, %s)
+                """,
+                    [product["productId"], product["title"]],
+                )
+
+            # Update product titles based on the mapping table
+            cursor.execute(
+                """
+                UPDATE product_product
+                SET title_ru = product_id_title_mapping.new_title
+                FROM product_id_title_mapping
+                WHERE product_product.product_id = product_id_title_mapping.product_id
+            """
+            )
 
     except Exception as e:
         print("Error in add_russian_titles: ", e)
