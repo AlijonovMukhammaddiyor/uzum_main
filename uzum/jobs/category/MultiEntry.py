@@ -127,6 +127,8 @@ def get_categories_with_less_than_n_products_for_russian_title(n, cat_totals: di
         all_categories_dict = {}
 
         for category in all_category_analytics:
+            if category.category.categoryId not in cat_totals:
+                continue
             all_categories_dict[category.category.categoryId] = {
                 "categoryId": category.category.categoryId,
                 "total_products": cat_totals[category.category.categoryId],
@@ -148,6 +150,6 @@ def get_categories_with_less_than_n_products_for_russian_title(n, cat_totals: di
 
         return filtered_categories
     except Exception as e:
-        print(f"Error in getCategoriesWithLessThanNProducts: {e}")
+        print(f"Error in getCategoriesWithLessThanNProducts for title: {e}")
         print(traceback.print_exc())
         return None

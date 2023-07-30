@@ -182,6 +182,11 @@ def add_product_russian_titles():
             is_ru=True,
         )
 
+        # remove duplcate product ids
+        product_ids_dict = {d["productId"]: d["title"] for d in product_ids}
+        product_ids = [{"productId": k, "title": v} for k, v in product_ids_dict.items()]
+        print(f"Total product ids: {len(product_ids)}")
+
         with connection.cursor() as cursor:
             # Create mapping table
             cursor.execute(
