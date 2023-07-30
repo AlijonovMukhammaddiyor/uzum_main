@@ -163,6 +163,10 @@ def update_analytics(date_pretty: str):
         traceback.print_exc()
 
 
+from django.db import transaction, connection
+from django.db.models import F
+
+
 def add_product_russian_titles():
     try:
         tree = get_categories_tree()
@@ -182,42 +186,42 @@ def add_product_russian_titles():
             is_ru=True,
         )
 
-        # remove duplcate product ids
+        # remove duplicate product ids
         product_ids_dict = {d["productId"]: d["title"] for d in product_ids}
         product_ids = [{"productId": k, "title": v} for k, v in product_ids_dict.items()]
         print(f"Total product ids: {len(product_ids)}")
 
-        with connection.cursor() as cursor:
-            # Create mapping table
-            cursor.execute(
-                """
-                DROP TABLE IF EXISTS product_id_title_mapping;
-                CREATE TABLE product_id_title_mapping (
-                    product_id INT PRIMARY KEY,
-                    new_title TEXT
-                );
-            """
-            )
-
-            # Insert product id and new title mapping into the table
-            for product in product_ids:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                # Create mapping table
                 cursor.execute(
                     """
-                    INSERT INTO product_id_title_mapping (product_id, new_title)
-                    VALUES (%s, %s)
-                """,
-                    [product["productId"], product["title"]],
+                    DROP TABLE IF EXISTS product_id_title_mapping;
+                    CREATE TABLE product_id_title_mapping (
+                        product_id INT PRIMARY KEY,
+                        new_title TEXT
+                    );
+                """
                 )
 
-            # Update product titles based on the mapping table
-            cursor.execute(
+                # Insert product id and new title mapping into the table using batch insert
+                values = ", ".join(["(%s, %s)"] * len(product_ids))
+                query = f"""
+                    INSERT INTO product_id_title_mapping (product_id, new_title)
+                    VALUES {values}
                 """
-                UPDATE product_product
-                SET title_ru = product_id_title_mapping.new_title
-                FROM product_id_title_mapping
-                WHERE product_product.product_id = product_id_title_mapping.product_id
-            """
-            )
+                cursor.execute(query, sum([list(item.values()) for item in product_ids], []))
+
+                # Update product titles based on the mapping table only if title_ru is null
+                cursor.execute(
+                    """
+                    UPDATE product_product
+                    SET title_ru = product_id_title_mapping.new_title
+                    FROM product_id_title_mapping
+                    WHERE product_product.product_id = product_id_title_mapping.product_id
+                    AND product_product.title_ru IS NULL
+                    """
+                )
 
     except Exception as e:
         print("Error in add_russian_titles: ", e)
