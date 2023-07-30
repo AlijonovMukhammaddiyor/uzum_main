@@ -554,7 +554,7 @@ class SubcategoriesView(APIView):
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT ca.*, c.title AS category_title
+                    SELECT ca.*, c.title AS category_title, c.title_ru AS category_title_ru
                     FROM category_categoryanalytics AS ca
                     JOIN category_category AS c ON ca.category_id = c."categoryId"
                     WHERE ca.category_id = %s AND ca.date_pretty = %s
@@ -568,7 +568,7 @@ class SubcategoriesView(APIView):
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT ca.*, c.title AS category_title
+                    SELECT ca.*, c.title AS category_title, c.title_ru AS category_title_ru
                     FROM category_categoryanalytics AS ca
                     JOIN category_category AS c ON ca.category_id = c."categoryId"
                     WHERE ca.category_id IN %s AND ca.date_pretty = %s
@@ -580,6 +580,7 @@ class SubcategoriesView(APIView):
             # for each category: title += "((category_id))"
             for child in children_analytics:
                 child["category_title"] += f"(({child['category_id']}))"
+                child["category_title_ru"] += f"(({child['category_id']}))"
 
             print("children_analytics", time.time() - start)
             return Response(
@@ -867,6 +868,7 @@ class GrowingCategoriesView(APIView):
                 .values(
                     "category__categoryId",
                     "category__title",
+                    "category__title_ru",
                     "category__created_at",
                     "category__descendants",
                     "average_purchase_price",

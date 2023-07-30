@@ -30,6 +30,19 @@ CATEGORIES_HEADER = {
     "x-iid": "25dc2cba-2d8e-4192-bac7-8f0df42cbdd5",
 }
 
+CATEGORIES_HEADER_RU = {
+    "Access-Control-Allow-Credentials": "true",
+    "Authorization": "Basic YjJjLWZyb250OmNsaWVudFNlY3JldA==",
+    "Origin": "https://uzum.uz",
+    "Authority": "graphql.uzum.uz",
+    "Accept-Language": "ru-RU",
+    "Referrer": "https://uzum.uz/",
+    "apollographql-client-name": "web-customers",
+    "apollographql-client-version": "1.5.6",
+    "User-Agent": get_random_user_agent(),
+    "x-iid": "25dc2cba-2d8e-4192-bac7-8f0df42cbdd5",
+}
+
 
 PRODUCT_HEADER = {
     "Access-Control-Allow-Credentials": "true",

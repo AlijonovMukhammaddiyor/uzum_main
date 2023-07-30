@@ -10,6 +10,7 @@ import pytz
 from asgiref.sync import async_to_sync
 from django.core.cache import cache
 from django.db import connection, transaction
+from django.db.models import Case, When, Value
 
 from config import celery_app
 from uzum.banner.models import Banner
@@ -123,7 +124,7 @@ def update_uzum_data(args=None, **kwargs):
     start = time.time()
     Category.update_descendants()
     print(f"Category Descendants updated in {time.time() - start} seconds")
-
+    time.sleep(60)
     print("Updating Analytics...")
     start = time.time()
     update_analytics(date_pretty)
@@ -156,6 +157,30 @@ def update_analytics(date_pretty: str):
     except Exception as e:
         print("Error in update_analytics:", e)
         traceback.print_exc()
+
+
+def add_product_russian_titles():
+    try:
+        categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
+        product_ids: list[int] = []  # it is [{productId: int, title: str}]
+
+        async_to_sync(get_all_product_ids_from_uzum)(
+            categories_filtered,
+            product_ids,
+            page_size=PAGE_SIZE,
+            is_ru=True,
+        )
+
+        whens = [When(product_id=product["productId"], then=Value(product["title"])) for product in product_ids]
+        ids = [product["productId"] for product in product_ids]
+
+        with transaction.atomic():
+            Product.objects.filter(product_id__in=ids).update(title_ru=Case(*whens))
+
+    except Exception as e:
+        print("Error in add_russian_titles: ", e)
+        traceback.print_exc()
+        return None
 
 
 def fetch_failed_products(product_ids: list[int]):
@@ -324,7 +349,7 @@ def create_todays_searches():
 
 
 def update_category_tree():
-    categories = Category.objects.values("categoryId", "title", "parent_id")
+    categories = Category.objects.values("categoryId", "title", "title_ru", "parent_id")
 
     # first create a dictionary mapping ids to category data
     category_dict = {category["categoryId"]: category for category in categories}
@@ -341,6 +366,7 @@ def update_category_tree():
         return {
             "categoryId": category_id,
             "title": category["title"],
+            "title_ru": category["title_ru"],
             "children": [build_tree(child["categoryId"]) for child in children],
         }
 
@@ -352,7 +378,7 @@ def update_category_tree():
 
 
 def update_category_tree_with_data():
-    categories = Category.objects.values("categoryId", "title", "parent_id")
+    categories = Category.objects.values("categoryId", "title", "title_ru", "parent_id")
 
     # first create a dictionary mapping ids to category data
     category_dict = {category["categoryId"]: category for category in categories}
@@ -365,7 +391,6 @@ def update_category_tree_with_data():
     # get analytics data
     analytics_data = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty()).values(
         "category_id",
-        "category__title",
         "total_orders_amount",
         "total_orders",
         "total_products",
@@ -375,7 +400,6 @@ def update_category_tree_with_data():
 
     min_max_data = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty(), category__children=None).values(
         "category_id",
-        "category__title",
         "total_orders_amount",
         "total_orders",
         "total_products",
@@ -418,6 +442,7 @@ def update_category_tree_with_data():
         res = {
             "categoryId": category_id,
             "title": category["title"],
+            "title_ru": category["title_ru"],
             "analytics": analytics.get(type, 0),
             "children": [build_tree(child["categoryId"], type) for child in children],
         }
@@ -483,8 +508,10 @@ def create_materialized_view(date_pretty_str):
             pa.date_pretty,
             pa.product_id,
             p.title AS product_title,
+            p.title_ru AS product_title_ru,  -- Added product_title_ru here
             p.category_id,
             c.title AS category_title,  -- Added category_title here
+            c.title_ru AS category_title_ru,  -- Added category_title_ru here
             p.characteristics AS product_characteristics,
             p.photos,
             sh.title AS shop_title,
@@ -521,8 +548,10 @@ def create_materialized_view(date_pretty_str):
             pa.date_pretty,
             pa.product_id,
             p.title,
+            p.title_ru,  -- Added product_title_ru here
             p.category_id,
             c.title,  -- Added category_title here
+            c.title_ru,  -- Added category_title_ru here
             p.characteristics,
             p.photos,
             sh.title,
