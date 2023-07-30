@@ -751,13 +751,18 @@ class GrowingProductsView(APIView):
                     prev_orders = analytics[i]["orders_amount"]
 
                     i += 1
+                print(last_analytics)
 
                 grouped_analytics.append(
                     {
                         "product_id": product_id,
                         "product__title": last_analytics["product__title"]
                         + f"(({last_analytics['product__product_id']}))",
+                        "product__title_ru": last_analytics["product__title_ru"]
+                        + f"(({last_analytics['product__product_id']}))",
                         "product__category__title": last_analytics["product__category__title"]
+                        + f"(({last_analytics['product__category__categoryId']}))",
+                        "product__category__title_ru": last_analytics["product__category__title_ru"]
                         + f"(({last_analytics['product__category__categoryId']}))",
                         "product__shop__title": last_analytics["product__shop__title"]
                         + f"(({last_analytics['product__shop__link']}))",
