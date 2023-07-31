@@ -163,10 +163,6 @@ def update_analytics(date_pretty: str):
         traceback.print_exc()
 
 
-from django.db import transaction, connection
-from django.db.models import F
-
-
 def add_product_russian_titles():
     try:
         tree = get_categories_tree()
@@ -420,7 +416,7 @@ def update_category_tree():
     category_tree = build_tree(1)
     # store in cache
     cache.set("category_tree", category_tree, timeout=60 * 60 * 48)  # 48 hours
-    return category_tree
+    # return category_tree
 
 
 def update_category_tree_with_data():

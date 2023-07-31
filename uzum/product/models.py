@@ -223,7 +223,7 @@ class ProductAnalytics(models.Model):
     @staticmethod
     def set_top_growing_products():
         # Set date range (last 30 days)
-        end_date = pd.to_datetime(get_today_pretty()).astimezone(pytz.timezone("Asia/Tashkent"))
+        end_date = pd.to_datetime(get_today_pretty()).tz_localize("UTC").astimezone(pytz.timezone("Asia/Tashkent"))
         start_date = end_date - pd.DateOffset(days=30)
 
         # Retrieve product sales data for the last 30 days
@@ -381,6 +381,7 @@ class ProductAnalyticsView(models.Model):
     badges = models.TextField(blank=True, null=True)
     sku_analytics = models.TextField(blank=True, null=True)
     category_title = models.CharField(max_length=255)
+    category_title_ru = models.CharField(max_length=255, null=True, blank=True)
     avg_purchase_price = models.FloatField(blank=True, null=True)
     orders_money = models.FloatField(blank=True, null=True, default=0.0)
 

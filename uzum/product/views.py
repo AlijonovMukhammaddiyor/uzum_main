@@ -542,6 +542,7 @@ class NewProductsView(APIView):
         "rating",
         "position_in_category",
         "average_purchase_price",
+        "product__created_at",
     ]
     VALID_FILTER_FIELDS = [
         "product__title",
@@ -633,7 +634,9 @@ class NewProductsView(APIView):
                 product["product__shop__title"] += f"(({product['product__shop__link']}))"
                 product["product__title"] += f"(({product['product__product_id']}))"
 
-                product["product__title_ru"] += f"(({product['product__product_id']}))"
+                product["product__title_ru"] = (
+                    product["product__title_ru"] if product["product__title_ru"] else product["product__title"]
+                ) + f"(({product['product__product_id']}))"
                 product["product__category__title_ru"] += f"(({product['product__category__categoryId']}))"
 
             # Get the total count of matching products
@@ -663,6 +666,15 @@ class GrowingProductsView(APIView):
         "product__category__title",
         "product__category__title_ru",
     ]
+    VALID_SORT_FIELDS = [
+        "orders_amount",
+        "reviews_amount",
+        "product_available_amount",
+        "rating",
+        "position_in_category",
+        "average_purchase_price",
+        "product__created_at",
+    ]
 
     @extend_schema(tags=["Product"])
     def get(self, request: Request):
@@ -673,8 +685,22 @@ class GrowingProductsView(APIView):
             elif not request.user.is_proplus:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
+            column = request.query_params.get("column", "orders_amount")  # default is 'orders_amount'
+            order = request.query_params.get("order", "desc")  # default is 'desc'
+
             search_columns = request.query_params.get("searches", "")  # default is empty string
             filters = request.query_params.get("filters", "")  # default is empty string
+
+            # Validate sorting
+            if column not in self.VALID_SORT_FIELDS:
+                raise ValidationError({"error": f"Invalid column: {column}"})
+
+            if order not in ["asc", "desc"]:
+                raise ValidationError({"error": f"Invalid order: {order}"})
+
+            # Determine sorting order
+            if order == "desc":
+                column = "-" + column
 
             # Build filter query
             filter_query = Q()
@@ -751,25 +777,32 @@ class GrowingProductsView(APIView):
                     prev_orders = analytics[i]["orders_amount"]
 
                     i += 1
-                print(last_analytics)
 
                 grouped_analytics.append(
                     {
                         "product_id": product_id,
                         "product__title": last_analytics["product__title"]
                         + f"(({last_analytics['product__product_id']}))",
-                        "product__title_ru": last_analytics["product__title_ru"]
+                        "product__title_ru": (
+                            last_analytics["product__title_ru"]
+                            if last_analytics["product__title_ru"]
+                            else last_analytics["product__title"]
+                        )
                         + f"(({last_analytics['product__product_id']}))",
                         "product__category__title": last_analytics["product__category__title"]
                         + f"(({last_analytics['product__category__categoryId']}))",
-                        "product__category__title_ru": last_analytics["product__category__title_ru"]
+                        "product__category__title_ru": (
+                            last_analytics["product__category__title_ru"]
+                            if last_analytics["product__category__title_ru"]
+                            else last_analytics["product__category__title"]
+                        )
                         + f"(({last_analytics['product__category__categoryId']}))",
                         "product__shop__title": last_analytics["product__shop__title"]
                         + f"(({last_analytics['product__shop__link']}))",
                         "position": last_analytics["position"],
                         "position_in_category": last_analytics["position_in_category"],
-                        "orders": orders,
-                        "reviews": reviews,
+                        "orders_amount": orders,
+                        "reviews_amount": reviews,
                         "available_amount": available_amount,
                         "average_purchase_price": last_analytics["average_purchase_price"],
                         "product__created_at": last_analytics["product__created_at"],
