@@ -8,7 +8,7 @@ from . import views
 
 app_name = "category"
 urlpatterns = [
-    path("", cache_page(seconds_until_next())(views.CategoryTreeView.as_view()), name="all-categories"),
+    path("", (views.CategoryTreeView.as_view()), name="all-categories"),
     path("current/<int:category_id>/", views.CurrentCategoryView.as_view(), name="current-categories"),
     path("segmentation/", views.AllCategoriesSegmentation.as_view(), name="segmentation"),
     path(

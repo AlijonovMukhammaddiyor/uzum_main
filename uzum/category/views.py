@@ -262,7 +262,7 @@ class CategoryTopProductsView(ListAPIView):
         return {
             "products": ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
             .order_by("-orders_money")[:10]
-            .values("product_id", "product_title", "orders_money"),
+            .values("product_id", "product_title", "product_title_ru", "orders_money"),
             "total_orders": total_orders,
             "total_revenue": total_revenue,
             "descendants": descendants_count - 1,
@@ -856,7 +856,7 @@ class GrowingCategoriesView(APIView):
             start = time.time()
 
             start_date = timezone.make_aware(
-                datetime.combine(date.today() - timedelta(days=50), datetime.min.time()),
+                datetime.combine(date.today() - timedelta(days=30), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
