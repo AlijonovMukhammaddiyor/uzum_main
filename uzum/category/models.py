@@ -131,25 +131,6 @@ class Category(models.Model):
         #     Category.objects.bulk_update(categories, ["descendants"])
         pass
 
-    @staticmethod
-    def get_descendants(category, include_self=False):
-        descendants = []
-
-        # Recursive function to retrieve descendants
-        def retrieve_descendants(category):
-            print("Retrieving descendants for: ", category.categoryId)
-            children = category.child_categories.all()
-            for child in children:
-                descendants.append(child)
-                retrieve_descendants(child)
-
-        retrieve_descendants(category)
-
-        if include_self:
-            descendants.append(category)
-
-        return descendants
-
     def get_category_descendants(self, include_self=False):
         if self.descendants is None:
             if include_self:

@@ -481,16 +481,10 @@ class ShopCompetitorsView(APIView):
             if not shop_categories_ids_str:
                 return []
 
-            # Get current shop's average purchase price and position
-            current_shop_avg_purchase_price = shop_analytics_today.average_purchase_price
-            current_shop_position = shop_analytics_today.position
-
             query = f"""
                 SELECT
                     sa.shop_id, s.title, s.link, COUNT(DISTINCT sac.category_id) as common_categories_count,
-                    sa.average_purchase_price, sa.position,
-                    ABS(sa.average_purchase_price - {current_shop_avg_purchase_price}) as price_difference,
-                    ABS(sa.position - {current_shop_position}) as position_difference,
+                    sa.total_revenue,
                     STRING_AGG(DISTINCT c.title, ', ') as common_categories_titles,
                     STRING_AGG(DISTINCT c.title_ru, ', ') as common_categories_titles_ru,
                     STRING_AGG(DISTINCT c."categoryId"::text, ', ') as common_categories_ids
@@ -506,12 +500,11 @@ class ShopCompetitorsView(APIView):
                     sa.date_pretty = '{date_pretty}'
                     AND sac.category_id IN ({shop_categories_ids_str})
                 GROUP BY
-                    sa.shop_id, s.title, s.link, sa.average_purchase_price, sa.position
+                    sa.shop_id, s.title, s.link, sa.total_revenue
                 ORDER BY
                     sa.shop_id != {shop.seller_id},  -- prioritize the current shop
                     common_categories_count DESC,
-                    price_difference ASC,
-                    position_difference ASC
+                    sa.total_revenue DESC
                 LIMIT {N + 1}  -- increase the limit to include the current shop
             """
 
@@ -549,10 +542,7 @@ class ShopCompetitorsView(APIView):
                 title,
                 link,
                 common_categories_count,
-                avg_purchase_price,
-                position,
-                price_difference,
-                position_difference,
+                total_revenue,
                 common_categories_titles,
                 common_categories_titles_ru,
                 common_categories_ids,
@@ -1210,7 +1200,9 @@ class ShopProductsByCategoryView(APIView):
 
             for product in products:
                 product["title"] = product["title"] + f'(({product["product_id"]}))'
-                product["title_ru"] = (product["title_ru"] if product['title_ru'] else product['title']) + f'(({product["product_id"]}))'
+                product["title_ru"] = (
+                    product["title_ru"] if product["title_ru"] else product["title"]
+                ) + f'(({product["product_id"]}))'
 
             return Response(
                 data={"data": products, "total": len(products)},

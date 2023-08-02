@@ -65,7 +65,7 @@ class ProductAnalytics(models.Model):
     reviews_amount = models.IntegerField(default=0)
     rating = models.FloatField(default=0)
     orders_amount = models.IntegerField(default=0, db_index=True)
-    orders_money = models.FloatField(default=0.0)
+    orders_money = models.FloatField(default=0.0, db_index=True)
 
     campaigns = models.ManyToManyField(
         "campaign.Campaign",
@@ -308,13 +308,7 @@ class ProductAnalytics(models.Model):
                     # Handle the entries for other dates
                     cursor.execute(
                         """
-                        WITH latest_pa AS (
-                            SELECT DISTINCT ON (product_id) *
-                            FROM product_productanalytics
-                            WHERE created_at < %s
-                            ORDER BY product_id, created_at DESC
-                        ),
-                        today_pa AS (
+                        WITH today_pa AS (
                             SELECT *
                             FROM product_productanalytics
                             WHERE date_pretty = %s
@@ -322,31 +316,31 @@ class ProductAnalytics(models.Model):
                         order_difference AS (
                             SELECT
                                 today_pa.product_id,
-                                (today_pa.orders_amount - COALESCE(latest_pa.orders_amount, 0)) AS delta_orders,
-                                COALESCE(latest_pa.orders_money, 0) AS latest_orders_money
+                                (today_pa.orders_amount - COALESCE(latest_pa.latest_orders_amount, 0)) AS delta_orders,
+                                COALESCE(latest_pa.latest_orders_money, 0) AS latest_orders_money
                             FROM
                                 today_pa
-                                LEFT JOIN latest_pa ON today_pa.product_id = latest_pa.product_id
+                        LEFT JOIN product_latest_analytics latest_pa ON today_pa.product_id = latest_pa.product_id
                         ),
                         delta_orders_money AS (
-                            SELECT
+                           SELECT
                                 order_difference.product_id,
-                                (order_difference.latest_orders_money + ((order_difference.delta_orders * today_pa.average_purchase_price) / 1000.0)) AS new_orders_money
+                                GREATEST(
+                                    (order_difference.latest_orders_money + ((order_difference.delta_orders * today_pa.average_purchase_price) / 1000.0)),
+                                    0
+                                ) AS new_orders_money
                             FROM
                                 order_difference
                                 JOIN today_pa ON order_difference.product_id = today_pa.product_id
                             WHERE today_pa.average_purchase_price IS NOT NULL
                         )
                         UPDATE product_productanalytics
-                        SET orders_money = CASE
-                            WHEN COALESCE(delta_orders_money.new_orders_money, 0) < 0 THEN 0
-                            ELSE COALESCE(delta_orders_money.new_orders_money, 0)
-                        END
+                        SET orders_money = delta_orders_money.new_orders_money
                         FROM delta_orders_money
                         WHERE product_productanalytics.product_id = delta_orders_money.product_id
                         AND product_productanalytics.date_pretty = %s
                         """,
-                        [date, date_pretty, date_pretty],
+                        [date_pretty, date_pretty],
                     )
         except Exception as e:
             print(e)
@@ -354,6 +348,8 @@ class ProductAnalytics(models.Model):
     @staticmethod
     def update_analytics(date_pretty: str):
         try:
+            yesterday_pretty = get_day_before_pretty(date_pretty)
+            create_product_latestanalytics(yesterday_pretty)
             ProductAnalytics.update_average_purchase_price(date_pretty)
             ProductAnalytics.set_orders_money(date_pretty)
             ProductAnalytics.set_positions(date_pretty)
@@ -388,3 +384,42 @@ class ProductAnalyticsView(models.Model):
     class Meta:
         managed = False
         db_table = "product_sku_analytics"
+
+
+class LatestProductAnalyticsView(models.Model):
+    product_id = models.IntegerField(primary_key=True)
+    last_updated_at = models.DateTimeField()
+    latest_orders_money = models.DecimalField(max_digits=10, decimal_places=2)
+    latest_average_purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
+    latest_orders_amount = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "product_latest_analytics"
+
+
+def create_product_latestanalytics(date_pretty: str):
+    # Convert date_pretty to a timezone-aware datetime object
+    date = (
+        pytz.timezone("Asia/Tashkent")
+        .localize(datetime.strptime(date_pretty, "%Y-%m-%d"))
+        .replace(hour=23, minute=59, second=59, microsecond=999999)
+    )
+
+    with connection.cursor() as cursor:
+        # Drop the materialized view if it exists
+        cursor.execute("DROP MATERIALIZED VIEW IF EXISTS product_latest_analytics")
+
+        # Create the materialized view
+        cursor.execute(
+            f"""
+            CREATE MATERIALIZED VIEW product_latest_analytics AS
+            SELECT DISTINCT ON (product_id) product_id, created_at as last_updated_at,
+                orders_money as latest_orders_money,
+                average_purchase_price as latest_average_purchase_price,
+                orders_amount as latest_orders_amount
+            FROM product_productanalytics
+            WHERE created_at <= '{date}'
+            ORDER BY product_id, created_at DESC
+        """
+        )
