@@ -48,8 +48,6 @@ def prepareProductData(
                 if parent_cat:
                     current_category.parent = parent_cat
                     current_category.save()
-                    parent_cat.children.add(current_category)
-                    parent_cat.save()
             except Category.DoesNotExist:
                 print("Parent category does not exist", category_id)
 

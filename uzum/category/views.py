@@ -132,6 +132,7 @@ class CategoryTreeView(APIView):
             redis_key = "category_tree"
 
             if cache.get(redis_key):
+                # print("category tree found", cache.get("category_tree"))
                 return Response(status=status.HTTP_200_OK, data=cache.get("category_tree"))
             print("category tree not found")
             root_category = Category.objects.get(categoryId=1)
@@ -543,7 +544,7 @@ class SubcategoriesView(APIView):
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
 
             category = Category.objects.get(categoryId=category_id)
-            children = category.children.all()
+            children = category.child_categories.all()
 
             if not children:
                 return Response(status=status.HTTP_200_OK, data={"data": [], "total": 0, "main": []})
@@ -924,7 +925,7 @@ class MainCategoriesAnalyticsView(APIView):
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             main_category = Category.objects.get(categoryId=1)
-            children = main_category.children.all()
+            children = main_category.child_categories.all()
 
             if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
                 end_date = timezone.make_aware(

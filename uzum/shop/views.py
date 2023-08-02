@@ -492,6 +492,7 @@ class ShopCompetitorsView(APIView):
                     ABS(sa.average_purchase_price - {current_shop_avg_purchase_price}) as price_difference,
                     ABS(sa.position - {current_shop_position}) as position_difference,
                     STRING_AGG(DISTINCT c.title, ', ') as common_categories_titles,
+                    STRING_AGG(DISTINCT c.title_ru, ', ') as common_categories_titles_ru,
                     STRING_AGG(DISTINCT c."categoryId"::text, ', ') as common_categories_ids
                 FROM
                     shop_shopanalytics as sa
@@ -553,6 +554,7 @@ class ShopCompetitorsView(APIView):
                 price_difference,
                 position_difference,
                 common_categories_titles,
+                common_categories_titles_ru,
                 common_categories_ids,
             ) in competitor_shops_data:
                 competitors_data.append(
@@ -562,7 +564,8 @@ class ShopCompetitorsView(APIView):
                         "shop_id": shop_id,
                         "common_categories_count": common_categories_count,
                         "common_categories_titles": common_categories_titles.split(","),
-                        "common_categories_ids": common_categories_ids.split(","),  # convert to list
+                        "common_categories_ids": common_categories_ids.split(","),  # convert to list,
+                        "common_categories_titles_ru": common_categories_titles_ru.split(","),
                     }
                 )
 
@@ -657,8 +660,11 @@ class ShopDailySalesView(APIView):
                     "reviews_amount",
                     "rating",
                     "product__title",
+                    "product__title_ru",
                     "product__category__title",
+                    "product__category__title_ru",
                     "product__product_id",
+                    "product__category__categoryId",
                     "product__photos",
                     "date_pretty",
                 )
@@ -685,8 +691,11 @@ class ShopDailySalesView(APIView):
                 "reviews_amount",
                 "rating",
                 "product__title",
+                "product__title_ru",
                 "product__category__title",
+                "product__category__title_ru",
                 "product__product_id",
+                "product__category__categoryId",
                 "date_pretty",
             )
 
@@ -697,7 +706,11 @@ class ShopDailySalesView(APIView):
             for item in target_analytics:
                 before_item = before_analytics_dict.get(item["product__product_id"], None)
                 item["product__title"] += f'(({item["product__product_id"]}))'
-                item["product__category__title"] += f'(({item["product__product_id"]}))'
+                item["product__category__title"] += f'(({item["product__category__categoryId"]}))'
+                item["product__title_ru"] = (
+                    item["product__title_ru"] if item["product__title_ru"] else item["product__title"]
+                ) + f'(({item["product__product_id"]}))'
+                item["product__category__title_ru"] += f'(({item["product__category__categoryId"]}))'
 
                 item["orders"] = {
                     "target": item["orders_amount"],
@@ -901,7 +914,7 @@ class StoppedProductsView(APIView):
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
             query = f"""
-            SELECT p.title, p.photos, pa.*, c.title AS category_title, c."categoryId" as category_id,  AVG(ska.purchase_price) AS avg_purchase_price, AVG(ska.full_price) AS avg_full_price
+            SELECT p.title, p.title_ru, p.photos, pa.*, c.title AS category_title, c.title_ru AS category_title_ru, c."categoryId" as category_id,  AVG(ska.purchase_price) AS avg_purchase_price, AVG(ska.full_price) AS avg_full_price
             FROM product_product p
             INNER JOIN category_category c ON p.category_id = c."categoryId"
             INNER JOIN (
@@ -916,7 +929,7 @@ class StoppedProductsView(APIView):
             LEFT JOIN sku_sku s ON p.product_id = s.product_id
             LEFT JOIN sku_skuanalytics ska ON s.sku = ska.sku_id AND pa.date_pretty = ska.date_pretty
             WHERE p.shop_id = {seller_id}
-            GROUP BY p.title, pa.id, c.title, c."categoryId", p.photos, pa.created_at, pa.date_pretty, pa.product_id, pa.reviews_amount, pa.orders_amount, pa.rating, pa.available_amount, pa.orders_money, pa.position, pa.position_in_category, pa.position_in_shop, pa.average_purchase_price
+            GROUP BY p.title, p.title_ru, pa.id, c.title, c."categoryId", p.photos, pa.created_at, pa.date_pretty, pa.product_id, pa.reviews_amount, pa.orders_amount, pa.rating, pa.available_amount, pa.orders_money, pa.position, pa.position_in_category, pa.position_in_shop, pa.average_purchase_price
             """
 
             with connection.cursor() as cursor:
@@ -931,7 +944,9 @@ class StoppedProductsView(APIView):
 
             for row in result:
                 row["title"] = row["title"] + f'(({row["product_id"]}))'
+                row["title_ru"] = (row["title_ru"] if row["title_ru"] else row["title"]) + f'(({row["product_id"]}))'
                 row["category_title"] = row["category_title"] + f'(({row["category_id"]}))'
+                row["category_title_ru"] = row["category_title_ru"] + f'(({row["category_id"]}))'
 
             print(f"STOPPED PRODUCTS: {time.time() - start} seconds")
             return Response(data=result, status=status.HTTP_200_OK)
@@ -963,7 +978,7 @@ class ShopCategoriesView(APIView):
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
             query = f"""
-            SELECT c."categoryId", c.title, COUNT(p.product_id) AS products_amount, SUM(pa.orders_amount) AS orders_amount, SUM(pa.reviews_amount) AS reviews_amount
+            SELECT c."categoryId", c.title, c.title_ru, COUNT(p.product_id) AS products_amount, SUM(pa.orders_amount) AS orders_amount, SUM(pa.reviews_amount) AS reviews_amount
             FROM category_category c
             INNER JOIN product_product p ON c."categoryId" = p.category_id
             INNER JOIN (
@@ -976,7 +991,7 @@ class ShopCategoriesView(APIView):
                 )
             ) pa ON p.product_id = pa.product_id
             WHERE p.shop_id = {seller_id}
-            GROUP BY c."categoryId", c.title
+            GROUP BY c."categoryId", c.title, c.title_ru
             ORDER BY products_amount DESC
             """
 
@@ -1181,6 +1196,7 @@ class ShopProductsByCategoryView(APIView):
                 .values(
                     "product_id",
                     "title",
+                    "title_ru",
                     "photos",
                 )
                 .annotate(
@@ -1194,6 +1210,7 @@ class ShopProductsByCategoryView(APIView):
 
             for product in products:
                 product["title"] = product["title"] + f'(({product["product_id"]}))'
+                product["title_ru"] = (product["title_ru"] if product['title_ru'] else product['title']) + f'(({product["product_id"]}))'
 
             return Response(
                 data={"data": products, "total": len(products)},

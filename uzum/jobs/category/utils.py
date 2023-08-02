@@ -114,7 +114,7 @@ def prepare_categories_for_bulk_create(
                     if current_id == category["category"]["parent"]["id"]:
                         raise Exception("Category cannot be its own parent")
                         return None
-                else:
+                elif parent.categoryId != category["category"]["parent"]["id"]:
                     # if parent changed
                     print(f"{category['category']['id']} - {parent.categoryId} parent changed")
                     cat_parents.append((current_id, category["category"]["parent"]["id"]))
@@ -153,9 +153,6 @@ def assign_parents(new_cat_parents: list[tuple[int, int]]):
             # assign parent category to new category
             new_cat.parent = parent_cat
             new_cat.save()
-
-            parent_cat.children.add(new_cat)
-            parent_cat.save()
 
             if parent_cat.title == "Pechlar":
                 print(f"{new_cat.title} - {parent_cat.title}")
