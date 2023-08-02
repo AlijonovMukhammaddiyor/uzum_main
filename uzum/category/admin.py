@@ -18,8 +18,8 @@ class CategoryAdmin(admin.ModelAdmin):
     search_fields = ("title", "categoryId")
 
     def get_children(self, obj):
-        if obj.children.all():
-            return list(obj.children.all().values_list("title", flat=True))
+        if obj.child_categories.all():
+            return list(obj.child_categories.all().values_list("title", flat=True))
         else:
             return "NA"
 

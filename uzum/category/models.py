@@ -24,7 +24,7 @@ class Category(models.Model):
         related_name="child_categories",
         null=True,
     )
-    children = models.ManyToManyField("self", blank=True, symmetrical=False, related_name="parent_cats")
+    # children = models.ManyToManyField("self", blank=True, symmetrical=False, related_name="parent_cats")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
 
@@ -62,19 +62,74 @@ class Category(models.Model):
     def __str__(self):
         return self.title + " " + str(self.categoryId)
 
-    @staticmethod
-    def update_descendants():
-        """
-        Updates descendants field of all categories.
-        """
-        categories = Category.objects.all()
-        for category in categories:
-            descendants = Category.get_descendants(category)
-            if len(descendants) > 0:
-                descendants = [str(descendant.categoryId) for descendant in descendants]
-                descendants = ",".join(descendants)
-                category.descendants = descendants
-                category.save()
+    def update_descendants_rec(category, visited=None):
+        if visited is None:
+            visited = set()
+
+        descendants = []
+
+        def gather_descendants(cat):
+            if cat in visited:
+                print(f"Cycle detected at category id {cat.categoryId}")
+                return
+            visited.add(cat)
+
+            if not cat.child_categories.all():
+                return
+
+            for child in cat.child_categories.all():
+                if child == category:
+                    print(f"Category {category.categoryId} is its own descendant!")
+                    continue
+                descendants.append(str(child.categoryId))
+                gather_descendants(child)
+
+        gather_descendants(category)
+        category.descendants = ",".join(descendants)
+        category.save()
+
+    # def update_descendants():
+    #     """
+    #     Updates descendants field of all categories.
+    #     """
+    #     # select categories only if it has analytics at today
+    #     categories = Category.objects.filter(categoryanalytics__date_pretty=get_today_pretty()).prefetch_related(
+    #         "child_categories"
+    #     )
+    #     print("Total categories: ", len(categories))
+    #     i = 0
+    #     for category in categories:
+    #         print(i)
+    #         i += 1
+    #         Category.update_descendants_rec(category)
+
+    #     return None
+
+    def update_descendants_bulk():
+        #     categories = list(
+        #         Category.objects.filter(categoryanalytics__date_pretty=get_today_pretty()).prefetch_related(
+        #             "child_categories"
+        #         )
+        #     )
+        #     print("Total categories: ", len(categories))
+
+        #     for category in categories:
+        #         descendants = []
+        #         visited = set()
+        #         stack = list(category.child_categories.all())
+
+        #         while stack:
+        #             current = stack.pop()
+        #             if current in visited:
+        #                 continue
+        #             visited.add(current)
+        #             descendants.append(str(current.categoryId))
+        #             stack.extend(current.child_categories.all())
+
+        #         category.descendants = ",".join(descendants)
+
+        #     Category.objects.bulk_update(categories, ["descendants"])
+        pass
 
     @staticmethod
     def get_descendants(category, include_self=False):
@@ -82,7 +137,8 @@ class Category(models.Model):
 
         # Recursive function to retrieve descendants
         def retrieve_descendants(category):
-            children = category.children.all()
+            print("Retrieving descendants for: ", category.categoryId)
+            children = category.child_categories.all()
             for child in children:
                 descendants.append(child)
                 retrieve_descendants(child)

@@ -61,7 +61,7 @@ def get_categories_with_less_than_n_products(n):
             all_categories_dict[category.category.categoryId] = {
                 "categoryId": category.category.categoryId,
                 "total_products": category.total_products,
-                "children": list(category.category.children.values_list("categoryId", flat=True)),
+                "children": list(category.category.child_categories.values_list("categoryId", flat=True)),
             }
 
         filtered_categories = []
@@ -132,7 +132,7 @@ def get_categories_with_less_than_n_products_for_russian_title(n, cat_totals: di
             all_categories_dict[category.category.categoryId] = {
                 "categoryId": category.category.categoryId,
                 "total_products": cat_totals[category.category.categoryId],
-                "children": list(category.category.children.values_list("categoryId", flat=True)),
+                "children": list(category.category.child_categories.values_list("categoryId", flat=True)),
             }
 
         filtered_categories = []

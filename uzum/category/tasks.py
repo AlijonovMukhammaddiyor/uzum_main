@@ -1,4 +1,5 @@
 import asyncio
+from itertools import chain
 import json
 import time
 import traceback
@@ -126,7 +127,7 @@ def update_uzum_data(args=None, **kwargs):
 
     print("Updating Category Descendants...")
     start = time.time()
-    Category.update_descendants()
+    # Category.update_descendants()
     print(f"Category Descendants updated in {time.time() - start} seconds")
     time.sleep(60)
     print("Updating Analytics...")
@@ -145,6 +146,36 @@ def update_uzum_data(args=None, **kwargs):
     update_category_tree_with_data()
     print("Uzum data updated...")
     return True
+
+
+def update_all_category_parents():
+    try:
+        tree = get_categories_tree()
+        cat_parents = {}  # mapping from id to parent id
+        all_categories = {}
+
+        for i, category in enumerate(tree):
+            if category["category"]["id"] != 1:
+                cat_parents[category["category"]["id"]] = category["category"]["parent"]["id"]
+
+        categories_qs = Category.objects.filter(categoryId__in=cat_parents.keys())
+        parent_qs = Category.objects.filter(categoryId__in=cat_parents.values())
+
+        # Build dictionary for quick access
+        for category in chain(categories_qs, parent_qs):
+            all_categories[category.categoryId] = category
+
+        # Update parent of each category
+        for cat_id, parent_id in cat_parents.items():
+            cat = all_categories[cat_id]
+            parent = all_categories[parent_id]
+            cat.parent = parent
+            cat.save()
+            # print(f"Category {cat.title} parent set to {parent.title}")
+
+    except Exception as e:
+        print("Error in update_all_category_parents:", e)
+        traceback.print_exc()
 
 
 def update_analytics(date_pretty: str):
@@ -390,8 +421,10 @@ def create_todays_searches():
         return None
 
 
-def update_category_tree():
-    categories = Category.objects.values("categoryId", "title", "title_ru", "parent_id")
+def update_category_tree(date_pretty=get_today_pretty()):
+    categories = Category.objects.filter(categoryanalytics__date_pretty=date_pretty).values(
+        "categoryId", "title", "title_ru", "parent_id"
+    )
 
     # first create a dictionary mapping ids to category data
     category_dict = {category["categoryId"]: category for category in categories}
@@ -419,8 +452,10 @@ def update_category_tree():
     # return category_tree
 
 
-def update_category_tree_with_data():
-    categories = Category.objects.values("categoryId", "title", "title_ru", "parent_id")
+def update_category_tree_with_data(date_pretty=get_today_pretty()):
+    categories = Category.objects.filter(
+        categoryanalytics__date_pretty=date_pretty,
+    ).values("categoryId", "title", "title_ru", "parent_id")
 
     # first create a dictionary mapping ids to category data
     category_dict = {category["categoryId"]: category for category in categories}
