@@ -56,6 +56,7 @@ class ProductAnalytics(models.Model):
         "banner.Banner",
         # on_delete=models.DO_NOTHING, null=True, blank=True, related_name="products"
     )
+
     badges = models.ManyToManyField(
         "badge.Badge",
         related_name="products",
@@ -209,13 +210,15 @@ class ProductAnalytics(models.Model):
             cursor.execute(
                 """
                 UPDATE product_productanalytics PA
-                SET average_purchase_price = (
-                    SELECT AVG(SA.purchase_price)
+                SET average_purchase_price = SA.avg_purchase_price
+                FROM (
+                    SELECT AVG(SA.purchase_price) as avg_purchase_price, S.product_id, SA.date_pretty
                     FROM sku_sku S
                     JOIN sku_skuanalytics SA ON S.sku = SA.sku_id
-                    WHERE S.product_id = PA.product_id AND SA.date_pretty = PA.date_pretty
-                )
-                WHERE PA.date_pretty = %s
+                    GROUP BY S.product_id, SA.date_pretty
+                ) SA
+                WHERE PA.product_id = SA.product_id AND PA.date_pretty = SA.date_pretty
+                AND PA.date_pretty = %s
             """,
                 [date_pretty],
             )

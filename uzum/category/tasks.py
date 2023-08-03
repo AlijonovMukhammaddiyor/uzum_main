@@ -144,6 +144,8 @@ def update_uzum_data(args=None, **kwargs):
     update_category_tree()
 
     update_category_tree_with_data()
+
+    Banner.set_products()
     print("Uzum data updated...")
     return True
 
@@ -475,7 +477,7 @@ def update_category_tree_with_data(date_pretty=get_today_pretty()):
         "total_shops",
     )
 
-    min_max_data = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty(), category__children=None).values(
+    min_max_data = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty(), category__child_categories=None).values(
         "category_id",
         "total_orders_amount",
         "total_orders",

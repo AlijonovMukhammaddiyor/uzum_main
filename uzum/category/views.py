@@ -246,6 +246,8 @@ class CategoryTopProductsView(ListAPIView):
 
         ca = CategoryAnalytics.objects.filter(category=category, date_pretty=get_today_pretty_fake()).first()
 
+        print("ca", ca)
+
         if ca is None:
             total_orders = 0
             total_revenue = 0

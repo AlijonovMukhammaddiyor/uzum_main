@@ -99,11 +99,10 @@ class ShopAnalytics(models.Model):
                     UPDATE shop_shopanalytics sa
                     SET average_purchase_price = sub.average_price
                     FROM (
-                        SELECT p.shop_id, AVG(ska.purchase_price) as average_price
-                        FROM sku_skuanalytics ska
-                        JOIN sku_sku s ON ska.sku_id = s.sku
-                        JOIN product_product p ON s.product_id = p.product_id
-                        WHERE ska.date_pretty = %s
+                        SELECT p.shop_id, AVG(pa.average_purchase_price) as average_price
+                        FROM product_productanalytics pa
+                        JOIN product_product p ON pa.product_id = p.product_id
+                        WHERE pa.date_pretty = %s
                         GROUP BY p.shop_id
                     ) sub
                     WHERE sa.shop_id = sub.shop_id AND sa.date_pretty = %s

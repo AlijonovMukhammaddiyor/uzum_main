@@ -13,7 +13,7 @@ class Sku(models.Model):
     """
 
     sku = models.IntegerField(unique=True, primary_key=True)
-    product = models.ForeignKey("product.Product", on_delete=models.DO_NOTHING, related_name="skus")
+    product = models.ForeignKey("product.Product", on_delete=models.DO_NOTHING, related_name="skus", db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     barcode = models.CharField(max_length=255, null=True, blank=True)
