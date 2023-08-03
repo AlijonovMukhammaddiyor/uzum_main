@@ -264,7 +264,7 @@ class CategoryTopProductsView(ListAPIView):
         # return ProductAnalyticsView.objects.filter(category_id__in=descendant_ids).order_by("-orders_amount")[:5]
         return {
             "products": ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
-            .order_by("-orders_money")[:10]
+            .order_by("-orders_money")[:200]
             .values("product_id", "product_title", "product_title_ru", "orders_money"),
             "total_orders": total_orders,
             "total_revenue": total_revenue,
