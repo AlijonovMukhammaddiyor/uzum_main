@@ -933,8 +933,8 @@ class StoppedProductsView(APIView):
                 result = [dict(zip(column_names, row)) for row in rows]
 
             for row in result:
-                row["title"] = row["title"] + f'(({row["product_id"]}))'
                 row["title_ru"] = (row["title_ru"] if row["title_ru"] else row["title"]) + f'(({row["product_id"]}))'
+                row["title"] = row["title"] + f'(({row["product_id"]}))'
                 row["category_title"] = row["category_title"] + f'(({row["category_id"]}))'
                 row["category_title_ru"] = row["category_title_ru"] + f'(({row["category_id"]}))'
 

@@ -173,6 +173,9 @@ def prepareProductData(
             "available_amount": product_api["totalAvailableAmount"],
             "orders_amount": product_api["ordersAmount"],
             "product_id": product_api["id"],
+            # get average of purchase_price from skuList
+            "average_purchase_price": sum([sku["purchasePrice"] for sku in product_api["skuList"]])
+            / len(product_api["skuList"]),
         }
 
         for sku_api in product_api["skuList"]:
