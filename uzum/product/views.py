@@ -427,9 +427,9 @@ class SimilarProductsViewByUzum(APIView):
                 product["product__title"] += f"(({product['product__product_id']}))"
 
                 product["product__title_ru"] = (
-                    product["product__category__title_ru"]
-                    if product["product__category__title_ru"]
-                    else product["product__category__title"] + f"(({product['product__product_id']}))"
+                    product["product__title_ru"]
+                    if product["product__title_ru"]
+                    else product["product__title"] + f"(({product['product__product_id']}))"
                 )
                 product["product__category__title_ru"] += f"(({product['product__category__categoryId']}))"
 

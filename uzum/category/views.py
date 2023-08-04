@@ -234,7 +234,9 @@ class CategoryTopProductsView(ListAPIView):
         # Get the category
         category = get_object_or_404(Category, pk=category_id)
         # Get the descendant category IDs as a list of integers
+        print(category.descendants, "descendants")
         if not category.descendants:
+            print("it is here")
             descendant_ids = []
         else:
             descendant_ids = list(map(int, category.descendants.split(",")))

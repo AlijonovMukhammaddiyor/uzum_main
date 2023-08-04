@@ -97,10 +97,9 @@ class BannersView(APIView):
                 product["product__title"] += f"(({product['product__product_id']}))"
 
                 product["product__title_ru"] = (
-                    product["product__category__title_ru"]
-                    if product["product__category__title_ru"]
-                    else product["product__category__title"] + f"(({product['product__product_id']}))"
-                )
+                    product["product__title_ru"] if product["product__title_ru"] else product["product__title"]
+                ) + f"(({product['product__product_id']}))"
+
                 product["product__category__title_ru"] += f"(({product['product__category__categoryId']}))"
                 product["first_date"] = d[product["product__product_id"]]["earliest_date"].strftime("%Y-%m-%d")
                 product["last_date"] = d[product["product__product_id"]]["latest_date"].strftime("%Y-%m-%d")

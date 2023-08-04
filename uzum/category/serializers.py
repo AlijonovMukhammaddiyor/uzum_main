@@ -88,7 +88,9 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
         representation["shop_title"] = f"{representation['shop_title']} (({representation['shop_link']}))"
         representation["category_title"] = f"{representation['category_title']} (({representation['category_id']}))"
 
-        representation["product_title_ru"] = f"{representation['product_title_ru']} (({representation['product_id']}))"
+        representation[
+            "product_title_ru"
+        ] = f"{representation['product_title_ru'] if representation['product_title_ru'] else representation['product_title']} (({representation['product_id']}))"
         representation[
             "category_title_ru"
         ] = f"{representation['category_title_ru']} (({representation['category_id']}))"

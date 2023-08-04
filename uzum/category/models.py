@@ -132,7 +132,7 @@ class Category(models.Model):
         pass
 
     def get_category_descendants(self, include_self=False):
-        if self.descendants is None:
+        if not self.descendants:
             if include_self:
                 return [self]
             else:
