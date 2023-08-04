@@ -356,7 +356,7 @@ class ProductAnalytics(models.Model):
         try:
             yesterday_pretty = get_day_before_pretty(date_pretty)
             create_product_latestanalytics(yesterday_pretty)
-            ProductAnalytics.update_average_purchase_price(date_pretty)
+            # ProductAnalytics.update_average_purchase_price(date_pretty)
             ProductAnalytics.set_orders_money(date_pretty)
             ProductAnalytics.set_positions(date_pretty)
             ProductAnalytics.set_top_growing_products()
