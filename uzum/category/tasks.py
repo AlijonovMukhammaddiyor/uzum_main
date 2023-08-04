@@ -542,7 +542,7 @@ def update_category_tree_with_data(date_pretty=get_today_pretty()):
 
     # store in cache
     # cache.set("category_tree_data", category_tree, timeout=60 * 60 * 48)  # 48 hours
-    print("revenue tree: ", category_tree_revenue)
+    # print("revenue tree: ", category_tree_revenue)
 
     cache.set(
         "category_tree_revenue",
