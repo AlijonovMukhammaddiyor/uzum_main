@@ -211,10 +211,14 @@ class ProductAnalytics(models.Model):
                 """
                 UPDATE product_productanalytics PA
                 SET average_purchase_price = SA.avg_purchase_price
-                FROM (
-                    SELECT AVG(SA.purchase_price) as avg_purchase_price, S.product_id
+                    FROM (
+                        ELECT AVG(filtered_SA.purchase_price) as avg_purchase_price, S.product_id
                     FROM sku_sku S
-                    JOIN sku_skuanalytics SA ON S.sku = SA.sku_id AND SA.date_pretty = %s
+                    JOIN (
+                        SELECT *
+                        FROM sku_skuanalytics
+                        WHERE date_pretty = %s
+                    ) AS filtered_SA ON S.sku = filtered_SA.sku_id
                     GROUP BY S.product_id
                 ) SA
                 WHERE PA.product_id = SA.product_id AND PA.date_pretty = %s
