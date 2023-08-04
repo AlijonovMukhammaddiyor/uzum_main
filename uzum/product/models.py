@@ -211,8 +211,8 @@ class ProductAnalytics(models.Model):
                 """
                 UPDATE product_productanalytics PA
                 SET average_purchase_price = SA.avg_purchase_price
-                    FROM (
-                        ELECT AVG(filtered_SA.purchase_price) as avg_purchase_price, S.product_id
+                FROM (
+                    SELECT AVG(filtered_SA.purchase_price) as avg_purchase_price, S.product_id
                     FROM sku_sku S
                     JOIN (
                         SELECT *
