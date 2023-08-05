@@ -77,15 +77,9 @@ def create_products_from_api(
                 shops_dict=shops_dict,
                 badges_dict=badges_dict,
                 shop_analytics_done=shop_analytics_done,
+                current_analytic=latest_product_analytics_dict.get(product["id"], None),
             )
 
-            # add orders_money to product_analytic:
-            # orders_money = (orders_amount - latest_orders_amount) * average_pruchase_price
-            current_analytic = latest_product_analytics_dict.get(product["id"], None)
-            latest_orders_amount = current_analytic["latest_orders_amount"] if current_analytic else 0
-            product_analytic["orders_money"] = (
-                product_analytic["orders_amount"] - latest_orders_amount
-            ) * product_analytic["average_purchase_price"]
             products_analytics.append(product_analytic)
             product_skus_analytics.extend(sku_list_analytics)
             if len(badges) > 0:
