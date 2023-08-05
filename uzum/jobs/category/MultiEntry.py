@@ -94,7 +94,10 @@ def filter_categories(current: dict, categories_dict: dict, categories_list: lis
             return
 
         for child in current["children"]:
-            filter_categories(categories_dict[child], categories_dict, categories_list, n, memo)
+            try:
+                filter_categories(categories_dict[child], categories_dict, categories_list, n, memo)
+            except KeyError:
+                continue
 
         return
     except Exception as e:
