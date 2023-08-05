@@ -661,8 +661,10 @@ class CategoryPriceSegmentationView(APIView):
 
             # Add the parent category ID to the list
             descendant_ids.append(category_id)
+            print(descendant_ids)
             products = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
             df = pd.DataFrame(list(products.values("product_id", "avg_purchase_price")))
+            print(products.values("product_id", "avg_purchase_price"))
 
             # Calculate the number of distinct average purchase prices
             distinct_prices_count = df["avg_purchase_price"].nunique()
@@ -814,7 +816,7 @@ class CategoryShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class NicheSlectionView(APIView):
+class NicheSelectionView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     serializer_class = CategorySerializer
@@ -822,7 +824,7 @@ class NicheSlectionView(APIView):
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination
 
-    def get(self, request):
+    def get(self, request: Request):
         """
         Based on category analytics, returns the list of categories that are suitable for the niche
         Args:
@@ -832,13 +834,52 @@ class NicheSlectionView(APIView):
             _type_: _description_
         """
         try:
+            start = time.time()
             if check_user(request) is None:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-            term = request.query_params.get("term")
 
-            categories = Category.objects.filter(title__icontains=term).values("categoryId", "title")
+            search = request.query_params.get("search", "")
+            today_pretty = get_today_pretty_fake()
 
-            return Response(status=status.HTTP_200_OK, data=categories)
+            categories = (
+                Category.objects.filter(Q(ancestors__icontains=search) | Q(title__icontains=search))
+                .values(
+                    "categoryId",
+                    "title",
+                    "title_ru",
+                    "ancestors",
+                    "ancestors_ru",
+                    analytics=F("categoryanalytics__date_pretty"),
+                    total_products=F("categoryanalytics__total_products"),
+                    total_orders=F("categoryanalytics__total_orders"),
+                    total_reviews=F("categoryanalytics__total_reviews"),
+                    total_shops=F("categoryanalytics__total_shops"),
+                    total_shops_with_sales=F("categoryanalytics__total_shops_with_sales"),
+                    total_products_with_sales=F("categoryanalytics__total_products_with_sales"),
+                    average_purchase_price=F("categoryanalytics__average_purchase_price"),
+                    average_product_rating=F("categoryanalytics__average_product_rating"),
+                    total_orders_amount=F("categoryanalytics__total_orders_amount"),
+                )
+                .filter(categoryanalytics__date_pretty=today_pretty)
+            )
+
+            for category in categories:
+                category["title_ru"] += f"(({category['categoryId']}))"
+                category["title"] += f"(({category['categoryId']}))"
+            paginator = PageNumberPagination()
+            result_page = paginator.paginate_queryset(categories, request)
+
+            # for category in result_page:
+            #     category["ancestors"] += "/" + str(category["category_title"]) + ":" + str(category["categoryid"])
+            #     category["ancestors_ru"] += (
+            #         "/" + str(category["category_title_ru"]) + ":" + str(category["categoryid"])
+            #     )
+            #     category["category_title_ru"] += f"(({category['categoryid']}))"
+            #     category["category_title"] += f"(({category['categoryid']}))"
+
+            print("NicheSelectionView took", time.time() - start)
+            return paginator.get_paginated_response(result_page)
+
         except Exception as e:
             print("Error in NicheSlectionView: ", e)
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
