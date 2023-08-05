@@ -21,6 +21,7 @@ def prepareProductData(
     shops_dict: dict,
     badges_dict: dict,
     shop_analytics_done: dict,
+    current_analytic: dict = None,
 ):
     try:
         result = None
@@ -166,6 +167,19 @@ def prepareProductData(
             result = Product(**result)
 
         # analytics
+        latest_orders_amount = current_analytic["latest_orders_amount"] if current_analytic else 0
+        # product_analytic["orders_money"] = (
+        #         product_analytic["orders_amount"] - latest_orders_amount
+        #     ) * product_analytic["average_purchase_price"]
+        average_purchase_price = sum([sku["purchasePrice"] for sku in product_api["skuList"]]) / len(
+            product_api["skuList"]
+        )
+        latest_orders_money = current_analytic["latest_orders_money"] if current_analytic else 0
+
+        new_orders_money = latest_orders_money + (
+            (product_api["ordersAmount"] - latest_orders_amount) * average_purchase_price
+        )
+
         analytics = {
             "created_at": datetime.now(tz=pytz.timezone("Asia/Tashkent")),
             "reviews_amount": product_api["reviewsAmount"],
@@ -176,6 +190,7 @@ def prepareProductData(
             # get average of purchase_price from skuList
             "average_purchase_price": sum([sku["purchasePrice"] for sku in product_api["skuList"]])
             / len(product_api["skuList"]),
+            "orders_money": max(new_orders_money, 0),
         }
 
         for sku_api in product_api["skuList"]:
