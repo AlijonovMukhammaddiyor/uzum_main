@@ -81,7 +81,7 @@ def create_products_from_api(
 
             # add orders_money to product_analytic:
             # orders_money = (orders_amount - latest_orders_amount) * average_pruchase_price
-            current_analytic = latest_product_analytics_dict.get(product_analytic["product_id"], None)
+            current_analytic = latest_product_analytics_dict.get(product["id"], None)
             latest_orders_amount = current_analytic["latest_orders_amount"] if current_analytic else 0
             product_analytic["orders_money"] = (
                 product_analytic["orders_amount"] - latest_orders_amount
