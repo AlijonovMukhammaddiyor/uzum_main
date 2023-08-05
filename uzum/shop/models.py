@@ -198,3 +198,37 @@ class ShopAnalytics(models.Model):
                 )
         except Exception as e:
             print(e, "Error in set_total_revenue")
+
+
+class ShopAnalyticsTable(models.Model):
+    date_pretty = models.CharField(max_length=255, db_index=True, primary_key=True)
+    total_revenue = models.FloatField()
+    total_reviews = models.IntegerField()
+    total_orders = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False  # No database table creation or deletion operations will be performed for this model.
+        db_table = "shop_analytics"
+
+
+def create_shop_analytics_table():
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            DROP TABLE IF EXISTS shop_analytics
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS shop_analytics (
+                date_pretty date NOT NULL,
+                total_revenue float,
+                total_reviews int,
+                total_orders int,
+                created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (date_pretty)
+            )
+            """
+        )

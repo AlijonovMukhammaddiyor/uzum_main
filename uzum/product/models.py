@@ -354,10 +354,10 @@ class ProductAnalytics(models.Model):
     @staticmethod
     def update_analytics(date_pretty: str):
         try:
-            yesterday_pretty = get_day_before_pretty(date_pretty)
-            create_product_latestanalytics(yesterday_pretty)
+            # yesterday_pretty = get_day_before_pretty(date_pretty)
+            # create_product_latestanalytics(yesterday_pretty)
             # ProductAnalytics.update_average_purchase_price(date_pretty)
-            ProductAnalytics.set_orders_money(date_pretty)
+            # ProductAnalytics.set_orders_money(date_pretty)
             ProductAnalytics.set_positions(date_pretty)
             ProductAnalytics.set_top_growing_products()
         except Exception as e:

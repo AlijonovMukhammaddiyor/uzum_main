@@ -30,13 +30,17 @@ class Category(models.Model):
 
     descendants = models.TextField(null=True, blank=True)  # descendant categoryIds separated by comma
     ancestors = models.TextField(null=True, blank=True)
+    ancestors_ru = models.TextField(null=True, blank=True)  # new field for Russian ancestors
 
-    def generate_ancestors_string(self):
+    def generate_ancestors_string(self, language="en"):
         current_category = self
         ancestors = []
 
         while current_category.parent:
-            ancestors.append(current_category.parent.title + ":" + str(current_category.parent.categoryId))
+            if language == "ru":
+                ancestors.append(current_category.parent.title_ru + ":" + str(current_category.parent.categoryId))
+            else:
+                ancestors.append(current_category.parent.title + ":" + str(current_category.parent.categoryId))
             current_category = current_category.parent
 
         # reverse the list since we want to start from the root
@@ -48,15 +52,17 @@ class Category(models.Model):
     @staticmethod
     def update_ancestors():
         """
-        Updates ancestors field of all categories.
+        Updates ancestors and ancestors_ru field of all categories.
         """
         i = 0
-        categories = Category.objects.all()
+        categories = Category.objects.filter(ancestors_ru=None)
         for category in categories:
             print(i)
             i += 1
             ancestors = category.generate_ancestors_string()
+            ancestors_ru = category.generate_ancestors_string("ru")  # generate Russian ancestors
             category.ancestors = ancestors
+            category.ancestors_ru = ancestors_ru  # update Russian ancestors
             category.save()
 
     def __str__(self):

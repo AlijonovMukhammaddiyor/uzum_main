@@ -25,7 +25,7 @@ from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
 from uzum.review.views import CookieJWTAuthentication
-from uzum.shop.models import Shop, ShopAnalytics
+from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsTable
 from uzum.utils.general import (
     check_user,
     get_day_before_pretty,
@@ -1235,28 +1235,14 @@ class UzumTotalOrders(APIView):
         try:
             user: User = request.user
             days = 60 if user.is_proplus else 30
-            start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=0, minute=0, second=0, microsecond=0)
+            # start_date = timezone.make_aware(
+            #     datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
+            # ).replace(hour=0, minute=0, second=0, microsecond=0)
 
-            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
-                # end date is end of yesterday
-                end_date = timezone.make_aware(
-                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
-                ).replace(hour=23, minute=59, second=59, microsecond=999999)
-            else:
-                # end date is end of today
-                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
-                    hour=23, minute=59, second=59, microsecond=999999
-                )
+            data = ShopAnalyticsTable.objects.all().values("date_pretty", "total_orders").order_by("date_pretty")
 
-            # Group by date_pretty and calculate the sum of total_orders for each day
-            data = (
-                ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
-                .values("date_pretty")
-                .annotate(total_orders=Sum("total_orders"))
-                .order_by("date_pretty")
-            )
+            # exclude "2023-06-22" and "2023-07-23"
+            data = [d for d in data if d["date_pretty"] not in ["2023-06-22", "2023-07-23"]][days * -1 :]
 
             return Response(list(data), status=status.HTTP_200_OK)
 
@@ -1283,28 +1269,14 @@ class UzumTotalReviews(APIView):
         try:
             user: User = request.user
             days = 60 if user.is_proplus else 30
-            start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=0, minute=0, second=0, microsecond=0)
+            # start_date = timezone.make_aware(
+            #     datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
+            # ).replace(hour=0, minute=0, second=0, microsecond=0)
 
-            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
-                # end date is end of yesterday
-                end_date = timezone.make_aware(
-                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
-                ).replace(hour=23, minute=59, second=59, microsecond=999999)
-            else:
-                # end date is end of today
-                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
-                    hour=23, minute=59, second=59, microsecond=999999
-                )
+            data = ShopAnalyticsTable.objects.all().values("date_pretty", "total_reviews").order_by("date_pretty")
 
-            # Group by date_pretty and calculate the sum of total_orders for each day
-            data = (
-                ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
-                .values("date_pretty")
-                .annotate(total_reviews=Sum("total_reviews"))
-                .order_by("date_pretty")
-            )
+            # exclude "2023-06-22" and "2023-07-23"
+            data = [d for d in data if d["date_pretty"] not in ["2023-06-22", "2023-07-23"]][days * -1 :]
 
             return Response(list(data), status=status.HTTP_200_OK)
 
@@ -1331,28 +1303,14 @@ class UzumTotalRevenue(APIView):
         try:
             user: User = request.user
             days = 60 if user.is_proplus else 30
-            start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=0, minute=0, second=0, microsecond=0)
+            # start_date = timezone.make_aware(
+            #     datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
+            # ).replace(hour=0, minute=0, second=0, microsecond=0)
 
-            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
-                # end date is end of yesterday
-                end_date = timezone.make_aware(
-                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
-                ).replace(hour=23, minute=59, second=59, microsecond=999999)
-            else:
-                # end date is end of today
-                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
-                    hour=23, minute=59, second=59, microsecond=999999
-                )
+            data = ShopAnalyticsTable.objects.all().values("date_pretty", "total_revenue").order_by("date_pretty")
 
-            # Group by date_pretty and calculate the sum of total_orders for each day
-            data = (
-                ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
-                .values("date_pretty")
-                .annotate(total_revenue=Sum("total_revenue"))
-                .order_by("date_pretty")
-            )
+            # exclude "2023-06-22" and "2023-07-23"
+            data = [d for d in data if d["date_pretty"] not in ["2023-06-22", "2023-07-23"]][days * -1 :]
 
             return Response(list(data), status=status.HTTP_200_OK)
 
@@ -1415,6 +1373,7 @@ class UzumTotalShops(APIView):
                 end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
                     hour=23, minute=59, second=59, microsecond=999999
                 )
+
             product_analytics = ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
             daily_totals = (
                 product_analytics.values("date_pretty")
