@@ -5,7 +5,7 @@ from uzum.badge.models import Badge
 from uzum.jobs.product.create_products import prepareProductData
 from uzum.jobs.seller.MultiEntry import create_shop_analytics_bulk
 from uzum.jobs.sku.MultiEntry import create_sku_analytics_bulk, create_skus_bulk
-from uzum.product.models import Product, ProductAnalytics
+from uzum.product.models import LatestProductAnalyticsView, Product, ProductAnalytics
 from uzum.shop.models import Shop
 
 
@@ -47,6 +47,11 @@ def create_products_from_api(
 
         shops = Shop.objects.all()
         shops_dict = {shop.seller_id: shop for shop in shops}
+        latest_product_analytics = LatestProductAnalyticsView.objects.values(
+            "product_id", "latest_orders_money", "latest_orders_amount"
+        )
+
+        latest_product_analytics_dict = {item["product_id"]: item for item in latest_product_analytics}
 
         badges_ = Badge.objects.all()
         badges_dict = {badge.badge_id: badge for badge in badges_}
@@ -74,6 +79,13 @@ def create_products_from_api(
                 shop_analytics_done=shop_analytics_done,
             )
 
+            # add orders_money to product_analytic:
+            # orders_money = (orders_amount - latest_orders_amount) * average_pruchase_price
+            current_analytic = latest_product_analytics_dict.get(product_analytic["product_id"], None)
+            latest_orders_amount = current_analytic["latest_orders_amount"] if current_analytic else 0
+            product_analytic["orders_money"] = (
+                product_analytic["orders_amount"] - latest_orders_amount
+            ) * product_analytic["average_purchase_price"]
             products_analytics.append(product_analytic)
             product_skus_analytics.extend(sku_list_analytics)
             if len(badges) > 0:

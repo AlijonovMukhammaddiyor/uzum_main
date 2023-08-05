@@ -4,7 +4,7 @@ import json
 import time
 import traceback
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 import pytz
@@ -29,11 +29,11 @@ from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.jobs.product.fetch_details import get_product_details_via_ids
 from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
 from uzum.jobs.product.MultiEntry import create_products_from_api
-from uzum.product.models import Product, ProductAnalytics
+from uzum.product.models import Product, ProductAnalytics, create_product_latestanalytics
 from uzum.review.models import PopularSeaches
 from uzum.shop.models import Shop, ShopAnalytics
 from uzum.sku.models import SkuAnalytics
-from uzum.utils.general import get_today_pretty
+from uzum.utils.general import get_day_before_pretty, get_today_pretty
 
 
 @celery_app.task(
@@ -66,6 +66,10 @@ def update_uzum_data(args=None, **kwargs):
     shop_analytics_done = {}
 
     BATCH_SIZE = 10_000
+
+    print("Creatig create_product_latestanalytics")
+    start = time.time()
+    create_product_latestanalytics(get_day_before_pretty(date_pretty))
 
     for i in range(0, len(product_ids), BATCH_SIZE):
         products_api: list[dict] = []
@@ -140,11 +144,6 @@ def update_uzum_data(args=None, **kwargs):
     create_materialized_view(date_pretty)
     print(f"Materialized View created in {time.time() - start} seconds")
 
-    print("Updating category tree...")
-    update_category_tree()
-
-    update_category_tree_with_data()
-
     Banner.set_products()
     print("Uzum data updated...")
     return True
@@ -174,7 +173,6 @@ def update_all_category_parents():
             cat.parent = parent
             cat.save()
             # print(f"Category {cat.title} parent set to {parent.title}")
-
     except Exception as e:
         print("Error in update_all_category_parents:", e)
         traceback.print_exc()
@@ -191,6 +189,16 @@ def update_analytics(date_pretty: str):
         start = time.time()
         CategoryAnalytics.update_analytics(date_pretty)
         print(f"CategoryAnalytics updated in {time.time() - start} seconds")
+
+        print(f"Creating latest analytics for {date_pretty}...")
+        create_product_latestanalytics(date_pretty=date_pretty)
+        insert_shop_analytics(date_pretty=date_pretty)
+
+        print("Updating category tree...")
+        update_category_tree()
+
+        update_category_tree_with_data()
+
     except Exception as e:
         print("Error in update_analytics:", e)
         traceback.print_exc()
@@ -256,6 +264,36 @@ def add_product_russian_titles():
         print("Error in add_russian_titles: ", e)
         traceback.print_exc()
         return None
+
+
+def insert_shop_analytics(date_pretty):
+    date = (
+        pytz.timezone("Asia/Tashkent")
+        .localize(datetime.strptime(date_pretty, "%Y-%m-%d"))
+        .replace(hour=23, minute=59, second=59, microsecond=999999)
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO shop_analytics (date_pretty, total_revenue, total_reviews, total_orders)
+            SELECT
+                '{date_pretty}' AS date_pretty,
+                SUM(total_revenue) as total_revenue,
+                SUM(total_reviews) as total_reviews,
+                SUM(total_orders) as total_orders
+            FROM (
+                SELECT DISTINCT ON (shop_id)
+                    shop_id,
+                    total_revenue,
+                    total_reviews,
+                    total_orders
+                FROM shop_shopanalytics
+                WHERE created_at <= '{date}'
+                ORDER BY shop_id, created_at DESC
+            ) AS latest_shop_analytics
+            """
+        )
 
 
 def fetch_failed_products(product_ids: list[int]):
