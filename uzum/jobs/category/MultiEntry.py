@@ -97,6 +97,8 @@ def filter_categories(current: dict, categories_dict: dict, categories_list: lis
             try:
                 filter_categories(categories_dict[child], categories_dict, categories_list, n, memo)
             except KeyError:
+                print(f"KeyError in filter_categories: {child}")
+                traceback.print_exc()
                 continue
 
         return
