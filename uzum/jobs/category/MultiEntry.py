@@ -1,6 +1,7 @@
 import traceback
 
 from uzum.category.models import Category, CategoryAnalytics
+from uzum.jobs.category.utils import get_categories_tree
 from uzum.utils.general import get_today_pretty
 
 
@@ -156,5 +157,60 @@ def get_categories_with_less_than_n_products_for_russian_title(n, cat_totals: di
         return filtered_categories
     except Exception as e:
         print(f"Error in getCategoriesWithLessThanNProducts for title: {e}")
+        print(traceback.print_exc())
+        return None
+
+
+def get_categories_with_less_than_n_products2(n):
+    """
+    Get categories with less than n products
+    Args:
+        n (int):   number of products
+    Returns:
+        Array: [{
+                categoryId: total_products
+            }]
+    """
+    try:
+        # all_categories = sync_to_async(Category.objects.all().order_by("categoryId"))
+        # order_by("categoryId")
+        all_category_analytics = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty()).order_by(
+            "category__categoryId"
+        )
+        print(
+            f"getCategoriesWithLessThanNProducts: all category analytics fetched {len(all_category_analytics)}",
+        )
+        category_tree = get_categories_tree()
+        cat_dict = {category["category"]["id"]: category["total"] for category in category_tree}
+
+        # 1. make dict of all categories: key - categoryId, value - total_products and children
+        # children is ManyToManey field to itself. We need to get list children's categoryId
+        all_categories_dict = {}
+
+        for category in all_category_analytics:
+            all_categories_dict[category.category.categoryId] = {
+                "categoryId": category.category.categoryId,
+                "total_products": cat_dict[category.category.categoryId]
+                if category.category.categoryId in cat_dict
+                else 0,
+                "children": list(category.category.child_categories.values_list("categoryId", flat=True)),
+            }
+
+        filtered_categories = []
+
+        filter_categories(all_categories_dict[1], all_categories_dict, filtered_categories, n, {})
+
+        print(f"getCategoriesWithLessThanNProducts: {len(filtered_categories)} categories found")
+
+        # calculate total products for all filtered categories
+        total = 0
+        for category in filtered_categories:
+            total += category["total_products"]
+
+        print(f"getCategoriesWithLessThanNProducts: {total} products found")
+
+        return filtered_categories
+    except Exception as e:
+        print(f"Error in getCategoriesWithLessThanNProducts: {e}")
         print(traceback.print_exc())
         return None

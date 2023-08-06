@@ -171,14 +171,15 @@ def prepareProductData(
         # product_analytic["orders_money"] = (
         #         product_analytic["orders_amount"] - latest_orders_amount
         #     ) * product_analytic["average_purchase_price"]
-        average_purchase_price = sum([sku["purchasePrice"] for sku in product_api["skuList"]]) / len(
-            product_api["skuList"]
+        average_purchase_price = sum([sku["purchasePrice"] for sku in product_api["skuList"]]) / (
+            len(product_api["skuList"] if len(product_api["skuList"]) > 0 else 1)
         )
-        latest_orders_money = current_analytic["latest_orders_money"] if current_analytic else 0
+        # latest_orders_money = current_analytic["latest_orders_money"] if current_analytic else 0
 
-        new_orders_money = latest_orders_money + (
-            (product_api["ordersAmount"] - latest_orders_amount) * average_purchase_price
-        )
+        # new_orders_money = latest_orders_money + (
+        #     (product_api["ordersAmount"] - latest_orders_amount)
+        #     * (average_purchase_price if average_purchase_price else 0)
+        # )
 
         analytics = {
             "created_at": datetime.now(tz=pytz.timezone("Asia/Tashkent")),
@@ -188,9 +189,8 @@ def prepareProductData(
             "orders_amount": product_api["ordersAmount"],
             "product_id": product_api["id"],
             # get average of purchase_price from skuList
-            "average_purchase_price": sum([sku["purchasePrice"] for sku in product_api["skuList"]])
-            / len(product_api["skuList"]),
-            "orders_money": max(new_orders_money, 0),
+            "average_purchase_price": average_purchase_price if average_purchase_price else 0,
+            "orders_money": 0,
         }
 
         for sku_api in product_api["skuList"]:
