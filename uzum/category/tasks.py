@@ -21,6 +21,7 @@ from uzum.jobs.campaign.utils import associate_with_shop_or_product
 from uzum.jobs.category.main import create_and_update_categories
 from uzum.jobs.category.MultiEntry import (
     get_categories_with_less_than_n_products,
+    get_categories_with_less_than_n_products2,
     get_categories_with_less_than_n_products_for_russian_title,
 )
 from uzum.jobs.category.utils import add_russian_titles, get_categories_tree
@@ -317,7 +318,7 @@ def fetch_failed_products(product_ids: list[int]):
 def fetch_product_ids(date_pretty: str = get_today_pretty()):
     # create_and_update_categories()
 
-    categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
+    categories_filtered = get_categories_with_less_than_n_products2(MAX_ID_COUNT)
     product_ids: list[int] = []
     async_to_sync(get_all_product_ids_from_uzum)(categories_filtered, product_ids, page_size=PAGE_SIZE)
     product_ids = set(int(id) for id in product_ids)
