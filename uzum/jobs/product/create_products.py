@@ -172,7 +172,7 @@ def prepareProductData(
         #         product_analytic["orders_amount"] - latest_orders_amount
         #     ) * product_analytic["average_purchase_price"]
         average_purchase_price = sum([sku["purchasePrice"] for sku in product_api["skuList"]]) / (
-            len(product_api["skuList"] if len(product_api["skuList"]) > 0 else 1)
+            len(product_api["skuList"]) if len(product_api["skuList"]) > 0 else 1
         )
         # latest_orders_money = current_analytic["latest_orders_money"] if current_analytic else 0
 
