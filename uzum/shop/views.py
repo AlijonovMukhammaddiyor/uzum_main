@@ -68,6 +68,24 @@ class Top5ShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class AllShopsView(APIView):
+    permission_classes = [AllowAny]
+    serializer_class = ShopSerializer
+    queryset = Shop.objects.all()
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Shop"])
+    def get(self, request: Request):
+        try:
+            shops = Shop.objects.all().values("title", "link")
+
+            return Response(shops, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class CurrentShopView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = [JWTAuthentication]

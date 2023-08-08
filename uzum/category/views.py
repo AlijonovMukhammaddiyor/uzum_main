@@ -841,33 +841,73 @@ class NicheSelectionView(APIView):
             search = request.query_params.get("search", "")
             today_pretty = get_today_pretty_fake()
 
-            categories = (
-                Category.objects.filter(Q(ancestors__icontains=search) | Q(title__icontains=search))
-                .values(
-                    "categoryId",
-                    "title",
-                    "title_ru",
-                    "ancestors",
-                    "ancestors_ru",
-                    analytics=F("categoryanalytics__date_pretty"),
-                    total_products=F("categoryanalytics__total_products"),
-                    total_orders=F("categoryanalytics__total_orders"),
-                    total_reviews=F("categoryanalytics__total_reviews"),
-                    total_shops=F("categoryanalytics__total_shops"),
-                    total_shops_with_sales=F("categoryanalytics__total_shops_with_sales"),
-                    total_products_with_sales=F("categoryanalytics__total_products_with_sales"),
-                    average_purchase_price=F("categoryanalytics__average_purchase_price"),
-                    average_product_rating=F("categoryanalytics__average_product_rating"),
-                    total_orders_amount=F("categoryanalytics__total_orders_amount"),
-                )
-                .filter(categoryanalytics__date_pretty=today_pretty)
+            # categories = (
+            #     Category.objects.filter(Q(ancestors__icontains=search) | Q(title__icontains=search))
+            #     .values(
+            #         "categoryId",
+            #         "title",
+            #         "title_ru",
+            #         "ancestors",
+            #         "ancestors_ru",
+            #         analytics=F("categoryanalytics__date_pretty"),
+            #         total_products=F("categoryanalytics__total_products"),
+            #         total_orders=F("categoryanalytics__total_orders"),
+            #         total_reviews=F("categoryanalytics__total_reviews"),
+            #         total_shops=F("categoryanalytics__total_shops"),
+            #         total_shops_with_sales=F("categoryanalytics__total_shops_with_sales"),
+            #         total_products_with_sales=F("categoryanalytics__total_products_with_sales"),
+            #         average_purchase_price=F("categoryanalytics__average_purchase_price"),
+            #         average_product_rating=F("categoryanalytics__average_product_rating"),
+            #         total_orders_amount=F("categoryanalytics__total_orders_amount"),
+            #     )
+            #     .filter(categoryanalytics__date_pretty=today_pretty)
+            # )
+
+            categories = CategoryAnalytics.objects.filter(
+                Q(category__ancestors__icontains=search) | Q(category__title__icontains=search),
+                date_pretty=today_pretty,
+            ).values(
+                "category__categoryId",
+                "category__title",
+                "category__title_ru",
+                "category__ancestors",
+                "category__ancestors_ru",
+                "date_pretty",
+                "total_products",
+                "total_orders",
+                "total_reviews",
+                "total_shops",
+                "total_shops_with_sales",
+                "total_products_with_sales",
+                "average_purchase_price",
+                "average_product_rating",
+                "total_orders_amount",
             )
 
             for category in categories:
-                category["title_ru"] += f"(({category['categoryId']}))"
-                category["title"] += f"(({category['categoryId']}))"
-            paginator = PageNumberPagination()
-            result_page = paginator.paginate_queryset(categories, request)
+                if category["category__categoryId"] != 1 and category["category__ancestors_ru"]:
+                    category["category__ancestors_ru"] = (
+                        category["category__ancestors_ru"]
+                        if category["category__ancestors_ru"]
+                        else category["category__ancestors"]
+                    ) + f"/{category['category__title_ru']}:{category['category__categoryId']}"
+
+                    category[
+                        "category__ancestors"
+                    ] += f"/{category['category__title']}:{category['category__categoryId']}"
+                elif category["category__categoryId"] == 1:
+                    category["category__ancestors_ru"] = (
+                        category["category__title_ru"] + f":{category['category__categoryId']}"
+                    )
+                    category["category__ancestors"] = (
+                        category["category__title"] + f":{category['category__categoryId']}"
+                    )
+                category["category__title_ru"] = (
+                    category["category__title_ru"] if category["category__title_ru"] else category["category__title"]
+                ) + f"(({category['category__categoryId']}))"
+                category["category__title"] += f"(({category['category__categoryId']}))"
+
+                del category["category__categoryId"]
 
             # for category in result_page:
             #     category["ancestors"] += "/" + str(category["category_title"]) + ":" + str(category["categoryid"])
@@ -878,10 +918,17 @@ class NicheSelectionView(APIView):
             #     category["category_title"] += f"(({category['categoryid']}))"
 
             print("NicheSelectionView took", time.time() - start)
-            return paginator.get_paginated_response(result_page)
+            return Response(
+                status=status.HTTP_200_OK,
+                data={
+                    "data": categories,
+                    "total": len(categories),
+                },
+            )
 
         except Exception as e:
             print("Error in NicheSlectionView: ", e)
+            traceback.print_exc()
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
 
 
