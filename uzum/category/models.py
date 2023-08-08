@@ -55,7 +55,7 @@ class Category(models.Model):
         Updates ancestors and ancestors_ru field of all categories.
         """
         i = 0
-        categories = Category.objects.filter(ancestors_ru=None)
+        categories = Category.objects.filter(models.Q(ancestors="") | models.Q(ancestors_ru=""))
         for category in categories:
             print(i)
             i += 1
