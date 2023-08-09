@@ -25,7 +25,6 @@ class UserAdminCreationForm(admin_forms.UserCreationForm):
             "email",
             "phone_number",
             "password",
-            "shop",
             "is_superuser",
             "is_staff",
         ]

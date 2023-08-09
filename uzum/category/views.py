@@ -866,6 +866,7 @@ class NicheSelectionView(APIView):
             categories = CategoryAnalytics.objects.filter(
                 Q(category__ancestors__icontains=search) | Q(category__title__icontains=search),
                 date_pretty=today_pretty,
+                category__child_categories__isnull=True,
             ).values(
                 "category__categoryId",
                 "category__title",
@@ -908,14 +909,6 @@ class NicheSelectionView(APIView):
                 category["category__title"] += f"(({category['category__categoryId']}))"
 
                 del category["category__categoryId"]
-
-            # for category in result_page:
-            #     category["ancestors"] += "/" + str(category["category_title"]) + ":" + str(category["categoryid"])
-            #     category["ancestors_ru"] += (
-            #         "/" + str(category["category_title_ru"]) + ":" + str(category["categoryid"])
-            #     )
-            #     category["category_title_ru"] += f"(({category['categoryid']}))"
-            #     category["category_title"] += f"(({category['categoryid']}))"
 
             print("NicheSelectionView took", time.time() - start)
             return Response(
