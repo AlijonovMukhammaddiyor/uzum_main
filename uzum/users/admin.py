@@ -17,7 +17,7 @@ class CustomUserAdmin(auth_admin.UserAdmin):
     fieldsets = (
         (None, {"fields": ("username", "password")}),
         ("Personal Info", {"fields": ("first_name", "last_name", "phone_number", "email")}),
-        ("Additional Info", {"fields": ("fingerprint", "referred_by", "referral_code", "shop", "is_developer")}),
+        ("Additional Info", {"fields": ("fingerprint", "referred_by", "referral_code", "is_developer")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
         ("Subscription", {"fields": ("is_pro", "is_proplus")}),

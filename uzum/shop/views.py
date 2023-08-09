@@ -117,8 +117,8 @@ class TreemapShopsView(APIView):
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             shops = (
                 ShopAnalytics.objects.filter(date_pretty=get_today_pretty_fake())
-                .order_by("-total_products")
-                .values("shop__title", "shop__link", "total_orders", "total_products", "total_reviews")
+                .order_by("-total_revenue")
+                .values("shop__title", "shop__link", "total_orders", "total_products", "total_reviews", "total_revenue")
             )
 
             totals = get_totals(get_today_pretty_fake())

@@ -21,6 +21,7 @@ from twilio.base.exceptions import TwilioRestException
 from twilio.rest import Client
 
 from config.settings.base import env
+from uzum.shop.models import Shop
 from uzum.users.api.serializers import (
     CheckUserNameAndPhoneSerializer,
     LogOutSerializer,
@@ -40,6 +41,79 @@ verify = client.verify.services(env("TWILIO_VERIFY_SERVICE_SID"))
 
 # Disable twilio logs
 # logging.getLogger("twilio").setLevel(logging.INFO)
+
+
+class SetShopsView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["POST"]
+
+    def post(self, request: Request):
+        try:
+            data = request.data
+            shop_ids = data.get("shop_ids")
+            if not shop_ids:
+                return Response(status=400, data={"message": "Shop ids are required"})
+            user: User = request.user
+            is_pro = user.is_pro
+
+            if not is_pro and not user.is_proplus:
+                return Response(status=400, data={"message": "You are not a pro user"})
+
+            if is_pro:
+                # only 2 shops is allowed for pro users
+                if len(shop_ids) == 0:
+                    return Response(status=400, data={"message": "Iltimos, 2 tagacha do'kon tanlang"})
+
+                if len(shop_ids) > 2:
+                    return Response(status=400, data={"message": "Iltimos, 2 tagacha do'kon tanlang"})
+
+                shop_id = int(shop_ids[0])
+                shop = Shop.objects.get(seller_id=shop_id)
+                account_id = shop.account_id
+
+                for shop_id in shop_ids:
+                    shop = Shop.objects.get(seller_id=shop_id)
+                    if shop.account_id != account_id:
+                        return Response(status=400, data={"message": "Do'konlar bir xisobga tegishli bo'lishi kerak"})
+
+                shop_id = int(shop_ids[0])
+                shop = Shop.objects.get(seller_id=shop_id)
+                user.shops.clear()
+                user.shops.add(shop)
+
+                if len(shop_ids) == 2:
+                    shop_id = int(shop_ids[1])
+                    shop = Shop.objects.get(seller_id=shop_id)
+                    user.shops.add(shop)
+
+            elif user.is_proplus:
+                #  5 shops is allowed for proplus users
+                if len(shop_ids) == 0:
+                    return Response(status=400, data={"message": "Iltimos, 5 tagacha do'kon tanlang"})
+
+                if len(shop_ids) > 5:
+                    return Response(status=400, data={"message": "Iltimos, 5 tagacha do'kon tanlang"})
+
+                shop_id = int(shop_ids[0])
+                shop = Shop.objects.get(seller_id=shop_id)
+                account_id = shop.account_id
+
+                for shop_id in shop_ids:
+                    shop = Shop.objects.get(seller_id=shop_id)
+                    if shop.account_id != account_id:
+                        return Response(status=400, data={"message": "Do'konlar bir xisobga tegishli bo'lishi kerak"})
+
+                user.shops.clear()
+
+                for shop_id in shop_ids:
+                    shop = Shop.objects.get(seller_id=shop_id)
+                    user.shops.add(shop)
+            user.save()
+            return Response(status=200, data={"message": "Shops successfully set"})
+        except Exception as e:
+            print("Error in SetShopsView: ", e)
+            return Response(status=500, data={"message": "Internal server error"})
 
 
 class VerificationSendView(APIView):

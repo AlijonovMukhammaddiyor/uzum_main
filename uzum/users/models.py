@@ -35,12 +35,13 @@ class User(AbstractUser):
     referred_by = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL)
     referral_code = models.CharField(unique=True, max_length=6)
 
-    shop = models.ForeignKey("shop.Shop", null=True, blank=True, on_delete=models.SET_NULL)
+    shops = models.ManyToManyField("shop.Shop", blank=True)
 
     is_developer = models.BooleanField(default=False, null=True, blank=True)
     is_proplus = models.BooleanField(default=False, null=True, blank=True)
     is_pro = models.BooleanField(default=True, null=True, blank=True)
-    # 1 day, trial ends
+    is_enterprise = models.BooleanField(default=False, null=True, blank=True)
+
     trial_end = models.DateTimeField(default=get_current_time, null=True, blank=True)
     is_paid = models.BooleanField(default=False, null=True, blank=True)
 
