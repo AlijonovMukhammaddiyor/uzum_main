@@ -58,8 +58,8 @@ class Top5ShopsView(APIView):
             date_pretty = get_today_pretty_fake()
             shops = (
                 ShopAnalytics.objects.filter(date_pretty=date_pretty)
-                .order_by("-total_orders")[:5]
-                .values("shop__title", "total_orders")
+                .order_by("-total_revenue")[:5]
+                .values("shop__title", "total_revenue")
             )
 
             return Response(shops, status=status.HTTP_200_OK)

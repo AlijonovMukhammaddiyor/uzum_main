@@ -1,5 +1,7 @@
+from collections import defaultdict
 import uuid
 from datetime import datetime
+from statsmodels.nonparametric.smoothers_lowess import lowess
 
 import numpy as np
 import pandas as pd
@@ -416,67 +418,71 @@ class CategoryAnalytics(models.Model):
             print(e, "Error in update_analytics")
 
     @staticmethod
-    def set_top_growing_categories_ema():
-        # Set date range (last 50 days)
-        end_date = timezone.make_aware(
-            datetime.strptime(get_today_pretty(), "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-        ).replace(hour=23, minute=59, second=59, microsecond=0)
-        start_date = end_date - pd.DateOffset(days=50)
+    def set_top_growing_categories():
+        # Helper function to calculate growth rate using linear regression
+        def calculate_growth_rate(metric, smoothing_window=7):
+            daily_metrics = defaultdict(list)
 
-        # Retrieve category sales data for the last 50 days
-        sales_data = CategoryAnalytics.objects.filter(
-            created_at__range=[start_date, end_date], category__descendants=None
-        ).values("category__categoryId", "created_at", "total_orders")
-
-        # Convert QuerySet to DataFrame
-        sales_df = pd.DataFrame.from_records(sales_data)
-
-        # Make sure created_at is a datetime type
-        sales_df["created_at"] = pd.to_datetime(sales_df["created_at"])
-
-        # Set created_at as index (required for rolling function)
-        sales_df = sales_df.set_index("created_at").sort_index()
-
-        # Group by category and calculate the 3-day, 7-day, 14-day, 21-day, 30-day, and 50-day EMA of sales
-        for span in [3, 7, 14, 21, 30, 50]:
-            sales_df[f"ema_{span}_days"] = sales_df.groupby("category__categoryId")["total_orders"].transform(
-                lambda x: x.ewm(span=span).mean()
+            analytics_data = (
+                CategoryAnalytics.objects.filter(category__child_categories__isnull=True)
+                .values("category", "created_at", metric)
+                .order_by("category", "created_at")
             )
 
-        # Calculate trend indicators (ratios of EMAs)
-        sales_df["trend_3_to_7"] = sales_df["ema_3_days"] / sales_df["ema_7_days"]
-        sales_df["trend_7_to_14"] = sales_df["ema_7_days"] / sales_df["ema_14_days"]
-        sales_df["trend_7_to_21"] = sales_df["ema_7_days"] / sales_df["ema_21_days"]
-        sales_df["trend_14_to_30"] = sales_df["ema_14_days"] / sales_df["ema_30_days"]
-        sales_df["trend_21_to_50"] = sales_df["ema_21_days"] / sales_df["ema_50_days"]
+            print("Length of analytics_data: ", len(analytics_data))
+            previous_entry = None
 
-        # Reset index (to allow the next operations)
-        sales_df = sales_df.reset_index()
+            for entry in analytics_data:
+                if previous_entry and entry["category"] == previous_entry["category"]:
+                    daily_revenue = entry[metric] - previous_entry[metric]
+                    daily_metrics[entry["category"]].append((entry["created_at"], daily_revenue))
+                else:
+                    daily_metrics[entry["category"]].append((entry["created_at"], entry[metric]))
+                previous_entry = entry
 
-        # Get the last day (most recent) of trend indicators for each category
-        sales_df = sales_df.groupby("category__categoryId").last()
+            # Smooth the data using LOESS
+            smoothed_metrics = defaultdict(list)
+            for category, data in daily_metrics.items():
+                dates, revenues = zip(*data)
 
-        # Only consider categories with total orders greater than 100
-        sales_df = sales_df[sales_df["total_orders"] > 200]
+                # Handle potential NaN or infinite values
+                revenues = np.nan_to_num(revenues)  # Convert NaN to 0 and inf to a large finite number
 
-        # Calculate score as the mean of trend indicators
-        weights = [0.4, 0.3, 0.2, 0.1, 0.05]  # adjust these weights as needed
-        sales_df["score"] = sales_df[
-            [
-                "trend_3_to_7",
-                "trend_7_to_14",
-                "trend_7_to_21",
-                "trend_14_to_30",
-                "trend_21_to_50",
-            ]
-        ].apply(lambda x: np.average(x, weights=weights), axis=1)
+                # If revenue contains zeros, replace with a small positive value
+                revenues = [r if r != 0 else 1e-5 for r in revenues]  # replace 0 with a small positive value
 
-        # Sort categories by score in descending order and take the top 10
-        top_growing_categories = sales_df.sort_values("score", ascending=False).head(20)
+                smoothed_revenues = lowess(revenues, range(len(revenues)), frac=0.25)[
+                    :, 1
+                ]  # frac determines smoothing degree
+                smoothed_metrics[category] = list(zip(dates, smoothed_revenues))
 
-        # Return the list of top growing category IDs
-        top_growing_categories = top_growing_categories.index.tolist()
+            # Compute Growth Rate
+            growth_rates = {}
+            for category, data in smoothed_metrics.items():
+                dates, revenues = zip(*data[-30:])  # Only consider the last 30 days
+                dates = [d.toordinal() for d in dates]
 
-        # Set to cache with timeout 1 day
-        print("Setting top_growing_categories to cache", len(top_growing_categories), top_growing_categories)
-        cache.set("top_growing_categories", top_growing_categories, timeout=60 * 60 * 24)
+                # Check if there's enough variability in revenue
+                if len(set(revenues)) > 1:
+                    coefficients = np.polyfit(dates, revenues, 1)
+                    slope = coefficients[0]
+                    growth_rates[category] = slope
+
+            # Sort categories by growth rate to get the top growing categories
+            top_growing_categories = sorted(growth_rates.keys(), key=lambda x: growth_rates[x], reverse=True)[:20]
+            return top_growing_categories
+
+        # Calculate top growing categories for each metric
+        # top_categories_by_product_count = calculate_growth_rate("total_products")
+        top_categories_by_revenue = calculate_growth_rate("total_orders_amount")
+        top_categories_by_orders = calculate_growth_rate("total_orders")
+        print(
+            "Setting top_growing_categories to cache",
+            # len(top_categories_by_product_count),
+            len(top_categories_by_revenue),
+            len(top_categories_by_orders),
+        )
+        # cache.set("top_growing_categories", top_growing_categories, timeout=60 * 60 * 24)
+        # cache.set("top_categories_by_product_count", top_categories_by_product_count, timeout=60 * 60 * 48)
+        cache.set("top_categories_by_revenue", top_categories_by_revenue, timeout=60 * 60 * 48)
+        cache.set("top_categories_by_orders", top_categories_by_orders, timeout=60 * 60 * 48)
