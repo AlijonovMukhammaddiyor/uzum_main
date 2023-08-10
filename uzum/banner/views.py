@@ -18,7 +18,7 @@ from uzum.banner.serializers import BannerSerializer
 # from uzum.category.utils import seconds_until_next
 from uzum.product.models import Product, ProductAnalytics
 from uzum.product.serializers import ProductAnalyticsSerializer
-from uzum.utils.general import get_day_before_pretty, get_today_pretty_fake
+from uzum.utils.general import check_user, get_day_before_pretty, get_today_pretty_fake
 
 
 class BannersView(APIView):
@@ -35,6 +35,10 @@ class BannersView(APIView):
     def get(self, request):
         try:
             start = time.time()
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            elif not request.user.is_proplus:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             banners = (
                 Banner.objects.exclude(product=None)  # Exclude banners without a product
                 .values("product")  # Group by product
@@ -132,6 +136,11 @@ class BannerImpactView(APIView):
     @extend_schema(tags=["Banner"])
     def get(self, request, product_id: str):
         try:
+            if check_user(request) is None:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            elif not request.user.is_proplus:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
             product = Product.objects.get(product_id=product_id)
 
             date_pretty = get_today_pretty_fake()
