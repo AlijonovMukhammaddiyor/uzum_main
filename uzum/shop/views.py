@@ -282,7 +282,7 @@ class UserShopsView(APIView):
             shops = user.shops.all()
 
             if not shops:
-                return Response({"error": "You don't have any shops"}, status=201)
+                return Response({"data": []}, status=201)
 
             # Execute raw SQL
             shop_ids = ",".join([str(shop.seller_id) for shop in shops])
