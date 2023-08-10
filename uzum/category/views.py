@@ -838,9 +838,6 @@ class NicheSelectionView(APIView):
             if check_user(request) is None:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
 
-            elif not request.user.is_proplus:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-
             search = request.query_params.get("search", "")
             today_pretty = get_today_pretty_fake()
 
