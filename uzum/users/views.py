@@ -1,6 +1,7 @@
 import datetime
 import logging
 from datetime import timedelta
+import traceback
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -47,18 +48,31 @@ class SetShopsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["POST"]
+    http_method_names = ["post", "head", "options"]
 
     def post(self, request: Request):
         try:
             data = request.data
-            shop_ids = data.get("shop_ids")
+            shop_ids = data.get("links")
             if not shop_ids:
-                return Response(status=400, data={"message": "Shop ids are required"})
+                return Response(status=400, data={"message": "Do'konlar tanlanmagan"})
             user: User = request.user
+
+            last_updated = user.shops_updated_at
+            if not last_updated:
+                pass
+            else:
+                # check if it at least 30 days since the last update
+                if timezone.now() - last_updated < timedelta(days=30):
+                    return Response(
+                        status=400,
+                        data={"message": "Do'konlar tanlangan kundan boshlab 30 kundan so'ng yangilanishi mumkin."},
+                    )
+
             is_pro = user.is_pro
 
             if not is_pro and not user.is_proplus:
-                return Response(status=400, data={"message": "You are not a pro user"})
+                return Response(status=400, data={"message": "Do'konlarni yangilash uchun Pro paketga o'ting"})
 
             if is_pro:
                 # only 2 shops is allowed for pro users
@@ -68,23 +82,23 @@ class SetShopsView(APIView):
                 if len(shop_ids) > 2:
                     return Response(status=400, data={"message": "Iltimos, 2 tagacha do'kon tanlang"})
 
-                shop_id = int(shop_ids[0])
-                shop = Shop.objects.get(seller_id=shop_id)
+                shop_id = shop_ids[0]
+                shop = Shop.objects.get(link=shop_id)
                 account_id = shop.account_id
 
                 for shop_id in shop_ids:
-                    shop = Shop.objects.get(seller_id=shop_id)
+                    shop = Shop.objects.get(link=shop_id)
                     if shop.account_id != account_id:
                         return Response(status=400, data={"message": "Do'konlar bir xisobga tegishli bo'lishi kerak"})
 
-                shop_id = int(shop_ids[0])
-                shop = Shop.objects.get(seller_id=shop_id)
+                shop_id = shop_ids[0]
+                shop = Shop.objects.get(link=shop_id)
                 user.shops.clear()
                 user.shops.add(shop)
 
                 if len(shop_ids) == 2:
-                    shop_id = int(shop_ids[1])
-                    shop = Shop.objects.get(seller_id=shop_id)
+                    shop_id = shop_ids[1]
+                    shop = Shop.objects.get(link=shop_id)
                     user.shops.add(shop)
 
             elif user.is_proplus:
@@ -95,25 +109,29 @@ class SetShopsView(APIView):
                 if len(shop_ids) > 5:
                     return Response(status=400, data={"message": "Iltimos, 5 tagacha do'kon tanlang"})
 
-                shop_id = int(shop_ids[0])
-                shop = Shop.objects.get(seller_id=shop_id)
+                shop_id = shop_ids[0]
+                shop = Shop.objects.get(link=shop_id)
                 account_id = shop.account_id
 
                 for shop_id in shop_ids:
-                    shop = Shop.objects.get(seller_id=shop_id)
+                    shop = Shop.objects.get(link=shop_id)
                     if shop.account_id != account_id:
                         return Response(status=400, data={"message": "Do'konlar bir xisobga tegishli bo'lishi kerak"})
 
                 user.shops.clear()
 
                 for shop_id in shop_ids:
-                    shop = Shop.objects.get(seller_id=shop_id)
+                    shop = Shop.objects.get(link=shop_id)
                     user.shops.add(shop)
+
+            user.shops_updated_at = timezone.now()
             user.save()
+
             return Response(status=200, data={"message": "Shops successfully set"})
         except Exception as e:
             print("Error in SetShopsView: ", e)
-            return Response(status=500, data={"message": "Internal server error"})
+            traceback.print_exc()
+            return Response(status=500, data={"message": "Xatolik yuz berdi. Iltimos, qayta urinib ko'ring."})
 
 
 class VerificationSendView(APIView):

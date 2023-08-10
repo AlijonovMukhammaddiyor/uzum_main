@@ -14,6 +14,6 @@ urlpatterns = [
     path("~update/", view=user_update_view, name="update"),
     # path("phone/send/", view=VerificationSendView.as_view(), name="send_verification"),
     # path("phone/verify/", view=CodeVerificationView.as_view(), name="verify_code"),
-    path("<str:username>/", view=user_detail_view, name="detail"),
     path("set-shops/", view=SetShopsView.as_view(), name="set_shops"),
+    path("<str:username>/", view=user_detail_view, name="detail"),
 ]

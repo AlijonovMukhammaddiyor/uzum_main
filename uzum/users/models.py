@@ -44,6 +44,7 @@ class User(AbstractUser):
 
     trial_end = models.DateTimeField(default=get_current_time, null=True, blank=True)
     is_paid = models.BooleanField(default=False, null=True, blank=True)
+    shops_updated_at = models.DateTimeField(null=True, blank=True)
 
     def get_absolute_url(self) -> str:
         """Get URL for user's detail view.
