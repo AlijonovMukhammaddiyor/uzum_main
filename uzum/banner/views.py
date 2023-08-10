@@ -39,15 +39,14 @@ class BannersView(APIView):
                 Banner.objects.exclude(product=None)  # Exclude banners without a product
                 .values("product")  # Group by product
                 .annotate(
-                    earliest_date=Min("created_at"), latest_date=Max("created_at")
+                    earliest_date=Min("created_at"),
+                    latest_date=Max("created_at"),
                 )  # Get the earliest and latest date for each product
                 .order_by("product")
             )
 
             # create mapping from product id to entry in banners
             d = {banner["product"]: banner for banner in list(banners)}
-
-            # print(d)
 
             productIds = [banner["product"] for banner in list(banners)]
 
@@ -58,14 +57,18 @@ class BannersView(APIView):
                 .replace(hour=23, minute=59, second=0, microsecond=0)
             )
 
-            latest_analytics_subquery = ProductAnalytics.objects.filter(
-                product__product_id=OuterRef("product__product_id"),
-            ).order_by("-created_at")
+            latest_analytics_subquery = (
+                ProductAnalytics.objects.filter(
+                    product__product_id=OuterRef("product__product_id"), created_at__lte=date
+                )
+                .order_by("-created_at")
+                .values("created_at")[:1]
+            )
 
             analytics = (
                 ProductAnalytics.objects.select_related("product")
                 .filter(product__product_id__in=productIds, created_at__lte=date)
-                .annotate(latest_created_at=Subquery(latest_analytics_subquery.values("created_at")[:1]))
+                .annotate(latest_created_at=Subquery(latest_analytics_subquery))
                 .filter(created_at=F("latest_created_at"))
                 .order_by("product__product_id", "created_at")
                 .values(
@@ -101,8 +104,16 @@ class BannersView(APIView):
                 ) + f"(({product['product__product_id']}))"
 
                 product["product__category__title_ru"] += f"(({product['product__category__categoryId']}))"
-                product["first_date"] = d[product["product__product_id"]]["earliest_date"].strftime("%Y-%m-%d")
-                product["last_date"] = d[product["product__product_id"]]["latest_date"].strftime("%Y-%m-%d")
+                product["first_date"] = (
+                    d[product["product__product_id"]]["earliest_date"]
+                    .astimezone(pytz.timezone("Asia/Tashkent"))
+                    .strftime("%Y-%m-%d")
+                )
+                product["last_date"] = (
+                    d[product["product__product_id"]]["latest_date"]
+                    .astimezone(pytz.timezone("Asia/Tashkent"))
+                    .strftime("%Y-%m-%d")
+                )
 
             print(f"Time taken: {time.time() - start}")
             return Response(analytics, status=status.HTTP_200_OK)

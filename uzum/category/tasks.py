@@ -147,7 +147,7 @@ def update_uzum_data(args=None, **kwargs):
     start = time.time()
     create_materialized_view(date_pretty)
     print(f"Materialized View created in {time.time() - start} seconds")
-
+    print("Setting banners...")
     Banner.set_products()
     print("Uzum data updated...")
     return True

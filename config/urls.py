@@ -47,7 +47,7 @@ urlpatterns += [
         ),
         name="api-docs",
     ),
-    path("api/users/", include("uzum.users.urls", namespace="users")),
+    path("api/user/", include("uzum.users.urls", namespace="users")),
     path("api/category/", include("uzum.category.urls", namespace="category")),
     path("api/shop/", include("uzum.shop.urls", namespace="shop")),
     path("api/product/", include("uzum.product.urls", namespace="product")),

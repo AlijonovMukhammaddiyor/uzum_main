@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 
 import pytz
 from django.db import connection
-from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
+from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum, Window, F
+from django.db.models.functions import RowNumber, Rank
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -77,8 +78,7 @@ class AllShopsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
-            shops = Shop.objects.all().values("title", "link")
-
+            shops = Shop.objects.all().values("title", "link", "account_id")
             return Response(shops, status=status.HTTP_200_OK)
         except Exception as e:
             print(e)
@@ -96,6 +96,14 @@ class CurrentShopView(APIView):
         try:
             if check_user(request) is None:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
+            user = request.user
+            shops = user.shops.all()
+
+            # check if user has this shop
+            if not shops.filter(link=link) and not user.is_enterprise:
+                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
             shop = Shop.objects.get(link=link)
             serializer = ShopSerializer(shop)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -118,7 +126,9 @@ class TreemapShopsView(APIView):
             shops = (
                 ShopAnalytics.objects.filter(date_pretty=get_today_pretty_fake())
                 .order_by("-total_revenue")
-                .values("shop__title", "shop__link", "total_orders", "total_products", "total_reviews", "total_revenue")
+                .values(
+                    "shop__title", "shop__link", "total_orders", "total_products", "total_reviews", "total_revenue"
+                )
             )
 
             totals = get_totals(get_today_pretty_fake())
@@ -250,6 +260,59 @@ class ShopsView(APIView):
             }
 
             return Response(data, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UserShopsView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request: Request, *args, **kwargs):
+        try:
+            user = request.user
+            is_paid = user.is_pro or user.is_proplus or user.is_enterprise
+
+            if not is_paid:
+                return Response({"error": "Please subscribe to see this page"}, status=201)
+
+            shops = user.shops.all()
+
+            if not shops:
+                return Response({"error": "You don't have any shops"}, status=201)
+
+            # Execute raw SQL
+            shop_ids = ",".join([str(shop.seller_id) for shop in shops])
+
+            raw_sql = f"""
+            WITH LatestDate AS (
+                SELECT shop_id, MAX(created_at) as max_created
+                FROM shop_shopanalytics
+                WHERE shop_id IN ({shop_ids})
+                GROUP BY shop_id
+            )
+
+            SELECT a.*, s.title, s.link, COUNT(DISTINCT sac.category_id) as num_categories
+            FROM shop_shopanalytics a
+            INNER JOIN LatestDate ld ON a.shop_id = ld.shop_id AND a.created_at = ld.max_created
+            INNER JOIN shop_shop s ON a.shop_id = s.seller_id
+            LEFT JOIN shop_shopanalytics_categories sac ON a.id = sac.shopanalytics_id
+            GROUP BY a.id, s.title, s.link;
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(raw_sql)
+                columns = [col[0] for col in cursor.description]
+                latest_analytics = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            for shop in latest_analytics:
+                shop["shop_title"] = f'{shop["title"]}(({shop["link"]}))'
+
+            return Response({"data": latest_analytics}, status=status.HTTP_200_OK)
+
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -500,12 +563,20 @@ class ShopCompetitorsView(APIView):
                 return []
 
             query = f"""
+                WITH CurrentShopRevenue AS (
+                    SELECT total_revenue as current_shop_revenue
+                    FROM shop_shopanalytics
+                    WHERE shop_id = {shop.seller_id}
+                    AND date_pretty = '{date_pretty}'
+                )
+
                 SELECT
                     sa.shop_id, s.title, s.link, COUNT(DISTINCT sac.category_id) as common_categories_count,
                     sa.total_revenue,
                     STRING_AGG(DISTINCT c.title, ', ') as common_categories_titles,
                     STRING_AGG(DISTINCT c.title_ru, ', ') as common_categories_titles_ru,
-                    STRING_AGG(DISTINCT c."categoryId"::text, ', ') as common_categories_ids
+                    STRING_AGG(DISTINCT c."categoryId"::text, ', ') as common_categories_ids,
+                    ABS(sa.total_revenue - (SELECT current_shop_revenue FROM CurrentShopRevenue)) as revenue_difference
                 FROM
                     shop_shopanalytics as sa
                 JOIN
@@ -522,7 +593,7 @@ class ShopCompetitorsView(APIView):
                 ORDER BY
                     sa.shop_id != {shop.seller_id},  -- prioritize the current shop
                     common_categories_count DESC,
-                    sa.total_revenue DESC
+                    revenue_difference  -- order by how close they are to the current shop in terms of revenue
                 LIMIT {N + 1}  -- increase the limit to include the current shop
             """
 
@@ -564,6 +635,7 @@ class ShopCompetitorsView(APIView):
                 common_categories_titles,
                 common_categories_titles_ru,
                 common_categories_ids,
+                revenue_difference,
             ) in competitor_shops_data:
                 competitors_data.append(
                     {
