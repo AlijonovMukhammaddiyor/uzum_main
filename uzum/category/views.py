@@ -946,7 +946,7 @@ class GrowingCategoriesView(APIView):
                 timezone=pytz.timezone("Asia/Tashkent"),
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
-            top_growing_categories = cache.get("top_growing_categories", [])
+            top_growing_categories = cache.get("top_categories_by_orders", [])
 
             categories = (
                 CategoryAnalytics.objects.select_related("product", "product__category", "product__shop")
@@ -966,6 +966,8 @@ class GrowingCategoriesView(APIView):
                     "total_shops_with_sales",
                     "total_products_with_sales",
                     "date_pretty",
+                    "total_orders_amount",
+                    "created_at",
                 )
                 .order_by("category__categoryId", "date_pretty")
             )
