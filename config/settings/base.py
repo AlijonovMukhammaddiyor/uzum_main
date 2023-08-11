@@ -385,7 +385,7 @@ SIMPLE_JWT = {
 
 REST_USE_JWT = True
 
-ORDER_MODEL = "payment.models.Payment"
+ORDER_MODEL = "uzum.payment.models.Payment"
 
 PAYME: dict = {
     "PAYME_ID": "64d64878a3b6d0cc97f5fbcc",
