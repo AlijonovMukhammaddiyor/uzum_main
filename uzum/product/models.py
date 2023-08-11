@@ -359,15 +359,15 @@ class ProductAnalytics(models.Model):
             # ProductAnalytics.update_average_purchase_price(date_pretty)
 
             # first, to make it faster, execute set_orders_money for past date
-            try:
-                create_product_latestanalytics("2023-06-04")
-                ProductAnalytics.set_orders_money("2023-06-05")
-            except Exception as e:
-                print(e)
-                traceback.print_exc()
+            # try:
+            #     create_product_latestanalytics("2023-06-04")
+            #     ProductAnalytics.set_orders_money("2023-06-05")
+            # except Exception as e:
+            #     print(e)
+            #     traceback.print_exc()
 
-            create_product_latestanalytics(get_day_before_pretty(date_pretty))
-            ProductAnalytics.set_orders_money(date_pretty)
+            # create_product_latestanalytics(get_day_before_pretty(date_pretty))
+            # ProductAnalytics.set_orders_money(date_pretty)
             ProductAnalytics.set_positions(date_pretty)
             ProductAnalytics.set_top_growing_products()
         except Exception as e:
