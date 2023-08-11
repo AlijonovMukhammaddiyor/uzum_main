@@ -22,6 +22,7 @@ ALLOWED_HOSTS += [
     "www.uzanalitika.uz",
     "uzumanalitika.com",
     "207.154.218.194",
+    "a2fa-110-76-71-9.ngrok.io",
 ]
 
 # DATABASES
