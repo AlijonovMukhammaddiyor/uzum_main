@@ -393,5 +393,5 @@ PAYME: dict = {
     "PAYME_URL": "https://checkout.test.paycom.uz",
     "PAYME_CALL_BACK_URL": env.str("PAYME_CALLBACK_URL"),
     "PAYME_MIN_AMOUNT": env.int("PAYME_MIN_AMOUNT", default=0),
-    "PAYME_ACCOUNT": "account_id",
+    "PAYME_ACCOUNT": "order_id",
 }
