@@ -53,6 +53,7 @@ urlpatterns += [
     path("api/product/", include("uzum.product.urls", namespace="product")),
     path("api/badge/", include("uzum.badge.urls", namespace="badge")),
     path("api/banner/", include("uzum.banner.urls", namespace="banner")),
+    path("api/payments/", include("uzum.payment.urls", namespace="payment")),
     path("api/username_phone_match", CheckUserNameAndPhone.as_view(), name="check_username"),
     path("api/newpassword/", view=PasswordRenewView.as_view(), name="check_username"),
     path("api/code/", view=VerificationSendView.as_view(), name="check_username"),
