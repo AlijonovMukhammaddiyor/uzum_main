@@ -413,7 +413,7 @@ class CategoryAnalytics(models.Model):
             CategoryAnalytics.update_totals_for_shops_and_products(date_pretty)
             CategoryAnalytics.update_totals_for_date(date_pretty)
             CategoryAnalytics.update_totals_with_sale(date_pretty)
-            CategoryAnalytics.set_top_growing_categories_ema()
+            CategoryAnalytics.set_top_growing_categories()
         except Exception as e:
             print(e, "Error in update_analytics")
 
