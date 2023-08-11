@@ -5,17 +5,23 @@ from rest_framework.response import Response
 from uzum.payment.serializers import GeneratePayLinkSerializer
 
 from payme.methods.generate_link import GeneratePayLink
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PaymeCallBackAPIView(MerchantAPIView):
     def create_transaction(self, order_id, action, *args, **kwargs) -> None:
-        print(f"create_transaction for order_id: {order_id}, response: {action}")
+        # print(f"create_transaction for order_id: {order_id}, response: {action}")
+        logger.info(f"create_transaction for order_id: {order_id}, response: {action}")
 
     def perform_transaction(self, order_id, action, *args, **kwargs) -> None:
-        print(f"perform_transaction for order_id: {order_id}, response: {action}")
+        # print(f"perform_transaction for order_id: {order_id}, response: {action}")
+        logger.info(f"perform_transaction for order_id: {order_id}, response: {action}")
 
     def cancel_transaction(self, order_id, action, *args, **kwargs) -> None:
-        print(f"cancel_transaction for order_id: {order_id}, response: {action}")
+        # print(f"cancel_transaction for order_id: {order_id}, response: {action}")
+        logger.info(f"cancel_transaction for order_id: {order_id}, response: {action}")
 
 
 class GeneratePayLinkAPIView(APIView):
