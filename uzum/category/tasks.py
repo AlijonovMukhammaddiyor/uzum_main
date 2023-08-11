@@ -133,10 +133,10 @@ def update_uzum_data(args=None, **kwargs):
     bulk_remove_duplicate_shop_analytics(date_pretty)
     bulk_remove_duplicate_sku_analytics(date_pretty)
 
-    print("Updating Category Descendants...")
-    start = time.time()
+    # print("Updating Category Descendants...")
+    # start = time.time()
     # Category.update_descendants()
-    print(f"Category Descendants updated in {time.time() - start} seconds")
+    # print(f"Category Descendants updated in {time.time() - start} seconds")
     time.sleep(60)
     print("Updating Analytics...")
     start = time.time()
