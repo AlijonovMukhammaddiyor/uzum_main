@@ -45,7 +45,7 @@ class MerchatTransactionsModelSerializer(serializers.ModelSerializer):
                     raise IncorrectAmount()
 
             except IncorrectAmount as error:
-                logger.error("Invalid amount for order: %s", attrs["order_id"])
+                logger.error("Invalid amount for order: %s", attrs["order"])
                 raise IncorrectAmount() from error
 
         return attrs
