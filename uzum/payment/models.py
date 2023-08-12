@@ -31,3 +31,6 @@ class Order(models.Model):
     amount = models.FloatField(null=True, blank=True)
     order_id = models.BigIntegerField(null=True, blank=True, unique=True)
     user = models.ForeignKey("users.User", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"User: {self.user} - Order: {self.order_id} - Amount: {self.amount}"
