@@ -19,12 +19,10 @@ class CheckTransaction:
     """
 
     def __call__(self, params: dict) -> None:
-        clean_data: dict = MTMS.get_validated_data(params=params)
+        # clean_data: dict = MTMS.get_validated_data(params=params)
 
         try:
-            transaction = MerchatTransactionsModel.objects.get(
-                _id=clean_data.get("_id"),
-            )
+            transaction = MerchatTransactionsModel.objects.get(_id=params["id"])
             response = {
                 "result": {
                     "create_time": int(transaction.created_at_ms),
