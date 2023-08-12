@@ -6,6 +6,9 @@ from django.utils.timezone import make_aware
 from config.settings.base import env
 from uzum.payment.exceptions import PerformTransactionDoesNotExist
 from uzum.payment.models import Order
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_params(params: dict) -> dict:
@@ -33,7 +36,10 @@ def get_params(params: dict) -> dict:
             clean_params["order"] = order.order_id
             clean_params["user"] = order.user.id
         except Order.DoesNotExist as error:
+            logger.error(f"Order with order_id: {order_id} does not exist")
             raise PerformTransactionDoesNotExist() from error
+
+    logger.info(f"Clean params: {clean_params}")
 
     return clean_params
 

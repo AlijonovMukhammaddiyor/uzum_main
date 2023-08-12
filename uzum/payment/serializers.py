@@ -33,6 +33,7 @@ class MerchatTransactionsModelSerializer(serializers.ModelSerializer):
         if attrs.get("order_id") is not None:
             try:
                 order = Order.objects.get(order_id=attrs["order_id"])
+                logger.info("Comparing amounts: order - %s and query - %s", order.amount, attrs["amount"])
                 if order.amount != int(attrs["amount"]):
                     raise IncorrectAmount()
 
