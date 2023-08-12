@@ -1,14 +1,15 @@
 import traceback
 import uuid
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import pytz
 from django.core.cache import cache
 from django.db import connection, models
 from django.utils import timezone
+
 from uzum.utils.general import get_day_before_pretty, get_today_pretty
-from datetime import datetime
-import pytz
 
 
 class Product(models.Model):

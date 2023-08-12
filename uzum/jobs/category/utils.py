@@ -1,10 +1,10 @@
 import traceback
 from datetime import datetime
-from django.db.models import Case, When, Value
-from django.db import transaction
 
 import pytz
 import requests
+from django.db import transaction
+from django.db.models import Case, Value, When
 
 from uzum.category.models import Category, CategoryAnalytics
 from uzum.jobs.constants import CATEGORIES_HEADER, CATEGORIES_HEADER_RU, CATEGORIES_PAYLOAD, CATEGORIES_URL

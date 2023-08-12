@@ -2,8 +2,8 @@ import time
 import traceback
 from datetime import date, datetime, timedelta
 from itertools import groupby
-import numpy as np
 
+import numpy as np
 import pandas as pd
 import pytz
 import requests
@@ -33,7 +33,6 @@ from uzum.product.serializers import (
     ExtendedProductSerializer,
     ProductSerializer,
 )
-
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
 from uzum.utils.general import check_user, get_today_pretty_fake

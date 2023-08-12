@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 
 import pytz
 from django.db import connection
-from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum, Window, F
-from django.db.models.functions import RowNumber, Rank
+from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum, Window
+from django.db.models.functions import Rank, RowNumber
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -19,7 +19,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from uzum.users.models import User
+
 from uzum.category.models import Category
 from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.serializers import ProductAnalyticsViewSerializer
@@ -27,12 +27,8 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
 from uzum.review.views import CookieJWTAuthentication
 from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsTable
-from uzum.utils.general import (
-    check_user,
-    get_day_before_pretty,
-    get_next_day_pretty,
-    get_today_pretty_fake,
-)
+from uzum.users.models import User
+from uzum.utils.general import check_user, get_day_before_pretty, get_next_day_pretty, get_today_pretty_fake
 
 from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer
 

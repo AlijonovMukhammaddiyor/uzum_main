@@ -1,9 +1,11 @@
-from datetime import datetime
 import uuid
+from datetime import datetime
+
 import pytz
 from django.apps import apps
 from django.db import connection, models
 from django.utils import timezone
+
 from uzum.utils.general import get_today_pretty
 
 

@@ -83,7 +83,7 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "drf_spectacular",
     "rest_framework_simplejwt",
-    "payme",
+    # "payme",
 ]
 
 LOCAL_APPS = [

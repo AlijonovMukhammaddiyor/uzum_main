@@ -1,12 +1,25 @@
 from django.db import models
 
 
-class Payment(models.Model):
+class MerchatTransactionsModel(models.Model):
+    """
+    MerchatTransactionsModel class \
+        That's used for managing transactions in database.
+    """
+
+    _id = models.CharField(max_length=255, null=True, blank=False)
+    transaction_id = models.CharField(max_length=255, null=True, blank=False)
+    order_id = models.BigIntegerField(null=True, blank=True, unique=True)
+    amount = models.FloatField(null=True, blank=True)
+    time = models.BigIntegerField(null=True, blank=True)
+    perform_time = models.BigIntegerField(null=True, default=0)
+    cancel_time = models.BigIntegerField(null=True, default=0)
+    state = models.IntegerField(null=True, default=1)
+    reason = models.CharField(max_length=255, null=True, blank=True)
+    created_at_ms = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     user = models.ForeignKey("users.User", on_delete=models.CASCADE)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    amount = models.DecimalField(max_digits=8, decimal_places=2)
-    payment_method = models.CharField(max_length=50)  # e.g., 'Credit Card', 'PayPal'
-    order_id = models.IntegerField()  # the ID returned by the payment processor
 
     def __str__(self):
-        return f"{self.user} paid {self.amount} on {self.timestamp}"
+        return str(self._id)

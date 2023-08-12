@@ -1,10 +1,9 @@
-from django.contrib.auth import get_user_model
 import pytz
+from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from config import celery_app
 from uzum.users.models import User
-from django.utils import timezone
-
 
 # @celery_app.task()
 # def get_users_count():
