@@ -49,7 +49,7 @@ class MerchatTransactionsModelSerializer(serializers.ModelSerializer):
         if amount is None:
             raise IncorrectAmount()
 
-        if int(amount) <= int(env("PAYME_MIN_AMOUNT", 0)):
+        if int(amount) <= env.int("PAYME_MIN_AMOUNT"):
             raise IncorrectAmount("Payment amount is less than allowed.")
 
         return amount
