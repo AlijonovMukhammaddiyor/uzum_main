@@ -4,6 +4,8 @@ from django.utils.timezone import datetime as dt
 from django.utils.timezone import make_aware
 
 from config.settings.base import env
+from uzum.payment.exceptions import PerformTransactionDoesNotExist
+from uzum.payment.models import Order
 
 
 def get_params(params: dict) -> dict:
@@ -24,7 +26,14 @@ def get_params(params: dict) -> dict:
 
     if account is not None:
         account_name: str = env.str("PAYME_ACCOUNT")
-        clean_params["order_id"] = account[account_name]
+        # clean_params["order_id"] = account[account_name]
+        order_id = account.get(account_name)
+        try:
+            order = Order.objects.get(order_id=order_id)
+            clean_params["order_id"] = order.order_id
+            clean_params["user"] = order.user.id
+        except Order.DoesNotExist as error:
+            raise PerformTransactionDoesNotExist() from error
 
     return clean_params
 

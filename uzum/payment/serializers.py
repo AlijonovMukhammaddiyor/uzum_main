@@ -63,6 +63,7 @@ class MerchatTransactionsModelSerializer(serializers.ModelSerializer):
         order_id: str -> Order Indentation.
         """
         try:
+            logger.info("Order id: %s", order_id)
             Order.objects.get(order_id=order_id)
         except Order.DoesNotExist as error:
             logger.error("Order does not exist order_id: %s", order_id)
