@@ -31,7 +31,7 @@ class MerchatTransactionsModelSerializer(serializers.ModelSerializer):
         Validate the data given to the MerchatTransactionsModel.
         """
         logger.info("Comparing amounts: order and query with attrs - %s", attrs)
-        order = attrs.get("order") or attrs.get("order_id")
+        order = attrs.get("order")
         if order is not None:
             if isinstance(order, int):
                 try:

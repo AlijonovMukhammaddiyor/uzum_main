@@ -26,12 +26,11 @@ class CreateTransaction:
         logger.info("Create transaction method called")
         serializer = MerchatTransactionsModelSerializer(data=get_params(params))
         serializer.is_valid(raise_exception=True)
-        order_id = serializer.validated_data.get("order")
-        if isinstance(order_id, Order):
-            order_id = order_id.order_id
+        order = serializer.validated_data.get("order")
+        user = serializer.validated_data.get("user")
 
         try:
-            transaction = MerchatTransactionsModel.objects.filter(order_id=order_id).last()
+            transaction = MerchatTransactionsModel.objects.filter(order=order).last()
 
             if transaction is not None:
                 if transaction._id != serializer.validated_data.get("_id"):
@@ -43,14 +42,12 @@ class CreateTransaction:
 
         if transaction is None:
             try:
-                order = Order.objects.get(order_id=order_id)
-                user = User.objects.get(id=serializer.validated_data.get("user"))
                 transaction, _ = MerchatTransactionsModel.objects.get_or_create(
                     _id=serializer.validated_data.get("_id"),
                     order=order,
                     amount=serializer.validated_data.get("amount"),
                     created_at_ms=int(time.time() * 1000),
-                    user=serializer.validated_data.get("user"),
+                    user=user,
                 )
             except Order.DoesNotExist as error:
                 logger.error("Order %s does not exist", error)
@@ -68,7 +65,7 @@ class CreateTransaction:
                 }
             }
 
-        return order_id, response
+        return order.order_id, response
 
     @staticmethod
     def _convert_ms_to_datetime(time_ms: str) -> int:
