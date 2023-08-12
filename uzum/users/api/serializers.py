@@ -115,8 +115,6 @@ class UserSerializer(serializers.ModelSerializer):
             # Add the generated referral code to the user data.
             validated_data["referral_code"] = referral_code
             validated_data["referred_by"] = referred_by
-            shop_id = self.context["request"].data.get("shop")
-            validated_data["shop"] = get_shop(shop_id)
             validated_data["is_staff"] = validated_data.get("is_staff", False)
             validated_data["fingerprint"] = validated_data.get("fingerprint", "")
             # Create the user instance.
