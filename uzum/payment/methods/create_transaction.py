@@ -24,7 +24,7 @@ class CreateTransaction:
     def __call__(self, params: dict) -> dict:
         serializer = MerchatTransactionsModelSerializer(data=get_params(params))
         serializer.is_valid(raise_exception=True)
-        order_id = serializer.validated_data.get("order_id")
+        order_id = serializer.validated_data.get("order")
 
         try:
             transaction = MerchatTransactionsModel.objects.filter(order_id=order_id).last()
@@ -40,10 +40,11 @@ class CreateTransaction:
         if transaction is None:
             transaction, _ = MerchatTransactionsModel.objects.get_or_create(
                 _id=serializer.validated_data.get("_id"),
-                order_id=serializer.validated_data.get("order_id"),
+                order_id=serializer.validated_data.get("order"),
                 transaction_id=uuid.uuid4(),
                 amount=serializer.validated_data.get("amount"),
                 created_at_ms=int(time.time() * 1000),
+                user=serializer.validated_data.get("user"),
             )
 
         if transaction:
