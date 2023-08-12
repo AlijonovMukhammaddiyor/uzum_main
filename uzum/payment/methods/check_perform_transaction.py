@@ -1,5 +1,8 @@
 from uzum.payment.serializers import MerchatTransactionsModelSerializer
 from uzum.payment.utils import get_params
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CheckPerformTransaction:
@@ -13,6 +16,7 @@ class CheckPerformTransaction:
     """
 
     def __call__(self, params: dict) -> dict:
+        logger.info("CheckPerformTransaction method called")
         serializer = MerchatTransactionsModelSerializer(data=get_params(params))
         serializer.is_valid(raise_exception=True)
 
