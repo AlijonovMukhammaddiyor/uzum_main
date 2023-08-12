@@ -30,7 +30,7 @@ def get_params(params: dict) -> dict:
         order_id = account.get(account_name)
         try:
             order = Order.objects.get(order_id=order_id)
-            clean_params["order_id"] = order.order_id
+            clean_params["order"] = order.order_id
             clean_params["user"] = order.user.id
         except Order.DoesNotExist as error:
             raise PerformTransactionDoesNotExist() from error
