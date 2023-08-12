@@ -4,13 +4,13 @@ import traceback
 from datetime import timedelta
 
 import pytz
+from django.db.models import F, Max, Min, OuterRef, Subquery
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.db.models import Min, Max, F, OuterRef, Subquery
 
 from uzum.banner.models import Banner
 from uzum.banner.serializers import BannerSerializer

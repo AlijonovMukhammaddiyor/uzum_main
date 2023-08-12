@@ -1,17 +1,17 @@
 import asyncio
-from itertools import chain
 import json
 import time
 import traceback
 from collections import Counter
 from datetime import datetime, timedelta
+from itertools import chain
 
 import httpx
 import pytz
 from asgiref.sync import async_to_sync
 from django.core.cache import cache
 from django.db import connection, transaction
-from django.db.models import Case, When, Value
+from django.db.models import Case, Value, When
 
 from config import celery_app
 from uzum.banner.models import Banner

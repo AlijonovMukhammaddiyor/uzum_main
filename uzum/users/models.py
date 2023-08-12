@@ -1,19 +1,20 @@
 import uuid
 from datetime import timedelta
 
+import pytz
+from celery import shared_task
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.urls import reverse
-from django.utils.translation import gettext_lazy as _
-from django.utils import timezone
-from celery import shared_task
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-import pytz
-from uzum.payment.models import Payment
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+
 from config.settings.base import env
+from uzum.payment.models import MerchatTransactionsModel
 
 
 def get_current_time():
@@ -61,7 +62,7 @@ class User(AbstractUser):
         Returns:
             datetime.date: The date of the user's next payment.
         """
-        payments = Payment.objects.filter(user=self).order_by("-payment_date")
+        payments = MerchatTransactionsModel.objects.filter(user=self).order_by("-payment_date")
 
         if len(payments) == 0:
             return self.date_joined + timedelta(days=1)

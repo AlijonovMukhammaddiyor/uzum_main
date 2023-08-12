@@ -31,7 +31,7 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.review.views import CookieJWTAuthentication
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
-from uzum.utils.general import get_today_pretty_fake, check_user
+from uzum.utils.general import check_user, get_today_pretty_fake
 
 from .models import Category, CategoryAnalytics
 from .serializers import CategoryAnalyticsSeralizer, CategorySerializer, ProductAnalyticsViewSerializer

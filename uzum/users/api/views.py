@@ -2,16 +2,17 @@ import time
 import traceback
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.http import HttpRequest, HttpResponseBadRequest
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.db import IntegrityError
-from rest_framework.exceptions import ValidationError
+
 from config.settings.base import env
 
 from .serializers import UserSerializer
