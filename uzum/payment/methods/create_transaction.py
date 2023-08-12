@@ -4,9 +4,10 @@ import time
 import uuid
 
 from uzum.payment.exceptions import TooManyRequests
-from uzum.payment.models import MerchatTransactionsModel
+from uzum.payment.models import MerchatTransactionsModel, Order
 from uzum.payment.serializers import MerchatTransactionsModelSerializer
 from uzum.payment.utils import get_params
+from uzum.users.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +39,22 @@ class CreateTransaction:
             raise TooManyRequests() from error
 
         if transaction is None:
-            transaction, _ = MerchatTransactionsModel.objects.get_or_create(
-                _id=serializer.validated_data.get("_id"),
-                order_id=serializer.validated_data.get("order"),
-                transaction_id=uuid.uuid4(),
-                amount=serializer.validated_data.get("amount"),
-                created_at_ms=int(time.time() * 1000),
-                user=serializer.validated_data.get("user"),
-            )
+            try:
+                order = Order.objects.get(order_id=order_id)
+                user = User.objects.get(id=serializer.validated_data.get("user"))
+                transaction, _ = MerchatTransactionsModel.objects.get_or_create(
+                    _id=serializer.validated_data.get("_id"),
+                    order=order,
+                    amount=serializer.validated_data.get("amount"),
+                    created_at_ms=int(time.time() * 1000),
+                    user=serializer.validated_data.get("user"),
+                )
+            except Order.DoesNotExist as error:
+                logger.error("Order %s does not exist", error)
+                raise Order.DoesNotExist() from error
+            except User.DoesNotExist as error:
+                logger.error("User %s does not exist", error)
+                raise User.DoesNotExist() from error
 
         if transaction:
             response: dict = {
