@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from config.settings.base import env
 from uzum.payment.exceptions import IncorrectAmount, PerformTransactionDoesNotExist
-from uzum.payment.models import MerchatTransactionsModel
+from uzum.payment.models import MerchatTransactionsModel, Order
 from uzum.payment.utils import get_params
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class MerchatTransactionsModelSerializer(serializers.ModelSerializer):
         """
         if attrs.get("order_id") is not None:
             try:
-                order = MerchatTransactionsModel.objects.get(order_id=attrs["order_id"])
+                order = Order.objects.get(order_id=attrs["order_id"])
                 if order.amount != int(attrs["amount"]):
                     raise IncorrectAmount()
 
@@ -63,8 +63,8 @@ class MerchatTransactionsModelSerializer(serializers.ModelSerializer):
         order_id: str -> Order Indentation.
         """
         try:
-            MerchatTransactionsModel.objects.get(order_id=order_id)
-        except MerchatTransactionsModel.DoesNotExist as error:
+            Order.objects.get(order_id=order_id)
+        except Order.DoesNotExist as error:
             logger.error("Order does not exist order_id: %s", order_id)
             raise PerformTransactionDoesNotExist() from error
 
