@@ -23,9 +23,12 @@ class CreateTransaction:
     """
 
     def __call__(self, params: dict) -> dict:
+        logger.info("Create transaction method called")
         serializer = MerchatTransactionsModelSerializer(data=get_params(params))
         serializer.is_valid(raise_exception=True)
         order_id = serializer.validated_data.get("order")
+        if isinstance(order_id, Order):
+            order_id = order_id.order_id
 
         try:
             transaction = MerchatTransactionsModel.objects.filter(order_id=order_id).last()
