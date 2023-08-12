@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 
 
@@ -8,7 +9,7 @@ class MerchatTransactionsModel(models.Model):
     """
 
     _id = models.CharField(max_length=255, null=True, blank=False)
-    transaction_id = models.CharField(max_length=255, null=True, blank=False)
+    transaction_id = models.CharField(max_length=255, null=True, blank=False, default=uuid.uuid4)
     # order_id = models.BigIntegerField(null=True, blank=True, unique=True)
     amount = models.FloatField(null=True, blank=True)
     time = models.BigIntegerField(null=True, blank=True)
