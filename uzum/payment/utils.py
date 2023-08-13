@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.utils.timezone import datetime as dt
 from django.utils.timezone import make_aware
@@ -6,7 +7,6 @@ from django.utils.timezone import make_aware
 from config.settings.base import env
 from uzum.payment.exceptions import PerformTransactionDoesNotExist
 from uzum.payment.models import Order
-import logging
 
 logger = logging.getLogger(__name__)
 
