@@ -1,10 +1,13 @@
 import logging
 
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from config.settings.base import env
 from uzum.payment.methods.generate_link import GeneratePayLink
+from uzum.payment.models import Order
 from uzum.payment.serializers import GeneratePayLinkSerializer
 
 logger = logging.getLogger(__name__)
@@ -148,45 +151,52 @@ class MerchantAPIView(APIView):
         """
         need implement in your view class
         """
+        order = Order.objects.get(order_id=order_id)
+        order.status = 2  # 2 - created
+        order.save()
         logger.info(f"create_transaction for order_id: {order_id}, response: {action}")
 
     def perform_transaction(self, order_id, action) -> None:
         """
         need implement in your view class
         """
+        order = Order.objects.get(order_id=order_id)
+        order.status = 3  # 3 - performed
+        order.save()
         logger.info(f"perform_transaction for order_id: {order_id}, response: {action}")
 
     def cancel_transaction(self, order_id, action) -> None:
         """
         need implement in your view class
         """
+        order = Order.objects.get(order_id=order_id)
+        order.status = 4  # 4 - canceled
+        order.save()
         logger.info(f"cancel_transaction for order_id: {order_id}, response: {action}")
 
 
 class GeneratePayLinkAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
     def post(self, request, *args, **kwargs):
         """
-        Generate a payment link for the given order ID and amount.
-
-        Request parameters:
-            - order_id (int): The ID of the order to generate a payment link for.
-            - amount (int): The amount of the payment.
-
-        Example request:
-            curl -X POST \
-                'http://your-host/shop/pay-link/' \
-                --header 'Content-Type: application/json' \
-                --data-raw '{
-                "order_id": 999,
-                "amount": 999
-            }'
+        Generate a payment link for the given amount.
 
         Example response:
             {
                 "pay_link": "http://payme-api-gateway.uz/bT0jcmJmZk1vNVJPQFFoP05GcHJtWnNHeH"
             }
         """
-        serializer = GeneratePayLinkSerializer(data=request.data)
+        user = request.user
+        amount = request.data.get("amount")
+
+        if not amount:
+            return Response({"amount": "Amount is required"}, status=400)
+
+        amount *= 100  # convert to tiyin
+        order = Order.objects.create(user=user, amount=amount)
+        serializer = GeneratePayLinkSerializer(data={"order_id": order.order_id, "amount": amount})
         serializer.is_valid(raise_exception=True)
         pay_link = GeneratePayLink(**serializer.validated_data).generate_link()
 

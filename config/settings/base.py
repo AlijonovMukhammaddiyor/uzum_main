@@ -365,7 +365,7 @@ SPECTACULAR_SETTINGS = {
 CELERY_BEAT_SCHEDULE = {
     "update_data": {
         "task": "update_uzum_data",
-        "schedule": crontab(minute=5, hour=0, day_of_week="*"),
+        "schedule": crontab(minute=50, hour=0, day_of_week="*"),
         "args": (),
     },
     # "update_trials": {
@@ -384,14 +384,3 @@ SIMPLE_JWT = {
 }
 
 REST_USE_JWT = True
-
-ORDER_MODEL = "uzum.payment.models.Payment"
-
-PAYME: dict = {
-    "PAYME_ID": "64d64878a3b6d0cc97f5fbcc",
-    "PAYME_KEY": "cxMpYem0Pf0buYJ4T#?CUIoopPeB29@e6904",
-    "PAYME_URL": "https://checkout.test.paycom.uz",
-    "PAYME_CALL_BACK_URL": env.str("PAYME_CALLBACK_URL"),
-    "PAYME_MIN_AMOUNT": env.int("PAYME_MIN_AMOUNT", default=0),
-    "PAYME_ACCOUNT": "order_id",
-}

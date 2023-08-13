@@ -1,4 +1,5 @@
 import uuid
+
 from django.db import models
 
 
@@ -28,9 +29,18 @@ class MerchatTransactionsModel(models.Model):
 
 
 class Order(models.Model):
+    # define order status choices
+    ORDER_STATUS = (
+        (1, "Requested"),
+        (2, "Created"),
+        (3, "Performed"),
+        (4, "Canceled"),
+    )
+
     amount = models.FloatField(null=True, blank=True)
-    order_id = models.BigIntegerField(null=True, blank=True, unique=True)
+    order_id = models.AutoField(primary_key=True)
     user = models.ForeignKey("users.User", on_delete=models.CASCADE)
+    # status = models.IntegerField(choices=ORDER_STATUS, default=1)
 
     def __str__(self):
         return f"User: {self.user} - Order: {self.order_id} - Amount: {self.amount}"

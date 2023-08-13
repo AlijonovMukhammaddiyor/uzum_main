@@ -44,14 +44,17 @@ def update_uzum_data(args=None, **kwargs):
     print(get_today_pretty())
     date_pretty = get_today_pretty()
     print(datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%H:%M:%S" + " - " + "%d/%m/%Y"))
-
+    print("Updating category parents")
+    start = time.time()
+    update_all_category_parents()
+    print("Time taken: ", time.time() - start)
     create_and_update_categories()
     # await create_and_update_products()
     root = CategoryAnalytics.objects.filter(category__categoryId=1, date_pretty=get_today_pretty())
     print("total_products: ", root[0].total_products)
     # 1. Get all categories which have less than N products
     categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
-    print(categories_filtered)
+
     product_ids: list[int] = []
     async_to_sync(get_all_product_ids_from_uzum)(
         categories_filtered,
@@ -158,6 +161,7 @@ def update_all_category_parents():
         tree = get_categories_tree()
         cat_parents = {}  # mapping from id to parent id
         all_categories = {}
+        Category.objects.all().update(parent=None)
 
         for i, category in enumerate(tree):
             if category["category"]["id"] != 1:

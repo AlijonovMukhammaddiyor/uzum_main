@@ -171,9 +171,14 @@ def prepareProductData(
         # product_analytic["orders_money"] = (
         #         product_analytic["orders_amount"] - latest_orders_amount
         #     ) * product_analytic["average_purchase_price"]
-        average_purchase_price = sum([sku["purchasePrice"] for sku in product_api["skuList"]]) / (
-            len(product_api["skuList"] if len(product_api["skuList"]) > 0 else 1)
-        )
+        try:
+            average_purchase_price = sum([sku["purchasePrice"] for sku in product_api["skuList"]]) / (
+                len(product_api["skuList"] if len(product_api["skuList"]) > 0 else 1)
+            )
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            average_purchase_price = 0
         latest_orders_money = current_analytic["latest_orders_money"] if current_analytic else 0
 
         new_orders_money = latest_orders_money + (

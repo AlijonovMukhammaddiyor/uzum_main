@@ -1,6 +1,7 @@
+import logging
+
 from uzum.payment.serializers import MerchatTransactionsModelSerializer
 from uzum.payment.utils import get_params
-import logging
 
 logger = logging.getLogger(__name__)
 
