@@ -35,7 +35,7 @@ class CheckPerformTransaction:
                     "receipt_type": 0,
                     "items": [
                         {
-                            "title": package_string,
+                            "title": "UzAnalitika - Pullik Tarif",
                             "price": amount,
                             "count": 1,
                             "code": "10602010001000000",
