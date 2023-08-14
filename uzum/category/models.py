@@ -99,22 +99,22 @@ class Category(models.Model):
         category.descendants = ",".join(descendants)
         category.save()
 
-    # def update_descendants():
-    #     """
-    #     Updates descendants field of all categories.
-    #     """
-    #     # select categories only if it has analytics at today
-    #     categories = Category.objects.filter(categoryanalytics__date_pretty=get_today_pretty()).prefetch_related(
-    #         "child_categories"
-    #     )
-    #     print("Total categories: ", len(categories))
-    #     i = 0
-    #     for category in categories:
-    #         print(i)
-    #         i += 1
-    #         Category.update_descendants_rec(category)
+    def update_descendants():
+        """
+        Updates descendants field of all categories.
+        """
+        # select categories only if it has analytics at today
+        categories = Category.objects.filter(categoryanalytics__date_pretty=get_today_pretty()).prefetch_related(
+            "child_categories"
+        )
+        print("Total categories: ", len(categories))
+        i = 0
+        for category in categories:
+            print(i)
+            i += 1
+            Category.update_descendants_rec(category)
 
-    #     return None
+        return None
 
     def update_descendants_bulk():
         #     categories = list(
