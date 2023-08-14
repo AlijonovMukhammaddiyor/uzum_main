@@ -1594,7 +1594,8 @@ class ShopsWithMostRevenueYesterdayView(APIView):
                         analytics.total_reviews,
                         analytics.total_revenue,
                         analytics.total_products,
-                        analytics.date_pretty
+                        analytics.date_pretty,
+                        analytics.average_purchase_price
                     FROM
                         shop_shopanalytics AS analytics
                     INNER JOIN
@@ -1618,26 +1619,29 @@ class ShopsWithMostRevenueYesterdayView(APIView):
 
                     # Check if the shop is already in the grouped_data list
                     shop_entry = next((item for item in grouped_data if item["id"] == shop_id), None)
+                    # print(shop_entry)
 
                     if not shop_entry:
                         # If not, create a new shop entry
                         shop_entry = {
                             "id": shop_id,
                             "title": shop_title,
-                            "total_orders": [],
-                            "total_reviews": [],
+                            "total_orders": row["total_orders"],
+                            "total_reviews": row["total_reviews"],
                             "total_revenue": [],
-                            "total_products": [],
-                            "date_pretty": [],
+                            "total_products": row["total_products"],
+                            "date_pretty": row["date_pretty"],
+                            "average_purchase_price": row["average_purchase_price"],
                         }
                         grouped_data.append(shop_entry)
 
                     # Append data to the shop entry
-                    shop_entry["total_orders"].append(row["total_orders"])
-                    shop_entry["total_reviews"].append(row["total_reviews"])
+                    # shop_entry["total_orders"].append(row["total_orders"])
+                    # shop_entry["total_reviews"].append(row["total_reviews"])
                     shop_entry["total_revenue"].append(row["total_revenue"])
-                    shop_entry["total_products"].append(row["total_products"])
-                    shop_entry["date_pretty"].append(row["date_pretty"])
+                    # shop_entry["total_products"].append(row["total_products"])
+                    # shop_entry["average_purchase_price"].append(row["average_purchase_price"])
+                    # shop_entry["date_pretty"].append(row["date_pretty"])
 
             print("Time taken by yesterday top shops ", time.time() - start)
             return Response(
