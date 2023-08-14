@@ -40,4 +40,5 @@ urlpatterns = [
     ),
     path("top5/", views.Top5ShopsView.as_view(), name="top-shops"),
     path("yesterday-tops/", views.YesterdayTopsView.as_view(), name="yesterday-tops"),
+    path("tops/", views.ShopsWithMostRevenueYesterdayView.as_view(), name="top-shops"),
 ]

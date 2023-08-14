@@ -88,8 +88,6 @@ def update_uzum_data(args=None, **kwargs):
 
     add_russian_titles()
 
-    # fetch_product_ids()
-
     time.sleep(30)
 
     print("Setting banners...", product_associations, shop_association)

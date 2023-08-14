@@ -1483,6 +1483,178 @@ class UzumTotalShops(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class ShopsWithMostRevenueYesterdayView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request: Request):
+        """
+        Return top 5 shops which had themost orders yesterday
+        """
+        try:
+            start = time.time()
+            date_pretty = get_today_pretty_fake()
+            yesterday_pretty = get_day_before_pretty(date_pretty)
+
+            shop_with_no_sales = ShopAnalytics.objects.filter(date_pretty=date_pretty, total_orders=0).count()
+
+            def dictfetchall(cursor):
+                "Returns all rows from a cursor as a dict"
+                desc = cursor.description
+                return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        COUNT(today.shop_id) as shops_with_sales_yesterday
+                    FROM
+                        (
+                        SELECT
+                            shop_id,
+                            total_orders
+                        FROM
+                            shop_shopanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as today
+                    INNER JOIN
+                        (
+                        SELECT
+                            shop_id,
+                            total_orders
+                        FROM
+                            shop_shopanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as yesterday
+                    ON
+                        today.shop_id = yesterday.shop_id
+                    WHERE
+                        today.total_orders - COALESCE(yesterday.total_orders, 0) > 0
+                    """,
+                    [date_pretty, yesterday_pretty],
+                )
+
+                res = dictfetchall(cursor)
+                shops_with_sales_yesterday = res[0]["shops_with_sales_yesterday"]
+
+                cursor.execute(
+                    """
+                    SELECT
+                        today.shop_id,
+                        today.total_revenue - COALESCE(yesterday.total_revenue, 10000000000) as diff_revenue
+                    FROM
+                        (
+                        SELECT
+                            shop_id,
+                            total_revenue
+                        FROM
+                            shop_shopanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as today
+                    INNER JOIN
+                        (
+                        SELECT
+                            shop_id,
+                            total_revenue
+                        FROM
+                            shop_shopanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as yesterday
+                    ON
+                        today.shop_id = yesterday.shop_id
+                    INNER JOIN
+                        shop_shop as shop
+                    ON
+                        today.shop_id = shop.seller_id
+                    ORDER BY
+                        diff_revenue DESC
+                    LIMIT 5
+                """,
+                    [date_pretty, yesterday_pretty],
+                )
+
+                res = dictfetchall(cursor)
+                shop_ids = [row["shop_id"] for row in res]
+                shop_ids_tuple = tuple(shop_ids)
+                start_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=7), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+                cursor.execute(
+                    """
+                    SELECT
+                        analytics.shop_id,
+                        shop.title AS shop_title,
+                        analytics.total_orders,
+                        analytics.total_reviews,
+                        analytics.total_revenue,
+                        analytics.total_products,
+                        analytics.date_pretty
+                    FROM
+                        shop_shopanalytics AS analytics
+                    INNER JOIN
+                        shop_shop AS shop
+                    ON
+                        analytics.shop_id = shop.seller_id
+                    WHERE
+                        analytics.shop_id IN %s AND analytics.created_at >= %s
+                    ORDER BY
+                        analytics.shop_id, analytics.date_pretty DESC
+                    """,
+                    [shop_ids_tuple, start_date],
+                )
+                rows = dictfetchall(cursor)
+
+                # Group results by shop_id
+                grouped_data = []
+                for row in rows:
+                    shop_id = row["shop_id"]
+                    shop_title = row["shop_title"] + f"(({shop_id}))"
+
+                    # Check if the shop is already in the grouped_data list
+                    shop_entry = next((item for item in grouped_data if item["id"] == shop_id), None)
+
+                    if not shop_entry:
+                        # If not, create a new shop entry
+                        shop_entry = {
+                            "id": shop_id,
+                            "title": shop_title,
+                            "total_orders": [],
+                            "total_reviews": [],
+                            "total_revenue": [],
+                            "total_products": [],
+                            "date_pretty": [],
+                        }
+                        grouped_data.append(shop_entry)
+
+                    # Append data to the shop entry
+                    shop_entry["total_orders"].append(row["total_orders"])
+                    shop_entry["total_reviews"].append(row["total_reviews"])
+                    shop_entry["total_revenue"].append(row["total_revenue"])
+                    shop_entry["total_products"].append(row["total_products"])
+                    shop_entry["date_pretty"].append(row["date_pretty"])
+
+            print("Time taken by yesterday top shops ", time.time() - start)
+            return Response(
+                {
+                    "shops_with_sales_yesterday": shops_with_sales_yesterday,
+                    "shop_with_no_sales": shop_with_no_sales,
+                    "shops": grouped_data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class YesterdayTopsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
