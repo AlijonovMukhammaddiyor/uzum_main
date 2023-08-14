@@ -7,8 +7,8 @@ from django.db.models.functions import TruncDay
 from django.utils import timezone
 
 from uzum.category.models import Category, CategoryAnalytics
-from uzum.product.models import Product, ProductAnalytics
-from uzum.shop.models import Shop, ShopAnalytics
+from uzum.product.models import ProductAnalytics
+from uzum.shop.models import ShopAnalytics
 from uzum.sku.models import SkuAnalytics
 
 
@@ -160,7 +160,7 @@ def calculate_niche_score_for_category(category: Category, start_date: datetime.
     if start_date < datetime.datetime(2023, 5, 20, tzinfo=pytz.timezone("Asia/Tashkent")):
         start_date = datetime.datetime(2023, 5, 20, tzinfo=pytz.timezone("Asia/Tashkent"))
 
-    start_pretty = get_date_pretty(start_date)
+    # start_pretty = get_date_pretty(start_date)
     end_date = get_date_pretty(end_date)
 
 

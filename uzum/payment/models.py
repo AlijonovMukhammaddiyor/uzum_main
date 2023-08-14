@@ -2,6 +2,8 @@ import uuid
 
 from django.db import models
 
+from uzum.users.models import Tariffs
+
 PRO = 39 * 12137.70 * 100
 PREMIUM = 59 * 12137.70 * 100
 ENTERPRISE = 99 * 12137.70 * 100
@@ -44,7 +46,13 @@ class Order(models.Model):
     amount = models.FloatField(null=True, blank=True)
     order_id = models.AutoField(primary_key=True)
     user = models.ForeignKey("users.User", on_delete=models.CASCADE)
-    # status = models.IntegerField(choices=ORDER_STATUS, default=1)
+    months = models.IntegerField(default=1)
+    status = models.IntegerField(choices=ORDER_STATUS, default=1)
+    tariff = models.CharField(
+        max_length=10,
+        choices=Tariffs.choices,
+        default=Tariffs.BASE,
+    )
 
     def __str__(self):
         return f"User: {self.user} - Order: {self.order_id} - Amount: {self.amount}"

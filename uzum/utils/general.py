@@ -97,6 +97,10 @@ def check_user_tariff(request: Request, tarif: Tariffs = Tariffs.FREE):
         if not user:
             return None
         if request.user.is_authenticated:
+            # if current time is after user.payment_date, set user.tariff to FREE
+            if user.payment_date and user.payment_date < datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")):
+                user.tariff = Tariffs.FREE
+                user.save()
             if user.tariff == tarif:
                 return True
             else:
