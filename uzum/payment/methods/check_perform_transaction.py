@@ -21,9 +21,10 @@ class CheckPerformTransaction:
         logger.info("CheckPerformTransaction method called")
         amount = params.get("amount")
         package = getPackageType(amount)
-        if package is None:
-            raise IncorrectAmount()
-        package_string = "UzAnalitika - " + package
+        if not package:
+            package_string = "UzAnalitika - " + package
+        else:
+            package = "UzAnalitika - " + "Free"
         serializer = MerchatTransactionsModelSerializer(data=get_params(params))
         serializer.is_valid(raise_exception=True)
 
