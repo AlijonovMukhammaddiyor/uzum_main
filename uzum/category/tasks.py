@@ -145,12 +145,6 @@ def update_uzum_data(args=None, **kwargs):
     update_analytics(date_pretty)
     print(f"Analytics updated in {time.time() - start} seconds")
 
-    print("Creating Materialized View...")
-    start = time.time()
-    create_materialized_view(date_pretty)
-    print(f"Materialized View created in {time.time() - start} seconds")
-    print("Setting banners...")
-    Banner.set_products()
     print("Uzum data updated...")
     return True
 
@@ -187,6 +181,8 @@ def update_all_category_parents():
 
 def update_analytics(date_pretty: str):
     try:
+        yesterday_pretty = get_day_before_pretty(date_pretty)
+        create_product_latestanalytics(yesterday_pretty)
         start = time.time()
         ProductAnalytics.update_analytics(date_pretty)
         print(f"ProductAnalytics updated in {time.time() - start} seconds")
@@ -205,6 +201,13 @@ def update_analytics(date_pretty: str):
         update_category_tree()
 
         update_category_tree_with_data()
+
+        print("Creating Materialized View...")
+        start = time.time()
+        create_materialized_view(date_pretty)
+        print(f"Materialized View created in {time.time() - start} seconds")
+        print("Setting banners...")
+        Banner.set_products()
 
     except Exception as e:
         print("Error in update_analytics:", e)
