@@ -355,13 +355,7 @@ class CategoryAnalytics(models.Model):
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    WITH latest_pa AS (
-                        SELECT DISTINCT ON (product_id) *
-                        FROM product_productanalytics
-                        WHERE created_at < %s
-                        ORDER BY product_id, created_at DESC
-                    ),
-                    today_pa AS (
+                    WITH today_pa AS (
                         SELECT *
                         FROM product_productanalytics
                         WHERE date_pretty = %s
@@ -370,11 +364,11 @@ class CategoryAnalytics(models.Model):
                         SELECT
                             today_pa.product_id,
                             product_product.shop_id,
-                            (today_pa.orders_amount - COALESCE(latest_pa.orders_amount, 0)) AS difference
+                            (today_pa.orders_amount - COALESCE(latest_pa.latest_orders_amount, 0)) AS difference
                         FROM
                             today_pa
                             JOIN product_product ON today_pa.product_id = product_product.product_id
-                            LEFT JOIN latest_pa ON today_pa.product_id = latest_pa.product_id
+                            LEFT JOIN product_latest_analytics latest_pa ON today_pa.product_id = latest_pa.product_id
                     ),
                     shops_and_products_with_sales AS (
                         SELECT
@@ -401,7 +395,7 @@ class CategoryAnalytics(models.Model):
                         category_categoryanalytics.category_id = shops_and_products_with_sales."categoryId"
                         AND category_categoryanalytics.date_pretty = %s
                     """,
-                    [date, date_pretty, date_pretty],
+                    [date_pretty, date_pretty],
                 )
         except Exception as e:
             print(e, "Error in update_totals_with_sale")

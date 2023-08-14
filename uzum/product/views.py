@@ -2,6 +2,7 @@ import time
 import traceback
 from datetime import date, datetime, timedelta
 from itertools import groupby
+from django.db import connection
 
 import numpy as np
 import pandas as pd
@@ -35,7 +36,7 @@ from uzum.product.serializers import (
 )
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
-from uzum.utils.general import check_user, get_today_pretty_fake
+from uzum.utils.general import check_user, get_day_before_pretty, get_today_pretty_fake
 
 
 class ProductView(APIView):
@@ -531,6 +532,173 @@ class ProductReviews(APIView):
         except Exception as e:
             print(e)
             traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ProductsWithMostRevenueYesterdayView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request: Request):
+        try:
+            start = time.time()
+            date_pretty = get_today_pretty_fake()
+            yesterday_pretty = get_day_before_pretty(date_pretty)
+
+            # Get the count of products with sales yesterday
+            product_with_no_sales = ProductAnalytics.objects.filter(date_pretty=date_pretty, orders_amount=0).count()
+
+            def dictfetchall(cursor):
+                "Returns all rows from a cursor as a dict"
+                desc = cursor.description
+                return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        COUNT(today.product_id) as products_with_sales_yesterday
+                    FROM
+                        (
+                        SELECT
+                            product_id,
+                            orders_amount
+                        FROM
+                            product_productanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as today
+                    INNER JOIN
+                        (
+                        SELECT
+                            product_id,
+                            orders_amount
+                        FROM
+                            product_productanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as yesterday
+                    ON
+                        today.product_id = yesterday.product_id
+                    WHERE
+                        today.orders_amount - COALESCE(yesterday.orders_amount, 0) > 0
+                    """,
+                    [date_pretty, yesterday_pretty],
+                )
+
+                res = dictfetchall(cursor)
+                products_with_sales_yesterday = res[0]["products_with_sales_yesterday"]
+
+                cursor.execute(
+                    """
+                    SELECT
+                        today.product_id,
+                        today.orders_money - COALESCE(yesterday.orders_money, 10000000000) as diff_revenue
+                    FROM
+                        (
+                        SELECT
+                            product_id,
+                            orders_money
+                        FROM
+                            product_productanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as today
+                    INNER JOIN
+                        (
+                        SELECT
+                            product_id,
+                            orders_money
+                        FROM
+                            product_productanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as yesterday
+                    ON
+                        today.product_id = yesterday.product_id
+                    INNER JOIN
+                        product_product as product
+                    ON
+                        today.product_id = product.product_id
+                    ORDER BY
+                        diff_revenue DESC
+                    LIMIT 5
+                """,
+                    [date_pretty, yesterday_pretty],
+                )
+
+                res = dictfetchall(cursor)
+
+                product_ids = [row["product_id"] for row in res]
+                product_ids_tuple = tuple(product_ids)
+                start_date = timezone.make_aware(
+                    datetime.now() - timedelta(days=7), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+                cursor.execute(
+                    """
+                    SELECT
+                        product_id,
+                        orders_amount,
+                        reviews_amount,
+                        orders_money,
+                        average_purchase_price,
+                        rating,
+                        date_pretty
+                    FROM
+                        product_productanalytics
+                    WHERE
+                        product_id IN %s AND created_at >= %s
+                    ORDER BY
+                        product_id, date_pretty DESC
+                    """,
+                    [product_ids_tuple, start_date],
+                )
+                rows = dictfetchall(cursor)
+
+                # Group results by shop_id
+                grouped_data = []
+                for row in rows:
+                    product_id = row["product_id"]
+
+                    # Check if the product is already in the grouped_data list
+                    product_entry = next((item for item in grouped_data if item["id"] == product_id), None)
+
+                    if not product_entry:
+                        # If not, create a new product entry
+                        product_entry = {
+                            "id": product_id,
+                            "orders_amount": [],
+                            "reviews_amount": [],
+                            "orders_money": [],
+                            "average_purchase_price": [],
+                            "rating": [],
+                            "date_pretty": [],
+                        }
+                        grouped_data.append(product_entry)
+
+                    # Append data to the product entry
+                    product_entry["orders_amount"].append(row["orders_amount"])
+                    product_entry["reviews_amount"].append(row["reviews_amount"])
+                    product_entry["orders_money"].append(row["orders_money"])
+                    product_entry["average_purchase_price"].append(row["average_purchase_price"])
+                    product_entry["rating"].append(row["rating"])
+                    product_entry["date_pretty"].append(row["date_pretty"])
+
+            print("Products with most revenue yesterday took", time.time() - start, "seconds")
+
+            return Response(
+                {
+                    "product_with_no_sales": product_with_no_sales,
+                    "products_with_sales_yesterday": products_with_sales_yesterday,
+                    "top_products": grouped_data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            print(e)
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

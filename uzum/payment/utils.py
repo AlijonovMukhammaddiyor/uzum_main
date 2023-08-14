@@ -6,7 +6,7 @@ from django.utils.timezone import make_aware
 
 from config.settings.base import env
 from uzum.payment.exceptions import PerformTransactionDoesNotExist
-from uzum.payment.models import Order
+from uzum.payment.models import ENTERPRISE, PREMIUM, PRO, Order
 
 logger = logging.getLogger(__name__)
 
@@ -66,3 +66,17 @@ def to_json(**kwargs) -> dict:
     }
 
     return json.dumps(data)
+
+
+def getPackageType(amount):
+    """
+    Args:
+        amount (_type_): amount in tiyin
+    """
+    if PRO <= amount <= PREMIUM:
+        return "PRO"
+    elif PREMIUM <= amount <= ENTERPRISE:
+        return "PREMIUM"
+    elif ENTERPRISE <= amount:
+        return "ENTERPRISE"
+    return None
