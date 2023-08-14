@@ -135,7 +135,7 @@ class MerchantAPIView(APIView):
             raise PermissionDenied(error_message=error_message) from error
 
         merchant_key = password.split(":")[-1]
-
+        logger.info("Merchant key is %s", merchant_key)
         if merchant_key == env.str("PAYME_KEY"):
             is_payme = True
 

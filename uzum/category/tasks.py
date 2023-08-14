@@ -46,7 +46,8 @@ def update_uzum_data(args=None, **kwargs):
     print(datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%H:%M:%S" + " - " + "%d/%m/%Y"))
     print("Updating category parents")
     start = time.time()
-    update_all_category_parents()
+    # update_all_category_parents()
+    Category.update_descendants()
     print("Time taken: ", time.time() - start)
     create_and_update_categories()
     # await create_and_update_products()
@@ -83,7 +84,7 @@ def update_uzum_data(args=None, **kwargs):
         create_products_from_api(products_api, product_campaigns, shop_analytics_done)
         time.sleep(30)
         del products_api
-
+    Category.update_descendants()
     time.sleep(600)
 
     add_russian_titles()
