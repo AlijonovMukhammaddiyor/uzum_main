@@ -31,7 +31,7 @@ class GeneratePayLink:
 
     def __init__(self, order_id: str, amount: Decimal) -> None:
         self.order_id = order_id
-        self.amount = self.to_tiyin(amount)
+        self.amount = amount
 
     def generate_link(self) -> str:
         """
