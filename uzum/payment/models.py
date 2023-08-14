@@ -2,7 +2,7 @@ import uuid
 
 from django.db import models
 
-from uzum.users.models import Tariffs
+from uzum.utils.general import Tariffs
 
 PRO = 39 * 12137.70 * 100
 PREMIUM = 59 * 12137.70 * 100

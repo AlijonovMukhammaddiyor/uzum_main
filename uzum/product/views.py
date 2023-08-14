@@ -35,13 +35,14 @@ from uzum.product.serializers import (
     ProductSerializer,
 )
 from uzum.sku.models import SkuAnalytics
-from uzum.users.models import Tariffs, User
+from uzum.users.models import User
 from uzum.utils.general import (
     authorize_Base_tariff,
     authorize_Seller_tariff,
     get_day_before_pretty,
     get_today_pretty_fake,
 )
+from uzum.utils.general import Tariffs
 
 
 # Base tariff
@@ -292,8 +293,7 @@ class SingleProductAnalyticsView(APIView):
             authorize_Base_tariff(request)
             print("SingleProductAnalyticsView")
             user: User = request.user
-            is_proplus = user.is_proplus
-            days = 60 if is_proplus else 30
+            days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
 
             # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
             start_date = timezone.make_aware(

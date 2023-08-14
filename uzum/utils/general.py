@@ -1,11 +1,19 @@
 import datetime
 
 import pytz
+from django.db import models
+from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from uzum.users.models import Tariffs, User
+
+class Tariffs(models.TextChoices):
+    FREE = "free", _("Free")
+    TRIAL = "trial", _("Trial")
+    BASE = "base", _("Base")
+    SELLER = "seller", _("Seller")
+    BUSINESS = "business", _("Business")
 
 
 def decode_request(request: Request, method: str) -> dict:
@@ -93,7 +101,7 @@ def check_user_tariff(request: Request, tarif: Tariffs = Tariffs.FREE):
     Returns:
     """
     try:
-        user: User = request.user
+        user = request.user
         if not user:
             return None
         if request.user.is_authenticated:

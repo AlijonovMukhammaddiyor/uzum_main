@@ -26,8 +26,14 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
 from uzum.review.views import CookieJWTAuthentication
 from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsTable
-from uzum.users.models import Tariffs, User
-from uzum.utils.general import authorize_Base_tariff, get_day_before_pretty, get_next_day_pretty, get_today_pretty_fake
+from uzum.users.models import User
+from uzum.utils.general import (
+    authorize_Base_tariff,
+    get_day_before_pretty,
+    get_next_day_pretty,
+    get_today_pretty_fake,
+    Tariffs,
+)
 
 from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer
 
@@ -99,7 +105,7 @@ class CurrentShopView(APIView):
             shops = user.shops.all()
 
             # check if user has this shop
-            if not shops.filter(link=link) and not user.is_enterprise:
+            if not shops.filter(link=link) and user.tariff != Tariffs.BUSINESS:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
 
             shop = Shop.objects.get(link=link)
@@ -276,14 +282,10 @@ class UserShopsView(APIView):
             authorize_Base_tariff(request)
 
             user = request.user
-            is_paid = user.is_pro or user.is_proplus or user.is_enterprise
-
-            if not is_paid:
-                return Response({"error": "Please subscribe to see this page"}, status=201)
 
             shops = user.shops.all()
 
-            if not shops:
+            if not shops or len(shops) == 0:
                 return Response({"data": []}, status=201)
 
             # Execute raw SQL
@@ -500,7 +502,7 @@ class ShopAnalyticsView(APIView):
 
             shops = user.shops.all()
 
-            if not shops.filter(seller_id=seller_id).exists():
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
                 raise Response(status=status.HTTP_403_FORBIDDEN)
 
             days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
@@ -623,7 +625,7 @@ class ShopCompetitorsView(APIView):
             user: User = request.user
             shops = user.shops.all()
 
-            if not shops.filter(seller_id=seller_id).exists():
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
                 return Response(status=status.HTTP_403_FORBIDDEN)
 
             if seller_id is None:
@@ -708,7 +710,7 @@ class ShopDailySalesView(APIView):
 
             shops = user.shops.all()
 
-            if not shops.filter(seller_id=seller_id).exists():
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
                 return Response(status=status.HTTP_403_FORBIDDEN)
 
             print("Shop Daily Sales View")
@@ -733,7 +735,7 @@ class ShopDailySalesView(APIView):
             if start_date < timezone.make_aware(
                 datetime.now() - timedelta(days=30), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0):
-                if user.is_proplus:
+                if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS:
                     pass
                 else:
                     start_date = timezone.make_aware(
@@ -978,7 +980,7 @@ class ShopTopProductsView(APIView):
         user: User = request.user
         shops = user.shops.all()
 
-        if not shops.filter(seller_id=seller_id).exists():
+        if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
             return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"})
 
         seller_id = self.kwargs["seller_id"]
@@ -1024,7 +1026,7 @@ class StoppedProductsView(APIView):
             user: User = request.user
             shops = user.shops.all()
 
-            if not shops.filter(seller_id=seller_id).exists():
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
                 return Response(
                     status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
                 )
@@ -1095,7 +1097,7 @@ class ShopCategoriesView(APIView):
             user: User = request.user
             shops = user.shops.all()
 
-            if not shops.filter(seller_id=seller_id).exists():
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
                 return Response(
                     status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
                 )
@@ -1152,7 +1154,7 @@ class ShopCategoryAnalyticsView(APIView):
             user: User = request.user
             shops = user.shops.all()
 
-            if not shops.filter(seller_id=seller_id).exists():
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
                 return Response(
                     status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
                 )
@@ -1284,7 +1286,7 @@ class ShopProductsByCategoryView(APIView):
             user: User = request.user
             shops = user.shops.all()
 
-            if not shops.filter(seller_id=seller_id).exists():
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
                 return Response(
                     status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
                 )

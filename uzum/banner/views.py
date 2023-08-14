@@ -18,8 +18,7 @@ from uzum.banner.serializers import BannerSerializer
 # from uzum.category.utils import seconds_until_next
 from uzum.product.models import Product, ProductAnalytics
 from uzum.product.serializers import ProductAnalyticsSerializer
-from uzum.users.models import Tariffs
-from uzum.utils.general import authorize_Seller_tariff, check_user_tariff, get_day_before_pretty, get_today_pretty_fake
+from uzum.utils.general import authorize_Seller_tariff, get_day_before_pretty, get_today_pretty_fake
 
 
 class BannersView(APIView):

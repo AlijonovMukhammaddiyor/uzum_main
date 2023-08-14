@@ -1,8 +1,5 @@
-import uuid
 from datetime import timedelta
 
-import pytz
-from celery import shared_task
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save
@@ -15,6 +12,7 @@ from slack_sdk.errors import SlackApiError
 
 from config.settings.base import env
 from uzum.payment.models import MerchatTransactionsModel
+from uzum.utils.general import Tariffs
 
 
 def get_current_time():
@@ -23,14 +21,6 @@ def get_current_time():
 
 def get_one_day_later():
     return timezone.now() + timedelta(days=1)
-
-
-class Tariffs(models.TextChoices):
-    FREE = "free", _("Free")
-    TRIAL = "trial", _("Trial")
-    BASE = "base", _("Base")
-    SELLER = "seller", _("Seller")
-    BUSINESS = "business", _("Business")
 
 
 class User(AbstractUser):
@@ -100,3 +90,32 @@ class User(AbstractUser):
             # The user has no payments yet, calculate next date based on registration date
             next_payment_date = self.date_joined + timedelta(days=1)
         return next_payment_date
+
+
+@receiver(post_save, sender=User)
+def start_trial(sender, instance: User, created, **kwargs):
+    if created:
+        channel_id = "C05K0MK0VG8"
+        slack_token = env("SLACK_BOT_TOKEN")
+        client = WebClient(token=slack_token)
+        block = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"Username - {instance.username}",
+                },
+            }
+        ]
+
+        try:
+            # Call the conversations.list method using the WebClient
+            client.chat_postMessage(
+                channel=channel_id,
+                text="New user signed up\n",
+                blocks=block
+                # You could also use a blocks[] array to send richer content
+            )
+
+        except SlackApiError as e:
+            print(f"Error: {e}")
