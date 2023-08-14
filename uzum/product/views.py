@@ -2,7 +2,6 @@ import time
 import traceback
 from datetime import date, datetime, timedelta
 from itertools import groupby
-from django.db import connection
 
 import numpy as np
 import pandas as pd
@@ -10,6 +9,7 @@ import pytz
 import requests
 from django.core.cache import cache
 from django.core.paginator import Paginator
+from django.db import connection
 from django.db.models import Avg, Count, Prefetch, Q, Sum
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -36,9 +36,16 @@ from uzum.product.serializers import (
 )
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
-from uzum.utils.general import check_user, get_day_before_pretty, get_today_pretty_fake
+from uzum.utils.general import (
+    authorize_Base_tariff,
+    authorize_Seller_tariff,
+    get_day_before_pretty,
+    get_today_pretty_fake,
+)
+from uzum.utils.general import Tariffs
 
 
+# Base tariff
 class ProductView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -47,9 +54,7 @@ class ProductView(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request, product_id: int):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-
+            authorize_Base_tariff(request)
             product = Product.objects.get(product_id=product_id)
 
             return Response(
@@ -66,6 +71,7 @@ class ProductView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Free tariff
 class Top5ProductsView(APIView):
     permission_classes = [AllowAny]
     allowed_methods = ["GET"]
@@ -86,11 +92,10 @@ class Top5ProductsView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class AllProductsPriceSegmentationView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    # replace the below with your actual serializer
-    # serializer_class = ProductAnalyticsSerializer
     queryset = ProductAnalyticsView.objects.all()
     allowed_methods = ["GET"]
     pagination_class = PageNumberPagination
@@ -118,9 +123,7 @@ class AllProductsPriceSegmentationView(APIView):
     def get(self, request: Request):
         try:
             start_time = time.time()
-            # if check_user(request) is None:
-            #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-
+            authorize_Base_tariff(request)
             segments_count = request.query_params.get("segments_count", 15)
             segments_count = int(segments_count)
 
@@ -171,6 +174,7 @@ class AllProductsPriceSegmentationView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class CurrentProductView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -179,8 +183,7 @@ class CurrentProductView(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request, product_id: str):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
             start = time.time()
             if product_id is None:
                 return Response({"error": "product_id is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -203,6 +206,7 @@ class CurrentProductView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class ProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -223,7 +227,6 @@ class ProductsView(ListAPIView):
     @extend_schema(tags=["Product"])
     def get_queryset(self):
         try:
-            # Get query parameters
             start = time.time()
             column = self.request.query_params.get("column", "orders_money")  # default is 'orders_amount'
             order = self.request.query_params.get("order", "desc")  # default is 'asc'
@@ -268,7 +271,13 @@ class ProductsView(ListAPIView):
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @extend_schema(tags=["Product"])
+    def list(self, request: Request):
+        authorize_Base_tariff(self.request)
+        return self.list(request)
 
+
+# Base tariff
 class SingleProductAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -281,13 +290,10 @@ class SingleProductAnalyticsView(APIView):
         try:
             start = time.time()
 
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-
+            authorize_Base_tariff(request)
             print("SingleProductAnalyticsView")
             user: User = request.user
-            is_proplus = user.is_proplus
-            days = 60 if is_proplus else 30
+            days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
 
             # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
             start_date = timezone.make_aware(
@@ -343,6 +349,7 @@ class SingleProductAnalyticsView(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff with Some Seller tariff
 class SimilarProductsViewByUzum(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -378,13 +385,10 @@ class SimilarProductsViewByUzum(APIView):
     def get(self, request: Request, product_id: str):
         try:
             start = time.time()
-            user = check_user(request)
-            if user is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
 
-            # is_proplus = user.is_proplus
-            # days = 60 if is_proplus else 3
-            days = 60
+            user: User = request.user
+            days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 2
 
             productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
             productIds.append(product_id)
@@ -433,7 +437,6 @@ class SimilarProductsViewByUzum(APIView):
                 )
                 product["product__category__title_ru"] += f"(({product['product__category__categoryId']}))"
 
-            # group by product__product_id
             grouped_analytics = []
             for product_id, group in groupby(analytics, key=lambda x: x["product__product_id"]):
                 grouped_analytics.append(
@@ -492,9 +495,6 @@ class ProductReviews(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request, product_id: str):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-
             reviews = ProductReviews.fetch_reviews_from_uzum(product_id)
             #         reviews = ProductReviews.fetch_reviews_from_uzum(product_id)
 
@@ -535,6 +535,7 @@ class ProductReviews(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Free tariff
 class ProductsWithMostRevenueYesterdayView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -548,6 +549,9 @@ class ProductsWithMostRevenueYesterdayView(APIView):
 
             # Get the count of products with sales yesterday
             product_with_no_sales = ProductAnalytics.objects.filter(date_pretty=date_pretty, orders_amount=0).count()
+            products_with_no_reviews = ProductAnalytics.objects.filter(
+                date_pretty=date_pretty, reviews_amount=0
+            ).count()
 
             def dictfetchall(cursor):
                 "Returns all rows from a cursor as a dict"
@@ -589,6 +593,41 @@ class ProductsWithMostRevenueYesterdayView(APIView):
 
                 res = dictfetchall(cursor)
                 products_with_sales_yesterday = res[0]["products_with_sales_yesterday"]
+
+                cursor.execute(
+                    """
+                    SELECT
+                        COUNT(today.product_id) as products_with_reviews_yesterday
+                    FROM
+                        (
+                        SELECT
+                            product_id,
+                            reviews_amount
+                        FROM
+                            product_productanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as today
+                    INNER JOIN
+                        (
+                        SELECT
+                            product_id,
+                            reviews_amount
+                        FROM
+                            product_productanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as yesterday
+                    ON
+                        today.product_id = yesterday.product_id
+                    WHERE
+                        today.reviews_amount - COALESCE(yesterday.reviews_amount, 0) > 0
+                    """,
+                    [date_pretty, yesterday_pretty],
+                )
+
+                res = dictfetchall(cursor)
+                products_with_reviews_yesterday = res[0]["products_with_reviews_yesterday"]
 
                 cursor.execute(
                     """
@@ -639,19 +678,32 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                 cursor.execute(
                     """
                     SELECT
-                        product_id,
-                        orders_amount,
-                        reviews_amount,
-                        orders_money,
-                        average_purchase_price,
-                        rating,
-                        date_pretty
+                        pa.product_id,
+                        pa.orders_amount,
+                        pa.reviews_amount,
+                        pa.orders_money,
+                        pa.average_purchase_price,
+                        pa.rating,
+                        pa.date_pretty,
+                        pp.title AS product_title,
+                        pp.title_ru AS product_title_ru,
+                        cat."categoryId" AS category_id,
+                        cat.title AS category_title,
+                        cat.title_ru AS category_title_ru,
+                        shop.seller_id AS shop_id,
+                        shop.title AS shop_title
                     FROM
-                        product_productanalytics
+                        product_productanalytics AS pa
+                    JOIN
+                        product_product AS pp ON pa.product_id = pp.product_id
+                    JOIN
+                        category_category AS cat ON pp.category_id = cat."categoryId"  -- Adjust the table and column names as necessary
+                    JOIN
+                        shop_shop AS shop ON pp.shop_id = shop.seller_id        -- Adjust the table and column names as necessary
                     WHERE
-                        product_id IN %s AND created_at >= %s
+                        pa.product_id IN %s AND pa.created_at >= %s
                     ORDER BY
-                        product_id, date_pretty DESC
+                        pa.product_id, pa.date_pretty DESC
                     """,
                     [product_ids_tuple, start_date],
                 )
@@ -669,23 +721,28 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                         # If not, create a new product entry
                         product_entry = {
                             "id": product_id,
-                            "orders_amount": [],
-                            "reviews_amount": [],
-                            "orders_money": [],
-                            "average_purchase_price": [],
-                            "rating": [],
-                            "date_pretty": [],
+                            "title": row["product_title"] + f"(({product_id}))",
+                            "title_ru": (row["product_title_ru"] if row["product_title_ru"] else row["product_title"])
+                            + f"(({product_id}))",
+                            "category_id": row["category_id"],
+                            "category_title": row["category_title"] + f"(({row['category_id']}))",
+                            "category_title_ru": (
+                                row["category_title_ru"] if row["category_title_ru"] else row["category_title"]
+                            )
+                            + f"(({row['category_id']}))",
+                            "shop_id": row["shop_id"],
+                            "shop_title": row["shop_title"] + f"(({row['shop_id']}))",
+                            "orders_amount": row["orders_amount"],
+                            "reviews_amount": row["reviews_amount"],
+                            "orders_money": [row["orders_money"]],  # Initialize with the current order_money in a list
+                            "average_purchase_price": row["average_purchase_price"],
+                            "rating": row["rating"],
+                            "date_pretty": row["date_pretty"],
                         }
                         grouped_data.append(product_entry)
-
-                    # Append data to the product entry
-                    product_entry["orders_amount"].append(row["orders_amount"])
-                    product_entry["reviews_amount"].append(row["reviews_amount"])
-                    product_entry["orders_money"].append(row["orders_money"])
-                    product_entry["average_purchase_price"].append(row["average_purchase_price"])
-                    product_entry["rating"].append(row["rating"])
-                    product_entry["date_pretty"].append(row["date_pretty"])
-
+                    else:
+                        # If the product entry exists, just append the orders_money to the list
+                        product_entry["orders_money"].append(row["orders_money"])
             print("Products with most revenue yesterday took", time.time() - start, "seconds")
 
             return Response(
@@ -693,6 +750,8 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                     "product_with_no_sales": product_with_no_sales,
                     "products_with_sales_yesterday": products_with_sales_yesterday,
                     "top_products": grouped_data,
+                    "products_with_reviews_yesterday": products_with_reviews_yesterday,
+                    "products_with_no_reviews": products_with_no_reviews,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -702,6 +761,7 @@ class ProductsWithMostRevenueYesterdayView(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Seller tariff
 class NewProductsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -726,11 +786,8 @@ class NewProductsView(APIView):
     @extend_schema(tags=["Product"])
     def get(self, request: Request):
         try:
+            authorize_Seller_tariff(request)
             print("Start NewProductsView")
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-            elif not request.user.is_proplus:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             start = time.time()
             column = request.query_params.get("column", "orders_amount")  # default is 'orders_amount'
             order = request.query_params.get("order", "desc")  # default is 'desc'
@@ -825,6 +882,7 @@ class NewProductsView(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Seller tariff
 class GrowingProductsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -851,10 +909,7 @@ class GrowingProductsView(APIView):
     def get(self, request: Request):
         try:
             print("Start GrowingProductsView")
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-            elif not request.user.is_proplus:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Seller_tariff(request)
             start = time.time()
             column = request.query_params.get("column", "orders_amount")  # default is 'orders_amount'
             order = request.query_params.get("order", "desc")  # default is 'desc'

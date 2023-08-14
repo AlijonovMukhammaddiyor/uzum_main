@@ -31,12 +31,13 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.review.views import CookieJWTAuthentication
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
-from uzum.utils.general import check_user, get_today_pretty_fake
+from uzum.utils.general import Tariffs, authorize_Base_tariff, authorize_Seller_tariff, get_today_pretty_fake
 
 from .models import Category, CategoryAnalytics
 from .serializers import CategoryAnalyticsSeralizer, CategorySerializer, ProductAnalyticsViewSerializer
 
 
+# Base tariff
 class CurrentCategoryView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -47,10 +48,7 @@ class CurrentCategoryView(APIView):
     @extend_schema(tags=["Category"])
     def get(self, request: Request, category_id: int):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-
-            user: User = request.user
+            authorize_Base_tariff(request)
 
             category = get_object_or_404(Category, pk=category_id)
             if not category:
@@ -65,6 +63,7 @@ class CurrentCategoryView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Free tariff
 class AllCategoriesSegmentation(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -90,6 +89,7 @@ class AllCategoriesSegmentation(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class CategoryTreeView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -128,11 +128,10 @@ class CategoryTreeView(APIView):
     @extend_schema(tags=["Category"])
     def get(self, request: Request):
         try:
-            print("category tree")
+            authorize_Base_tariff(request)
             redis_key = "category_tree"
 
             if cache.get(redis_key):
-                # print("category tree found", cache.get("category_tree"))
                 return Response(status=status.HTTP_200_OK, data=cache.get("category_tree"))
             print("category tree not found")
             root_category = Category.objects.get(categoryId=1)
@@ -148,6 +147,7 @@ class CategoryTreeView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class CategoryProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -210,8 +210,7 @@ class CategoryProductsView(ListAPIView):
     def list(self, request, *args, **kwargs):
         start_time = time.time()
 
-        if check_user(request) is None:
-            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+        authorize_Base_tariff(request)
 
         print("CATEGORY PRODUCTS")
         response = super().list(request, *args, **kwargs)
@@ -219,6 +218,7 @@ class CategoryProductsView(ListAPIView):
         return response
 
 
+# Base tariff
 class CategoryTopProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -275,12 +275,12 @@ class CategoryTopProductsView(ListAPIView):
         }
 
     def get(self, request, category_id: int):
-        if check_user(request) is None:
-            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+        authorize_Base_tariff(request)
         products = self.get_products(category_id)
         return Response(status=status.HTTP_200_OK, data=products)
 
 
+# Base tariff
 class CategoryProductsPeriodComparisonView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -419,8 +419,7 @@ class CategoryProductsPeriodComparisonView(APIView):
             _type_: _description_
         """
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
             category = Category.objects.get(categoryId=category_id)
             category_products = self.get_category_products_comparison(category)
 
@@ -447,6 +446,7 @@ class CategoryProductsPeriodComparisonView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class CategoryDailyAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -492,11 +492,10 @@ class CategoryDailyAnalyticsView(APIView):
             }]
         """
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
 
             user: User = request.user
-            range = 30 if user.is_pro else 60
+            range = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
 
             start = time.time()
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
@@ -525,6 +524,7 @@ class CategoryDailyAnalyticsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class SubcategoriesView(APIView):
     """
     This class implements CategoryAnalytics for each subcategory.
@@ -543,10 +543,7 @@ class SubcategoriesView(APIView):
     def get(self, request: Request, category_id):
         try:
             start = time.time()
-
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-
+            authorize_Base_tariff(request)
             category = Category.objects.get(categoryId=category_id)
             children = category.child_categories.all()
 
@@ -610,6 +607,7 @@ def dictfetchall(cursor):
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
+# Base tariff
 class CategoryPriceSegmentationView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -642,8 +640,7 @@ class CategoryPriceSegmentationView(APIView):
     def get(self, request: Request, category_id):
         try:
             start_time = time.time()
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
             # range_count = request.query_params.get("range", 15)
             segments_count = request.query_params.get("segments_count", 15)
 
@@ -740,6 +737,7 @@ class CategoryPriceSegmentationView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class CategoryShopsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -763,8 +761,7 @@ class CategoryShopsView(APIView):
     def get(self, request: Request, category_id):
         try:
             start_time = time.time()
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
             category = Category.objects.get(categoryId=category_id)
 
             if category.descendants:
@@ -816,6 +813,7 @@ class CategoryShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class NicheSelectionView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -835,8 +833,7 @@ class NicheSelectionView(APIView):
         """
         try:
             start = time.time()
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
 
             search = request.query_params.get("search", "")
             today_pretty = get_today_pretty_fake()
@@ -925,6 +922,7 @@ class NicheSelectionView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
 
 
+# Seller tariff
 @method_decorator(csrf_protect, name="dispatch")
 class GrowingCategoriesView(APIView):
     permission_classes = [IsAuthenticated]
@@ -935,10 +933,7 @@ class GrowingCategoriesView(APIView):
     def get(self, request: Request):
         try:
             print("Start GrowingProductsView")
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-            elif not request.user.is_proplus:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Seller_tariff(request)
             start = time.time()
 
             start_date = timezone.make_aware(
@@ -988,6 +983,7 @@ class GrowingCategoriesView(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Seller tariff
 class MainCategoriesAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CookieJWTAuthentication]
@@ -995,16 +991,14 @@ class MainCategoriesAnalyticsView(APIView):
 
     def get(self, request: Request):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-            elif not request.user.is_proplus:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            print("Start MainCategoriesAnalyticsView")
+            authorize_Seller_tariff(request)
 
             start = time.time()
 
             user: User = request.user
 
-            days = 30 if user.is_pro else 60
+            days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
 
             start_date = timezone.make_aware(
                 datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),

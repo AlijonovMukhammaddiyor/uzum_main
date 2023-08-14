@@ -1,6 +1,8 @@
 import json
 import logging
+from datetime import datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
 from django.utils.timezone import datetime as dt
 from django.utils.timezone import make_aware
 
@@ -74,3 +76,10 @@ def getPackageType(amount):
         amount (_type_): amount in tiyin
     """
     return "Pullik Tarif"
+
+
+def next_payment_date(start_date, months=1):
+    if months == 1 or months == 3:
+        return start_date + relativedelta(months=months)
+    else:
+        raise ValueError("Invalid period. Accepts only '1 month' or '3 months'.")

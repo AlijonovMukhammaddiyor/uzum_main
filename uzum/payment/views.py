@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 from rest_framework.permissions import IsAuthenticated
@@ -9,6 +10,8 @@ from config.settings.base import env
 from uzum.payment.methods.generate_link import GeneratePayLink
 from uzum.payment.models import Order
 from uzum.payment.serializers import GeneratePayLinkSerializer
+from uzum.payment.utils import next_payment_date
+from uzum.users.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +166,15 @@ class MerchantAPIView(APIView):
         order = Order.objects.get(order_id=order_id)
         order.status = 3  # 3 - performed
         order.save()
+
+        # now update user tariff
+        user: User = order.user
+        months = order.months
+        tariff = order.tariff
+        user.tariff = tariff
+        user.payment_date = next_payment_date(datetime.datetime.now(), months)
+
+        user.save()
         logger.info(f"perform_transaction for order_id: {order_id}, response: {action}")
 
     def cancel_transaction(self, order_id, action) -> None:

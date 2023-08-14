@@ -76,10 +76,7 @@ class UserSerializer(serializers.ModelSerializer):
             "password",
             "email",
             "is_staff",
-            "is_proplus",
-            "is_pro",
-            "is_enterprise",
-            "is_paid",
+            "tariff",
             "shops_updated_at",
         ]
 
@@ -94,9 +91,7 @@ class UserSerializer(serializers.ModelSerializer):
             "referred_by": {"required": False},
             "is_staff": {"required": False},
             "shops_updated_at": {"required": False},
-            "is_proplus": {"required": False},
-            "is_pro": {"required": False},
-            "is_enterprise": {"required": False},
+            "tariff": {"required": False},
         }
 
     def create(self, validated_data: dict):

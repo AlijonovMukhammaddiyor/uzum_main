@@ -1,6 +1,6 @@
 import logging
-from uzum.payment.exceptions import IncorrectAmount
 
+from uzum.payment.exceptions import IncorrectAmount
 from uzum.payment.serializers import MerchatTransactionsModelSerializer
 from uzum.payment.utils import get_params, getPackageType
 

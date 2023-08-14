@@ -5,8 +5,7 @@ from datetime import datetime, timedelta
 
 import pytz
 from django.db import connection
-from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum, Window
-from django.db.models.functions import Rank, RowNumber
+from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -28,7 +27,13 @@ from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializ
 from uzum.review.views import CookieJWTAuthentication
 from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsTable
 from uzum.users.models import User
-from uzum.utils.general import check_user, get_day_before_pretty, get_next_day_pretty, get_today_pretty_fake
+from uzum.utils.general import (
+    authorize_Base_tariff,
+    get_day_before_pretty,
+    get_next_day_pretty,
+    get_today_pretty_fake,
+    Tariffs,
+)
 
 from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer
 
@@ -42,6 +47,7 @@ def get_totals(date_pretty):
     return totals
 
 
+# Free tariff
 class Top5ShopsView(APIView):
     permission_classes = [AllowAny]
     serializer_class = ShopSerializer
@@ -65,6 +71,7 @@ class Top5ShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Free tariff
 class AllShopsView(APIView):
     permission_classes = [AllowAny]
     serializer_class = ShopSerializer
@@ -74,6 +81,7 @@ class AllShopsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
+            # authorize_Base_tariff(request)
             shops = Shop.objects.all().values("title", "link", "account_id")
             return Response(shops, status=status.HTTP_200_OK)
         except Exception as e:
@@ -82,6 +90,7 @@ class AllShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class CurrentShopView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = [JWTAuthentication]
@@ -90,14 +99,13 @@ class CurrentShopView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request, link: str):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
 
             user = request.user
             shops = user.shops.all()
 
             # check if user has this shop
-            if not shops.filter(link=link) and not user.is_enterprise:
+            if not shops.filter(link=link) and user.tariff != Tariffs.BUSINESS:
                 return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
 
             shop = Shop.objects.get(link=link)
@@ -109,6 +117,7 @@ class CurrentShopView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class TreemapShopsView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = [JWTAuthentication]
@@ -117,8 +126,7 @@ class TreemapShopsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
             shops = (
                 ShopAnalytics.objects.filter(date_pretty=get_today_pretty_fake())
                 .order_by("-total_revenue")
@@ -146,7 +154,7 @@ class TreemapShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# free
+# Base tariff
 class ShopsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -168,6 +176,7 @@ class ShopsView(APIView):
 
     def get(self, request: Request, *args, **kwargs):
         try:
+            authorize_Base_tariff(request)
             date_pretty = get_today_pretty_fake()
             page_number = int(request.query_params.get("page", 1))
             offset = (page_number - 1) * self.PAGE_SIZE
@@ -262,6 +271,7 @@ class ShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class UserShopsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -269,15 +279,13 @@ class UserShopsView(APIView):
 
     def get(self, request: Request, *args, **kwargs):
         try:
-            user = request.user
-            is_paid = user.is_pro or user.is_proplus or user.is_enterprise
+            authorize_Base_tariff(request)
 
-            if not is_paid:
-                return Response({"error": "Please subscribe to see this page"}, status=201)
+            user = request.user
 
             shops = user.shops.all()
 
-            if not shops:
+            if not shops or len(shops) == 0:
                 return Response({"data": []}, status=201)
 
             # Execute raw SQL
@@ -315,6 +323,7 @@ class UserShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class ShopsOrdersSegmentationView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -383,8 +392,7 @@ class ShopsOrdersSegmentationView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
             start_date_str = request.query_params.get(
                 "start_date", (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")  # default 30 days ago
             )
@@ -401,6 +409,7 @@ class ShopsOrdersSegmentationView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class ShopsProductsSegmentation(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -466,8 +475,7 @@ class ShopsProductsSegmentation(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
             segments = self.shops_segmentation(request)
 
             return Response(data={"data": segments}, status=status.HTTP_200_OK)
@@ -477,6 +485,7 @@ class ShopsProductsSegmentation(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class ShopAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -488,10 +497,15 @@ class ShopAnalyticsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request, seller_id: int):
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
             user: User = request.user
-            days = 60 if user.is_proplus else 30
+
+            shops = user.shops.all()
+
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+                raise Response(status=status.HTTP_403_FORBIDDEN)
+
+            days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=days + 1), timezone=pytz.timezone("Asia/Tashkent")
@@ -535,6 +549,7 @@ class ShopAnalyticsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class ShopCompetitorsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -606,14 +621,19 @@ class ShopCompetitorsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request, seller_id: int):
         try:
+            authorize_Base_tariff(request)
+            user: User = request.user
+            shops = user.shops.all()
+
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+                return Response(status=status.HTTP_403_FORBIDDEN)
+
             if seller_id is None:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
             print("Shop Competitors View")
             start = time.time()
             shop = get_object_or_404(Shop, seller_id=seller_id)
-            days = 60 if request.user.is_proplus else 30
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
             print(days, request.user)
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=int(days) + 1), timezone=pytz.timezone("Asia/Tashkent")
@@ -674,6 +694,7 @@ class ShopCompetitorsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
 
 
+# Base tariff
 class ShopDailySalesView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -684,8 +705,13 @@ class ShopDailySalesView(APIView):
         Get Productanalytics of a shop at a specific date and next day
         """
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
+            user: User = request.user
+
+            shops = user.shops.all()
+
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+                return Response(status=status.HTTP_403_FORBIDDEN)
 
             print("Shop Daily Sales View")
             start = time.time()
@@ -709,7 +735,7 @@ class ShopDailySalesView(APIView):
             if start_date < timezone.make_aware(
                 datetime.now() - timedelta(days=30), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0):
-                if user.is_proplus:
+                if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS:
                     pass
                 else:
                     start_date = timezone.make_aware(
@@ -883,6 +909,7 @@ class ShopDailySalesView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
 
 
+# Base tariff
 class ShopProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -928,15 +955,16 @@ class ShopProductsView(ListAPIView):
         return ProductAnalyticsView.objects.filter(shop_link=shop.link).filter(filter_query).order_by(order_by_column)
 
     def list(self, request, *args, **kwargs):
+        authorize_Base_tariff(request)
+
         start_time = time.time()
         print("Shop PRODUCTS")
-        if check_user(request) is None:
-            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
         response = super().list(request, *args, **kwargs)
         print(f"Shop PRODUCTS: {time.time() - start_time} seconds")
         return response
 
 
+# Base tariff
 class ShopTopProductsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -947,8 +975,14 @@ class ShopTopProductsView(APIView):
         This view should return a list of all the products for
         the category as determined by the category portion of the URL.
         """
-        if check_user(request) is None:
-            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+        authorize_Base_tariff(request)
+
+        user: User = request.user
+        shops = user.shops.all()
+
+        if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"})
+
         seller_id = self.kwargs["seller_id"]
         shop = Shop.objects.get(seller_id=seller_id)
 
@@ -974,6 +1008,7 @@ class ShopTopProductsView(APIView):
         )
 
 
+# Base tariff
 class StoppedProductsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -986,8 +1021,15 @@ class StoppedProductsView(APIView):
         try:
             # Write the raw SQL query
             print("STOPPED PRODUCTS")
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
+
+            user: User = request.user
+            shops = user.shops.all()
+
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+                return Response(
+                    status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
+                )
             start = time.time()
             query = f"""
             SELECT p.title, p.title_ru, p.photos, pa.*, c.title AS category_title, c.title_ru AS category_title_ru, c."categoryId" as category_id,  AVG(ska.purchase_price) AS avg_purchase_price, AVG(ska.full_price) AS avg_full_price
@@ -1033,6 +1075,7 @@ class StoppedProductsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
 
 
+# Base tariff
 class ShopCategoriesView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -1050,8 +1093,14 @@ class ShopCategoriesView(APIView):
         """
         try:
             print("SHOP CATEGORIES")
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
+            user: User = request.user
+            shops = user.shops.all()
+
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+                return Response(
+                    status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
+                )
             start = time.time()
             query = f"""
             SELECT c."categoryId", c.title, c.title_ru, COUNT(p.product_id) AS products_amount, SUM(pa.orders_amount) AS orders_amount, SUM(pa.reviews_amount) AS reviews_amount
@@ -1088,6 +1137,7 @@ class ShopCategoriesView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
 
 
+# Base tariff
 class ShopCategoryAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -1100,11 +1150,17 @@ class ShopCategoryAnalyticsView(APIView):
 
         try:
             start = time.time()
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-            print("SHOP CATEGORY ANALYTICS")
+            authorize_Base_tariff(request)
             user: User = request.user
-            days = 60 if user.is_proplus else 30
+            shops = user.shops.all()
+
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+                return Response(
+                    status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
+                )
+            print("SHOP CATEGORY ANALYTICS")
+
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -1212,6 +1268,7 @@ class ShopCategoryAnalyticsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"detail": str(e)})
 
 
+# Base tariff
 class ShopProductsByCategoryView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [CookieJWTAuthentication]
@@ -1225,8 +1282,14 @@ class ShopProductsByCategoryView(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            if check_user(request) is None:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            authorize_Base_tariff(request)
+            user: User = request.user
+            shops = user.shops.all()
+
+            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+                return Response(
+                    status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
+                )
 
             shop = Shop.objects.get(pk=seller_id)
             category = Category.objects.get(pk=category_id)
@@ -1304,6 +1367,7 @@ class ShopProductsByCategoryView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={"message": "Internal server error"})
 
 
+# Free tariff
 class UzumTotalOrders(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -1320,7 +1384,7 @@ class UzumTotalOrders(APIView):
         """
         try:
             user: User = request.user
-            days = 60 if user.is_proplus else 30
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
             # start_date = timezone.make_aware(
             #     datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             # ).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1338,6 +1402,7 @@ class UzumTotalOrders(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Free tariff
 class UzumTotalReviews(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -1354,7 +1419,7 @@ class UzumTotalReviews(APIView):
         """
         try:
             user: User = request.user
-            days = 60 if user.is_proplus else 30
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
             # start_date = timezone.make_aware(
             #     datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             # ).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1372,6 +1437,7 @@ class UzumTotalReviews(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Free tariff
 class UzumTotalRevenue(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -1388,7 +1454,7 @@ class UzumTotalRevenue(APIView):
         """
         try:
             user: User = request.user
-            days = 60 if user.is_proplus else 30
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
             # start_date = timezone.make_aware(
             #     datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             # ).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1406,6 +1472,7 @@ class UzumTotalRevenue(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Free tariff
 class UzumTotalProducts(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -1414,7 +1481,7 @@ class UzumTotalProducts(APIView):
     def get(self, request):
         try:
             user: User = request.user
-            days = 60 if user.is_proplus else 30
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
             now_tz = datetime.now().astimezone(pytz.timezone("Asia/Tashkent"))
             start_date = (now_tz - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
             end_date = now_tz.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -1437,6 +1504,7 @@ class UzumTotalProducts(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Free tariff
 class UzumTotalShops(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -1445,7 +1513,7 @@ class UzumTotalShops(APIView):
     def get(self, request: Request):
         try:
             user: User = request.user
-            days = 60 if user.is_proplus else 30
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1483,6 +1551,7 @@ class UzumTotalShops(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Free tariff
 class ShopsWithMostRevenueYesterdayView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -1498,6 +1567,7 @@ class ShopsWithMostRevenueYesterdayView(APIView):
             yesterday_pretty = get_day_before_pretty(date_pretty)
 
             shop_with_no_sales = ShopAnalytics.objects.filter(date_pretty=date_pretty, total_orders=0).count()
+            shops_with_no_reviews = ShopAnalytics.objects.filter(date_pretty=date_pretty, total_reviews=0).count()
 
             def dictfetchall(cursor):
                 "Returns all rows from a cursor as a dict"
@@ -1539,6 +1609,41 @@ class ShopsWithMostRevenueYesterdayView(APIView):
 
                 res = dictfetchall(cursor)
                 shops_with_sales_yesterday = res[0]["shops_with_sales_yesterday"]
+
+                cursor.execute(
+                    """
+                    SELECT
+                        COUNT(today.shop_id) as shops_with_reviews_yesterday
+                    FROM
+                        (
+                        SELECT
+                            shop_id,
+                            total_reviews
+                        FROM
+                            shop_shopanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as today
+                    INNER JOIN
+                        (
+                        SELECT
+                            shop_id,
+                            total_reviews
+                        FROM
+                            shop_shopanalytics
+                        WHERE
+                            date_pretty = %s
+                        ) as yesterday
+                    ON
+                        today.shop_id = yesterday.shop_id
+                    WHERE
+                        today.total_reviews - COALESCE(yesterday.total_reviews, 0) > 0
+                    """,
+                    [date_pretty, yesterday_pretty],
+                )
+
+                res = dictfetchall(cursor)
+                shops_with_reviews_yesterday = res[0]["shops_with_reviews_yesterday"]
 
                 cursor.execute(
                     """
@@ -1649,6 +1754,8 @@ class ShopsWithMostRevenueYesterdayView(APIView):
                     "shops_with_sales_yesterday": shops_with_sales_yesterday,
                     "shop_with_no_sales": shop_with_no_sales,
                     "shops": grouped_data,
+                    "shops_with_reviews_yesterday": shops_with_reviews_yesterday,
+                    "shops_with_no_reviews": shops_with_no_reviews,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -1659,6 +1766,7 @@ class ShopsWithMostRevenueYesterdayView(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Base tariff
 class YesterdayTopsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -1669,6 +1777,7 @@ class YesterdayTopsView(APIView):
         Return top 20 shops which had themost orders yesterday
         """
         try:
+            authorize_Base_tariff(request)
             date_pretty = get_today_pretty_fake()
             yesterday_pretty = get_day_before_pretty(date_pretty)
 

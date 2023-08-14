@@ -29,6 +29,7 @@ from uzum.users.api.serializers import (
     PasswordRenewSerializer,
     UserLoginSerializer,
 )
+from uzum.utils.general import Tariffs
 
 # disable twilio info logs
 # twilio_logger = logging.getLogger("twilio.http_client")
@@ -69,18 +70,16 @@ class SetShopsView(APIView):
                         data={"message": "Do'konlar tanlangan kundan boshlab 30 kundan so'ng yangilanishi mumkin."},
                     )
 
-            is_pro = user.is_pro
-
-            if not is_pro and not user.is_proplus:
+            if user.tariff == Tariffs.FREE:
                 return Response(status=400, data={"message": "Do'konlarni yangilash uchun Pro paketga o'ting"})
 
-            if is_pro:
-                # only 2 shops is allowed for pro users
+            if user.tariff == Tariffs.BASE:
+                # only 1 shop is allowed for base users
                 if len(shop_ids) == 0:
-                    return Response(status=400, data={"message": "Iltimos, 2 tagacha do'kon tanlang"})
+                    return Response(status=400, data={"message": "Iltimos, 1 tagacha do'kon tanlang"})
 
-                if len(shop_ids) > 2:
-                    return Response(status=400, data={"message": "Iltimos, 2 tagacha do'kon tanlang"})
+                if len(shop_ids) > 1:
+                    return Response(status=400, data={"message": "Iltimos, 1 tagacha do'kon tanlang"})
 
                 shop_id = shop_ids[0]
                 shop = Shop.objects.get(link=shop_id)
@@ -96,18 +95,18 @@ class SetShopsView(APIView):
                 user.shops.clear()
                 user.shops.add(shop)
 
-                if len(shop_ids) == 2:
-                    shop_id = shop_ids[1]
-                    shop = Shop.objects.get(link=shop_id)
-                    user.shops.add(shop)
+                # if len(shop_ids) == 1:
+                #     shop_id = shop_ids[1]
+                #     shop = Shop.objects.get(link=shop_id)
+                #     user.shops.add(shop)
 
-            elif user.is_proplus:
-                #  5 shops is allowed for proplus users
+            elif user.tariff == Tariffs.SELLER:
+                #  4 shops is allowed for proplus users
                 if len(shop_ids) == 0:
-                    return Response(status=400, data={"message": "Iltimos, 5 tagacha do'kon tanlang"})
+                    return Response(status=400, data={"message": "Iltimos, 4 tagacha do'kon tanlang"})
 
-                if len(shop_ids) > 5:
-                    return Response(status=400, data={"message": "Iltimos, 5 tagacha do'kon tanlang"})
+                if len(shop_ids) > 4:
+                    return Response(status=400, data={"message": "Iltimos, 4 tagacha do'kon tanlang"})
 
                 shop_id = shop_ids[0]
                 shop = Shop.objects.get(link=shop_id)
