@@ -2,9 +2,9 @@ import uuid
 
 from django.db import models
 
-PRO = 39 * 12137.70
-PREMIUM = 59 * 12137.70
-ENTERPRISE = 99 * 12137.70
+PRO = 39 * 12137.70 * 100
+PREMIUM = 59 * 12137.70 * 100
+ENTERPRISE = 99 * 12137.70 * 100
 
 
 class MerchatTransactionsModel(models.Model):

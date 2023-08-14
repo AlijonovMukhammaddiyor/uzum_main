@@ -73,10 +73,4 @@ def getPackageType(amount):
     Args:
         amount (_type_): amount in tiyin
     """
-    if PRO <= amount <= PREMIUM:
-        return "PRO"
-    elif PREMIUM <= amount <= ENTERPRISE:
-        return "PREMIUM"
-    elif ENTERPRISE <= amount:
-        return "ENTERPRISE"
-    return None
+    return "Pullik Tarif"
