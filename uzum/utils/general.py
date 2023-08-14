@@ -1,9 +1,11 @@
 import datetime
 
 import pytz
+from rest_framework import status
 from rest_framework.request import Request
+from rest_framework.response import Response
 
-from uzum.users.models import User
+from uzum.users.models import Tariffs, User
 
 
 def decode_request(request: Request, method: str) -> dict:
@@ -83,14 +85,95 @@ def date_in_Tashkent(date: datetime.datetime):
     return date.astimezone(pytz.timezone("Asia/Tashkent"))
 
 
-def check_user(request: Request):
+def check_user_tariff(request: Request, tarif: Tariffs = Tariffs.FREE):
+    """
+    Checks if the user is authenticated and has the given tariff.
+    Args:
+        request (Request): _description_
+    Returns:
+    """
     try:
         user: User = request.user
+        if not user:
+            return None
         if request.user.is_authenticated:
-            if user.is_pro or user.is_proplus:
-                return user
-
+            if user.tariff == tarif:
+                return True
+            else:
+                return False
         return None
     except Exception as e:
         print("Error in check_user: ", e)
         return None
+
+
+def authorize_Base_tariff(request: Request):
+    """
+    Args:
+        request (Request): _description_
+    Returns:
+    """
+    try:
+        if check_user_tariff(request) is None:
+            return Response(
+                status=status.HTTP_403_FORBIDDEN,
+                data={"message": "Forbidden", "detail": "Only authorized users can access this endpoint"},
+            )
+        elif check_user_tariff(request, Tariffs.FREE) or check_user_tariff(request, Tariffs.TRIAL):
+            return Response(
+                status=status.HTTP_403_FORBIDDEN,
+                data={"message": "Forbidden", "detail": "Free users can't access this endpoint"},
+            )
+    except Exception as e:
+        print("Error in check_user: ", e)
+
+
+def authorize_Seller_tariff(request: Request):
+    """
+    Args:
+        request (Request): _description_
+    Returns:
+    """
+    try:
+        if check_user_tariff(request) is None:
+            return Response(
+                status=status.HTTP_403_FORBIDDEN,
+                data={"message": "Forbidden", "detail": "Only authorized users can access this endpoint"},
+            )
+        elif (
+            check_user_tariff(request, Tariffs.FREE)
+            or check_user_tariff(request, Tariffs.TRIAL)
+            or check_user_tariff(request, Tariffs.BASE)
+        ):
+            return Response(
+                status=status.HTTP_403_FORBIDDEN,
+                data={"message": "Forbidden", "detail": "Free or Basic users can't access this endpoint"},
+            )
+    except Exception as e:
+        print("Error in check_user: ", e)
+
+
+def authorize_Business_tariff(request: Request):
+    """
+    Args:
+        request (Request): _description_
+    Returns:
+    """
+    try:
+        if check_user_tariff(request) is None:
+            return Response(
+                status=status.HTTP_403_FORBIDDEN,
+                data={"message": "Forbidden", "detail": "Only authorized users can access this endpoint"},
+            )
+        elif (
+            check_user_tariff(request, Tariffs.FREE)
+            or check_user_tariff(request, Tariffs.TRIAL)
+            or check_user_tariff(request, Tariffs.BASE)
+            or check_user_tariff(request, Tariffs.SELLER)
+        ):
+            return Response(
+                status=status.HTTP_403_FORBIDDEN,
+                data={"message": "Forbidden", "detail": "Free, Basic, Seller users can't access this endpoint"},
+            )
+    except Exception as e:
+        print("Error in check_user: ", e)
