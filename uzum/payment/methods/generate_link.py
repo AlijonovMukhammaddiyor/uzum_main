@@ -56,20 +56,6 @@ class GeneratePayLink:
         )
         encode_params = base64.b64encode(params.encode("utf-8"))
 
-        # res = requests.post(
-        #     url=PAYME_URL,
-        #     data={
-        #         "merchant": PAYME_ID,
-        #         # "merchant": "64d64878a3b6d0cc97f5fbcc",
-        #         "amount": self.amount,
-        #         "account[order_id]": self.order_id,
-        #         "callback": PAYME_CALL_BACK_URL,
-        #         "lang": "ru",
-        #     },
-        # )
-
-        # data = res.text
-        # print(data)
         return generated_pay_link.format(payme_url=PAYME_URL, encode_params=str(encode_params, "utf-8"))
 
     @staticmethod
