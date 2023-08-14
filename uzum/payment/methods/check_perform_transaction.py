@@ -40,7 +40,7 @@ class CheckPerformTransaction:
                             "count": 1,
                             "code": "10602010001000000",
                             "vat_percent": 0,
-                            # "package_code": params.get("order_id"),
+                            "package_code": "14545",
                         }
                     ],
                 },
