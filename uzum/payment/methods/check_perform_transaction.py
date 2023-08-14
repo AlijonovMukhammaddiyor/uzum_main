@@ -24,7 +24,7 @@ class CheckPerformTransaction:
         if not package:
             package_string = "UzAnalitika - " + package
         else:
-            package = "UzAnalitika - " + "Free"
+            package_string = "UzAnalitika - " + "Free"
         serializer = MerchatTransactionsModelSerializer(data=get_params(params))
         serializer.is_valid(raise_exception=True)
 
