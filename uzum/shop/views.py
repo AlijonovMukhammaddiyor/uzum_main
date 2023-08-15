@@ -103,14 +103,21 @@ class CurrentShopView(APIView):
 
             user = request.user
             shops = user.shops.all()
+            is_owner = False
 
-            # check if user has this shop
-            if not shops.filter(link=link) and user.tariff != Tariffs.BUSINESS:
-                return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+            # # check if user has this shop
+            # if not shops.filter(link=link) and user.tariff != Tariffs.BUSINESS:
+            #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
+
+            # check if this is user's shop
+            if shops.filter(link=link).exists():
+                is_owner = True
 
             shop = Shop.objects.get(link=link)
             serializer = ShopSerializer(shop)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            data = serializer.data
+            data["is_owner"] = is_owner
+            return Response(data, status=status.HTTP_200_OK)
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -503,9 +510,9 @@ class ShopAnalyticsView(APIView):
             shops = user.shops.all()
 
             if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
-                raise Response(status=status.HTTP_403_FORBIDDEN)
+                return Response(status=status.HTTP_403_FORBIDDEN)
 
-            days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=days + 1), timezone=pytz.timezone("Asia/Tashkent")
@@ -977,11 +984,11 @@ class ShopTopProductsView(APIView):
         """
         authorize_Base_tariff(request)
 
-        user: User = request.user
-        shops = user.shops.all()
+        # user: User = request.user
+        # shops = user.shops.all()
 
-        if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
-            return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"})
+        # if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+        #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"})
 
         seller_id = self.kwargs["seller_id"]
         shop = Shop.objects.get(seller_id=seller_id)
@@ -1023,13 +1030,13 @@ class StoppedProductsView(APIView):
             print("STOPPED PRODUCTS")
             authorize_Base_tariff(request)
 
-            user: User = request.user
-            shops = user.shops.all()
+            # user: User = request.user
+            # shops = user.shops.all()
 
-            if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
-                return Response(
-                    status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
-                )
+            # if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+            #     return Response(
+            #         status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"}
+            #     )
             start = time.time()
             query = f"""
             SELECT p.title, p.title_ru, p.photos, pa.*, c.title AS category_title, c.title_ru AS category_title_ru, c."categoryId" as category_id,  AVG(ska.purchase_price) AS avg_purchase_price, AVG(ska.full_price) AS avg_full_price

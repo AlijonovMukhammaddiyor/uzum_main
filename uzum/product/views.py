@@ -274,7 +274,7 @@ class ProductsView(ListAPIView):
     @extend_schema(tags=["Product"])
     def list(self, request: Request):
         authorize_Base_tariff(self.request)
-        return self.list(request)
+        return super().list(request)
 
 
 # Base tariff
@@ -293,7 +293,7 @@ class SingleProductAnalyticsView(APIView):
             authorize_Base_tariff(request)
             print("SingleProductAnalyticsView")
             user: User = request.user
-            days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
 
             # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
             start_date = timezone.make_aware(
@@ -388,7 +388,7 @@ class SimilarProductsViewByUzum(APIView):
             authorize_Base_tariff(request)
 
             user: User = request.user
-            days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 2
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 2
 
             productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
             productIds.append(product_id)

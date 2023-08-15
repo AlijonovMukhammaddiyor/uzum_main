@@ -234,9 +234,7 @@ class CategoryTopProductsView(ListAPIView):
         # Get the category
         category = get_object_or_404(Category, pk=category_id)
         # Get the descendant category IDs as a list of integers
-        print(category.descendants, "descendants")
         if not category.descendants:
-            print("it is here")
             descendant_ids = []
         else:
             descendant_ids = list(map(int, category.descendants.split(",")))
@@ -247,8 +245,6 @@ class CategoryTopProductsView(ListAPIView):
         descendant_ids.append(category_id)
 
         ca = CategoryAnalytics.objects.filter(category=category, date_pretty=get_today_pretty_fake()).first()
-
-        print("ca", ca)
 
         if ca is None:
             total_orders = 0
@@ -458,8 +454,16 @@ class CategoryDailyAnalyticsView(APIView):
     @staticmethod
     def analytics(category: Category, start_date: datetime):
         try:
+            end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                hour=23, minute=59, second=59, microsecond=0
+            )
+
+            # if it is before 7 am in Tashkent, set end_date to 23:59 of the previous day
+            if datetime.now(tz=pytz.timezone("Asia/Tashkent")).hour < 7:
+                end_date = end_date - timedelta(days=1)
+
             category_analytics = CategoryAnalytics.objects.filter(
-                category=category, created_at__gte=start_date
+                category=category, created_at__range=[start_date, end_date]
             ).order_by("created_at")
 
             return CategoryAnalyticsSeralizer(category_analytics, many=True).data
@@ -495,12 +499,13 @@ class CategoryDailyAnalyticsView(APIView):
             authorize_Base_tariff(request)
 
             user: User = request.user
-            range = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
+
+            range = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
 
             start = time.time()
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=int(range) + 1), timezone=pytz.timezone("Asia/Tashkent")
+                datetime.now() - timedelta(days=range + 1), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             category = Category.objects.get(categoryId=category_id)
@@ -584,7 +589,6 @@ class SubcategoriesView(APIView):
                 child["category_title"] += f"(({child['category_id']}))"
                 child["category_title_ru"] += f"(({child['category_id']}))"
 
-            print("children_analytics", time.time() - start)
             return Response(
                 status=status.HTTP_200_OK,
                 data={
@@ -658,10 +662,9 @@ class CategoryPriceSegmentationView(APIView):
 
             # Add the parent category ID to the list
             descendant_ids.append(category_id)
-            print(descendant_ids)
+
             products = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
             df = pd.DataFrame(list(products.values("product_id", "avg_purchase_price")))
-            print(products.values("product_id", "avg_purchase_price"))
 
             # Calculate the number of distinct average purchase prices
             distinct_prices_count = df["avg_purchase_price"].nunique()
@@ -998,7 +1001,7 @@ class MainCategoriesAnalyticsView(APIView):
 
             user: User = request.user
 
-            days = 60 if user.tariff == Tariffs.SELLER or Tariffs.BUSINESS else 30
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
 
             start_date = timezone.make_aware(
                 datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),

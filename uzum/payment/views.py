@@ -12,6 +12,7 @@ from uzum.payment.models import Order
 from uzum.payment.serializers import GeneratePayLinkSerializer
 from uzum.payment.utils import next_payment_date
 from uzum.users.models import User
+from uzum.utils.general import Tariffs
 
 logger = logging.getLogger(__name__)
 
@@ -202,12 +203,29 @@ class GeneratePayLinkAPIView(APIView):
         """
         user = request.user
         amount = request.data.get("amount")
+        tariff = request.data.get("tariff")
+        months = request.data.get("months")
+
+        if not months:
+            return Response({"months": "Months is required"}, status=400)
+
+        if tariff != "free" and tariff != "seller" and tariff != "base" and tariff != "business":
+            return Response({"tariff": "Tariff is not valid"}, status=400)
+
+        if tariff == "free":
+            tariff = Tariffs.FREE
+        elif tariff == "seller":
+            tariff = Tariffs.SELLER
+        elif tariff == "base":
+            tariff = Tariffs.BASE
+        elif tariff == "business":
+            tariff = Tariffs.BUSINESS
 
         if not amount:
             return Response({"amount": "Amount is required"}, status=400)
 
         amount *= 100  # convert to tiyin
-        order = Order.objects.create(user=user, amount=amount)
+        order = Order.objects.create(user=user, amount=amount, tariff=tariff, months=months)
         serializer = GeneratePayLinkSerializer(data={"order_id": order.order_id, "amount": amount})
         serializer.is_valid(raise_exception=True)
         pay_link = GeneratePayLink(**serializer.validated_data).generate_link()

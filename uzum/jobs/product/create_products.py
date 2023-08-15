@@ -22,6 +22,7 @@ def prepareProductData(
     badges_dict: dict,
     shop_analytics_done: dict,
     current_analytic: dict = None,
+    category_sales_map: dict = None,
 ):
     try:
         result = None
@@ -188,6 +189,14 @@ def prepareProductData(
             )
             / 1000.0
         )
+
+        if product_api["ordersAmount"] - latest_orders_amount > 0:
+            if category_id not in category_sales_map:
+                category_sales_map[category_id] = {"products_with_sales": set(), "shops_with_sales": set()}
+            else:
+                category_sales_map[category_id]["products_with_sales"].add(product_api["id"])
+                # add sellers as well
+                category_sales_map[category_id]["shops_with_sales"].add(seller["id"])
 
         analytics = {
             "created_at": datetime.now(tz=pytz.timezone("Asia/Tashkent")),
