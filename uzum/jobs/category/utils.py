@@ -1,3 +1,4 @@
+import time
 import traceback
 from datetime import datetime
 
@@ -12,27 +13,33 @@ from uzum.jobs.helpers import generateUUID, get_random_user_agent
 
 
 def get_categories_tree():
-    try:
-        tree = requests.post(
-            CATEGORIES_URL,
-            json=CATEGORIES_PAYLOAD,
-            headers={
-                **CATEGORIES_HEADER,
-                "User-Agent": get_random_user_agent(),
-                "x-iid": generateUUID(),
-                "Content-Type": "application/json",
-            },
-        )
-        if tree.status_code == 200:
-            return tree.json().get("data").get("makeSearch").get("categoryTree")
-        else:
-            print(f"Error in get_categories_tree: {tree.status_code} - {tree.text}")
-            return None
+    retry_count = 0
+    while retry_count < 10:
+        try:
+            tree = requests.post(
+                CATEGORIES_URL,
+                json=CATEGORIES_PAYLOAD,
+                headers={
+                    **CATEGORIES_HEADER,
+                    "User-Agent": get_random_user_agent(),
+                    "x-iid": generateUUID(),
+                    "Content-Type": "application/json",
+                },
+            )
+            if tree.status_code == 200:
+                return tree.json().get("data").get("makeSearch").get("categoryTree")
+            else:
+                print(f"Error in get_categories_tree: {tree.status_code} - {tree.text}")
+                return None
 
-    except Exception as e:
-        print("Error in get_categories_tree: ", e)
-        traceback.print_exc()
-        return None
+        except Exception as e:
+            print("Error in get_categories_tree: ", e)
+            traceback.print_exc()
+            if retry_count == 9:  # last attempt
+                return None
+            else:
+                time.sleep(10)
+                retry_count += 1
 
 
 def get_categories_tree_ru():
