@@ -47,7 +47,7 @@ def update_uzum_data(args=None, **kwargs):
     print("Updating category parents")
     start = time.time()
     # update_all_category_parents()
-    Category.update_descendants()
+    # Category.update_descendants()
     print("Time taken: ", time.time() - start)
     create_and_update_categories()
     # await create_and_update_products()
@@ -77,19 +77,26 @@ def update_uzum_data(args=None, **kwargs):
     start = time.time()
     create_product_latestanalytics(get_day_before_pretty(date_pretty))
 
+    # create {category_id: { products_with_sales: set(), shops_with_sales: set()}} for each category
+    category_sales_map = {
+        analytics.category.categoryId: {
+            "products_with_sales": set(),
+            "shops_with_sales": set(),
+        }
+        for analytics in CategoryAnalytics.objects.filter(date_pretty=date_pretty).prefetch_related("category")
+    }
+
     for i in range(0, len(product_ids), BATCH_SIZE):
         products_api: list[dict] = []
         print(f"{i}/{len(product_ids)}")
         async_to_sync(get_product_details_via_ids)(product_ids[i : i + BATCH_SIZE], products_api)
-        create_products_from_api(products_api, product_campaigns, shop_analytics_done)
+        create_products_from_api(products_api, product_campaigns, shop_analytics_done, category_sales_map)
         time.sleep(30)
         del products_api
-    Category.update_descendants()
-    time.sleep(600)
-
-    add_russian_titles()
-
+    # Category.update_descendants()
     time.sleep(30)
+
+    # add_russian_titles()
 
     print("Setting banners...", product_associations, shop_association)
     print(product_associations, shop_association)
@@ -135,6 +142,8 @@ def update_uzum_data(args=None, **kwargs):
     bulk_remove_duplicate_shop_analytics(date_pretty)
     bulk_remove_duplicate_sku_analytics(date_pretty)
 
+    update_category_with_sales(category_sales_map, date_pretty)
+
     # print("Updating Category Descendants...")
     # start = time.time()
     # Category.update_descendants()
@@ -147,6 +156,50 @@ def update_uzum_data(args=None, **kwargs):
 
     print("Uzum data updated...")
     return True
+
+
+def update_category_with_sales(category_sales_map, date_pretty=get_today_pretty()):
+    try:
+        start = time.time()
+
+        # Fetch all the relevant CategoryAnalytics objects at once
+        category_ids = list(category_sales_map.keys())
+        categories = CategoryAnalytics.objects.filter(category__categoryId__in=category_ids, date_pretty=date_pretty)
+
+        # Store the CategoryAnalytics objects in a dictionary for quick access
+        category_dict = {cat.category.categoryId: cat for cat in categories}
+
+        to_update = []  # List to store the updated CategoryAnalytics objects
+
+        for category_id, sales in category_sales_map.items():
+            category = category_dict.get(category_id)
+            if not category:
+                continue
+
+            descendants = [category_id]
+            if category.category.descendants:
+                descendants.extend(map(int, category.category.descendants.split(",")))
+
+            # update total_products_with_sales
+            category.total_products_with_sales = sum(
+                len(category_sales_map.get(c_id, {}).get("products_with_sales", [])) for c_id in descendants
+            )
+
+            # update total_shops_with_sales
+            category.total_shops_with_sales = sum(
+                len(category_sales_map.get(c_id, {}).get("shops_with_sales", [])) for c_id in descendants
+            )
+
+            to_update.append(category)
+
+        # Update the CategoryAnalytics objects in bulk
+        CategoryAnalytics.objects.bulk_update(to_update, ["total_products_with_sales", "total_shops_with_sales"])
+
+        print(f"Category with sales updated in {time.time() - start} seconds")
+    except Exception as e:
+        print("Error in update_category_with_sales: ", e)
+        traceback.print_exc()
+        return None
 
 
 def update_all_category_parents():

@@ -33,7 +33,10 @@ def create_product_analytics_bulk(analytics):
 
 
 def create_products_from_api(
-    produts_api: list[dict], product_campaigns: dict = None, shop_analytics_done: dict = None
+    produts_api: list[dict],
+    product_campaigns: dict = None,
+    shop_analytics_done: dict = None,
+    category_sales_map: dict = None,
 ):
     try:
         print("Starting createProductsFromApi...")
@@ -78,6 +81,7 @@ def create_products_from_api(
                 badges_dict=badges_dict,
                 shop_analytics_done=shop_analytics_done,
                 current_analytic=latest_product_analytics_dict.get(product["id"], None),
+                category_sales_map=category_sales_map,
             )
 
             products_analytics.append(product_analytic)
