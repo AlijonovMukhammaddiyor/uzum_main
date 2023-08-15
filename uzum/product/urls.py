@@ -31,5 +31,9 @@ urlpatterns = [
     path("top/", views.Top5ProductsView.as_view(), name="top-products"),
     path("recent/", (views.NewProductsView.as_view()), name="new-products"),
     path("growing/", (views.GrowingProductsView.as_view()), name="growing-products"),
-    path("tops/", (views.ProductsWithMostRevenueYesterdayView.as_view()), name="tops-products"),
+    path(
+        "tops/",
+        (views.ProductsWithMostRevenueYesterdayView.as_view()),
+        name="tops-products",
+    ),
 ]

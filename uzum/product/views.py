@@ -562,31 +562,19 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                 cursor.execute(
                     """
                     SELECT
-                        COUNT(today.product_id) as products_with_sales_yesterday
+                        COUNT(DISTINCT today.product_id) as products_with_sales_yesterday
                     FROM
-                        (
-                        SELECT
-                            product_id,
-                            orders_amount
-                        FROM
-                            product_productanalytics
-                        WHERE
-                            date_pretty = %s
-                        ) as today
-                    INNER JOIN
-                        (
-                        SELECT
-                            product_id,
-                            orders_amount
-                        FROM
-                            product_productanalytics
-                        WHERE
-                            date_pretty = %s
-                        ) as yesterday
+                        product_productanalytics AS today
+                    JOIN
+                        product_productanalytics AS yesterday
                     ON
                         today.product_id = yesterday.product_id
+                    AND
+                        today.date_pretty = %s
+                    AND
+                        yesterday.date_pretty = %s
                     WHERE
-                        today.orders_amount - COALESCE(yesterday.orders_amount, 0) > 0
+                        today.orders_amount - COALESCE(yesterday.orders_amount, 0) > 0;
                     """,
                     [date_pretty, yesterday_pretty],
                 )
@@ -597,32 +585,20 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                 cursor.execute(
                     """
                     SELECT
-                        COUNT(today.product_id) as products_with_reviews_yesterday
+                        COUNT(DISTINCT today.product_id) as products_with_reviews_yesterday
                     FROM
-                        (
-                        SELECT
-                            product_id,
-                            reviews_amount
-                        FROM
-                            product_productanalytics
-                        WHERE
-                            date_pretty = %s
-                        ) as today
-                    INNER JOIN
-                        (
-                        SELECT
-                            product_id,
-                            reviews_amount
-                        FROM
-                            product_productanalytics
-                        WHERE
-                            date_pretty = %s
-                        ) as yesterday
+                        product_productanalytics AS today
+                    JOIN
+                        product_productanalytics AS yesterday
                     ON
                         today.product_id = yesterday.product_id
+                    AND
+                        today.date_pretty = %s
+                    AND
+                        yesterday.date_pretty = %s
                     WHERE
                         today.reviews_amount - COALESCE(yesterday.reviews_amount, 0) > 0
-                    """,
+                                        """,
                     [date_pretty, yesterday_pretty],
                 )
 
@@ -633,7 +609,7 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                     """
                     SELECT
                         today.product_id,
-                        today.orders_money - COALESCE(yesterday.orders_money, 10000000000) as diff_revenue
+                        today.orders_money - COALESCE(yesterday.orders_money, 0) as diff_revenue
                     FROM
                         (
                         SELECT
@@ -656,13 +632,9 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                         ) as yesterday
                     ON
                         today.product_id = yesterday.product_id
-                    INNER JOIN
-                        product_product as product
-                    ON
-                        today.product_id = product.product_id
                     ORDER BY
                         diff_revenue DESC
-                    LIMIT 5
+                    LIMIT 5;
                 """,
                     [date_pretty, yesterday_pretty],
                 )
