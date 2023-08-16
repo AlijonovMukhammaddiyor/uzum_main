@@ -36,3 +36,5 @@ slack_sdk
 
 #payments
 payme-pkg==2.5.2
+statsmodels
+httpx
