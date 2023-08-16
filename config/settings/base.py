@@ -376,6 +376,7 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 SESSION_CACHE_ALIAS = "default"
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
