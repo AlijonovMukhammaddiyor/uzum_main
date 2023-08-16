@@ -4,14 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('category', '0009_category_ancestors'),
+        ("category", "0009_category_ancestors"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='categoryanalytics',
-            name='total_orders_amount',
-            ),
-        ]
+            model_name="categoryanalytics",
+            name="total_orders_amount",
+            field=models.FloatField(null=True, blank=True, default=0.0),  # total orders
+        ),
+    ]
