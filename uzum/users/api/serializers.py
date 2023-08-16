@@ -11,6 +11,9 @@ from uzum.referral.models import Referral
 from uzum.shop.models import Shop
 
 User = get_user_model()
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_random_string(length, username: str, phone_number: str):
@@ -129,6 +132,7 @@ class UserSerializer(serializers.ModelSerializer):
             }
         except Exception as e:
             print("Error in create: ", e)
+            logger.error(traceback.format_exc())
             traceback.print_exc()
             return None
 

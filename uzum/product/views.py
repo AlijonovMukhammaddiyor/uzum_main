@@ -37,12 +37,12 @@ from uzum.product.serializers import (
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
 from uzum.utils.general import (
+    Tariffs,
     authorize_Base_tariff,
     authorize_Seller_tariff,
     get_day_before_pretty,
     get_today_pretty_fake,
 )
-from uzum.utils.general import Tariffs
 
 
 # Base tariff
@@ -607,6 +607,7 @@ class ProductsWithMostRevenueYesterdayView(APIView):
 
                 cursor.execute(
                     """
+                    EXPLAIN ANALYZE
                     SELECT
                         today.product_id,
                         today.orders_money - COALESCE(yesterday.orders_money, 0) as diff_revenue
@@ -618,7 +619,7 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                         FROM
                             product_productanalytics
                         WHERE
-                            date_pretty = %s
+                            date_pretty = '2023-08-16'
                         ) as today
                     INNER JOIN
                         (
@@ -628,7 +629,7 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                         FROM
                             product_productanalytics
                         WHERE
-                            date_pretty = %s
+                            date_pretty = '2023-08-15'
                         ) as yesterday
                     ON
                         today.product_id = yesterday.product_id

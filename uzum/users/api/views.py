@@ -60,6 +60,7 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
             # Continue with the user creation logic
             return super().create(request, *args, **kwargs)
         except IntegrityError as e:
+            logger.error("Error in create: ", e)
             print("Error in create: ", e)
             field_errors = str(e.args[1]).split(",")
             error_message = ""
@@ -71,6 +72,7 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
 
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": error_message})
         except ValidationError as e:
+            logger.error("Error in create: ", e)
             print("Error in create: ", e)
             error_message = ""
             error_details = e.detail  # This should be a dictionary with the error details.
@@ -82,6 +84,7 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
 
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": error_message})
         except Exception as e:
+            logger.error("Error in create: ", e)
             print("Error in create: ", e)
             traceback.print_exc()
             # send error message

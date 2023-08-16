@@ -1,11 +1,14 @@
+import io
 import math
 import time
 import traceback
 from datetime import datetime, timedelta
 
 import pytz
+import xlsxwriter
 from django.db import connection
 from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -28,11 +31,11 @@ from uzum.review.views import CookieJWTAuthentication
 from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsTable
 from uzum.users.models import User
 from uzum.utils.general import (
+    Tariffs,
     authorize_Base_tariff,
     get_day_before_pretty,
     get_next_day_pretty,
     get_today_pretty_fake,
-    Tariffs,
 )
 
 from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer
@@ -155,6 +158,55 @@ class TreemapShopsView(APIView):
                 },
                 status=status.HTTP_200_OK,
             )
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ShopsExportExcelView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request: Request, *args, **kwargs):
+        try:
+            authorize_Base_tariff(request)
+            date_pretty = get_today_pretty_fake()
+
+            with connection.cursor() as cursor:
+                # First, count total number of rows
+                cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM shop_shopanalytics sa
+                    JOIN shop_shop s ON sa.shop_id = s.seller_id
+                    WHERE sa.date_pretty = %s
+                """,
+                    [date_pretty],
+                )
+
+                cursor.execute(
+                    f"""
+                    SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
+                        sa.average_purchase_price, sa.average_order_price, sa.rating,
+                        sa.date_pretty,
+                        COUNT(DISTINCT sac.category_id) as num_categories,
+                        s.title as shop_title, s.link as seller_link,
+                        ROW_NUMBER() OVER (ORDER BY sa.total_revenue DESC) as position
+                    FROM shop_shopanalytics sa
+                    JOIN shop_shop s ON sa.shop_id = s.seller_id
+                    LEFT JOIN shop_shopanalytics_categories sac ON sa.id = sac.shopanalytics_id
+                    WHERE sa.date_pretty = %s
+                    GROUP BY sa.id, s.title, s.link
+                    ORDER BY position ASC
+                """,
+                    [date_pretty],
+                )
+                columns = [col[0] for col in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+                return Response(data=results, status=status.HTTP_200_OK)
         except Exception as e:
             print(e)
             traceback.print_exc()
