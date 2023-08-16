@@ -607,7 +607,6 @@ class ProductsWithMostRevenueYesterdayView(APIView):
 
                 cursor.execute(
                     """
-                    EXPLAIN ANALYZE
                     SELECT
                         today.product_id,
                         today.orders_money - COALESCE(yesterday.orders_money, 0) as diff_revenue
@@ -731,6 +730,7 @@ class ProductsWithMostRevenueYesterdayView(APIView):
 
         except Exception as e:
             print(e)
+            traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
