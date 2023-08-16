@@ -9,6 +9,7 @@ from . import views
 app_name = "shops"
 urlpatterns = [
     path("", views.ShopsView.as_view(), name="all-shops"),
+    path("toexcel/", views.ShopsExportExcelView.as_view(), name="all-shops"),
     path("select/", views.AllShopsView.as_view(), name="all-shops-select"),
     path("mine/", views.UserShopsView.as_view(), name="all-shops-select"),
     path("current/<str:link>", views.CurrentShopView.as_view(), name="all-shops"),
