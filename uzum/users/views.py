@@ -2,7 +2,10 @@ import datetime
 import logging
 import traceback
 from datetime import timedelta
-
+import requests
+import json
+from django.contrib.auth.base_user import BaseUserManager
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
@@ -20,6 +23,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from twilio.base.exceptions import TwilioRestException
 from twilio.rest import Client
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from config.settings.base import env
 from uzum.shop.models import Shop
@@ -28,9 +32,14 @@ from uzum.users.api.serializers import (
     LogOutSerializer,
     PasswordRenewSerializer,
     UserLoginSerializer,
+    UserSerializer,
+    create_referral,
+    get_random_string,
+    get_referred_by,
 )
 from uzum.utils.general import Tariffs
 
+logger = logging.getLogger(__name__)
 # disable twilio info logs
 # twilio_logger = logging.getLogger("twilio.http_client")
 # twilio_logger.setLevel(logging.WARNING)
@@ -41,8 +50,53 @@ User = get_user_model()
 client = Client(env("TWILIO_ACCOUNT_SID"), env("TWILIO_AUTH_TOKEN"))
 verify = client.verify.services(env("TWILIO_VERIFY_SERVICE_SID"))
 
-# Disable twilio logs
+
 # logging.getLogger("twilio").setLevel(logging.INFO)
+class GoogleView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        try:
+            print("request.data: ", request.data)
+            payload = {"access_token": request.data.get("code")}  # validate the token
+            r = requests.get("https://www.googleapis.com/oauth2/v2/userinfo", params=payload)
+            data = json.loads(r.text)
+
+            if "error" in data:
+                content = {"message": "wrong google token / this google token is already expired."}
+                return Response(content)
+
+            # create user if not exist
+            try:
+                user = User.objects.get(username=data["email"])
+            except User.DoesNotExist:
+                referral_code = get_random_string(6, data["email"], data["email"])
+                referred_by_code = request.data.get("referred_by_code", None)
+                referred_by = None
+                if referred_by_code:
+                    referred_by = get_referred_by(referred_by_code)
+                user = User.objects.create(
+                    username=data["email"],
+                    email=data["email"],
+                    referral_code=referral_code,
+                    password=make_password(BaseUserManager().make_random_password()),
+                    referred_by=referred_by,
+                )
+
+                create_referral(referred_by, user)
+
+            token = RefreshToken.for_user(user)  # generate token without username & password
+            response = {}
+            response["username"] = user.username
+            response["access_token"] = str(token.access_token)
+            response["refresh_token"] = str(token)
+            return Response(response)
+        except Exception as e:
+            print("Error in GoogleView: ", e)
+            logger.error(traceback.format_exc())
+            traceback.print_exc()
+            return Response(status=500, data={"message": "Internal server error"})
 
 
 class SetShopsView(APIView):
@@ -252,16 +306,13 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class CustomTokenRefreshView(TokenRefreshView):
-    serializer_class = UserLoginSerializer
-
     @extend_schema(tags=["token"], operation_id="login")
     def post(self, request, *args, **kwargs):
-        print("request.data: ", request.data)
-        serializer = self.get_serializer(data=request.data)
+        # First, let the original TokenRefreshView handle the refresh and get the response
+        response = super().post(request, *args, **kwargs)
 
-        serializer.is_valid(raise_exception=True)
-
-        response = Response()
+        # If you want, you can inspect the response here as well
+        # print("response.data: ", response.data)
 
         return response
 

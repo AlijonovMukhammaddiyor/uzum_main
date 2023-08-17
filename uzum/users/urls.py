@@ -1,6 +1,7 @@
 from django.urls import path
 
 from uzum.users.views import (  # CodeVerificationView,; VerificationSendView,
+    GoogleView,
     PasswordRenewView,
     SetShopsView,
     user_detail_view,

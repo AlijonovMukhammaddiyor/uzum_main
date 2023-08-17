@@ -13,6 +13,8 @@ from uzum.shop.views import UzumTotalOrders, UzumTotalProducts, UzumTotalRevenue
 from uzum.users.views import (
     CheckUserNameAndPhone,
     CodeVerificationView,
+    CustomTokenRefreshView,
+    GoogleView,
     LogoutView,
     PasswordRenewView,
     VerificationSendView,
@@ -36,7 +38,7 @@ urlpatterns += [
     # path("auth-token/", CustomObtainAuthToken.as_view()),
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/logout/", LogoutView.as_view(), name="token_logout"),
-    path("api/token/civuiaubcyvsdcibhsvus/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/token/civuiaubcyvsdcibhsvus/refresh/", CustomTokenRefreshView.as_view(), name="token_refresh"),
     path("api/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     path("api/schema/", SpectacularAPIView.as_view(), name="api-schema"),
     path(
@@ -50,6 +52,7 @@ urlpatterns += [
     path("api/user/", include("uzum.users.urls", namespace="users")),
     path("api/category/", include("uzum.category.urls", namespace="category")),
     path("api/shop/", include("uzum.shop.urls", namespace="shop")),
+    path("api/google/", GoogleView.as_view(), name="google"),
     path("api/product/", include("uzum.product.urls", namespace="product")),
     path("api/badge/", include("uzum.badge.urls", namespace="badge")),
     path("api/banner/", include("uzum.banner.urls", namespace="banner")),

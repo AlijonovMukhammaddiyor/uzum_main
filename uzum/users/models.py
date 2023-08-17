@@ -30,6 +30,13 @@ class User(AbstractUser):
     check forms.SignupForm and forms.SocialSignupForms accordingly.
     """
 
+    AUTHENTICATION_METHODS = [
+        ("STANDARD", "Standard Registration"),
+        ("GOOGLE", "Google OAuth"),
+        ("TELEGRAM", "Telegram"),
+        ("PHONE", "Phone"),
+    ]
+
     # make choices for tariffs
 
     phone_number = models.CharField(max_length=20, blank=True, unique=False, null=True)
@@ -60,6 +67,11 @@ class User(AbstractUser):
         default=get_one_day_later,
     )
     shops_updated_at = models.DateTimeField(null=True, blank=True)
+    authentication_method = models.CharField(
+        max_length=10,
+        choices=AUTHENTICATION_METHODS,
+        default=AUTHENTICATION_METHODS[0][0],
+    )
 
     def get_absolute_url(self) -> str:
         """Get URL for user's detail view.

@@ -105,6 +105,15 @@ class UserSerializer(serializers.ModelSerializer):
             if not password:
                 raise ValueError("Password is required.")
 
+            phone_number = validated_data.get("phone_number")
+            if phone_number:
+                if User.objects.filter(phone_number=phone_number).exists():
+                    raise ValueError("A user with this phone number already exists.")
+
+            if validated_data.get("username"):
+                if User.objects.filter(username=validated_data["username"]).exists():
+                    raise ValueError("A user with this username already exists.")
+
             # Generate a unique referral code. This will generate a random string of length 6.
             referral_code = get_random_string(6, validated_data["username"], validated_data["username"])
             # replace space with underscore
@@ -112,7 +121,6 @@ class UserSerializer(serializers.ModelSerializer):
             context = self.context["request"].data
             referred_by_code = context.get("referred_by_code")
             referred_by = get_referred_by(referred_by_code)
-
             # Add the generated referral code to the user data.
             validated_data["referral_code"] = referral_code
             validated_data["referred_by"] = referred_by
@@ -125,11 +133,10 @@ class UserSerializer(serializers.ModelSerializer):
 
             create_referral(referred_by, user)
             # before returning the user, we need to remove the password from the validated data
-            return {
-                "id": user.id,
-                "username": user.username,
-                "referral_code": user.referral_code,
-            }
+            return user
+        except ValueError as e:
+            logger.error("ValueError in create: ", e)
+            raise serializers.ValidationError({"detail": str(e)})
         except Exception as e:
             print("Error in create: ", e)
             logger.error(traceback.format_exc())

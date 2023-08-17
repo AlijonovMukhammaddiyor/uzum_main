@@ -12,6 +12,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import UserSerializer
 
@@ -58,10 +59,20 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
             #     return HttpResponseBadRequest("Invalid verification token")
 
             # Continue with the user creation logic
-            return super().create(request, *args, **kwargs)
+            response = super().create(request, *args, **kwargs)
+
+            if response.status_code == status.HTTP_201_CREATED:
+                user = User.objects.get(username=response.data["username"])
+                refresh = RefreshToken.for_user(user)
+
+                # Add refresh and access tokens to the response data
+                response.data["refresh_token"] = str(refresh)
+                response.data["access_token"] = str(refresh.access_token)
+
+            return response
+
         except IntegrityError as e:
-            logger.error("Error in create: ", e)
-            print("Error in create: ", e)
+            logger.error("IntegrityError in create: ", e)
             field_errors = str(e.args[1]).split(",")
             error_message = ""
 
@@ -72,20 +83,20 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
 
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": error_message})
         except ValidationError as e:
-            logger.error("Error in create: ", e)
-            print("Error in create: ", e)
+            logger.error("ValueError in create view: ", e)
             error_message = ""
-            error_details = e.detail  # This should be a dictionary with the error details.
+            error_details = str(e)
 
-            if "phone_number" in error_details:
+            if "phone number" in error_details:
                 error_message = "A user with this phone number already exists."
             elif "username" in error_details:
                 error_message = "A user with this username already exists."
+            else:
+                error_message = "An unspecified validation error occurred."
 
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": error_message})
         except Exception as e:
-            logger.error("Error in create: ", e)
-            print("Error in create: ", e)
+            logger.error("Just Error in create view: ", e)
             traceback.print_exc()
             # send error message
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "Something went wrong"})
