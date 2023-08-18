@@ -2,7 +2,7 @@ import time
 import traceback
 from datetime import date, datetime, timedelta
 from itertools import groupby
-
+import logging
 import numpy as np
 import pandas as pd
 import pytz
@@ -43,6 +43,9 @@ from uzum.utils.general import (
     get_day_before_pretty,
     get_today_pretty_fake,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 # Base tariff
@@ -275,6 +278,47 @@ class ProductsView(ListAPIView):
     def list(self, request: Request):
         authorize_Base_tariff(self.request)
         return super().list(request)
+
+
+class ProductsToExcelView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Product"])
+    def get(self, request: Request):
+        try:
+            authorize_Base_tariff(request)
+            start = time.time()
+
+            products = (
+                ProductAnalyticsView.objects.all()
+                .order_by("-orders_money")
+                .values(
+                    "product_title_ru",
+                    "product_title",
+                    "orders_amount",
+                    "product_available_amount",
+                    "orders_money",
+                    "reviews_amount",
+                    "rating",
+                    "shop_title",
+                    "category_title",
+                    "category_title_ru",
+                    "avg_purchase_price",
+                    "position_in_category",
+                )
+            )
+
+            logger.info(f"ProductsToExcelView: {time.time() - start}")
+
+            return Response(
+                data=products,
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # Base tariff

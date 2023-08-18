@@ -77,6 +77,7 @@ class ProductAnalytics(models.Model):
     position_in_category = models.IntegerField(default=0, null=True, blank=True)
     position = models.IntegerField(default=0, null=True, blank=True)
     average_purchase_price = models.IntegerField(default=0, null=True, blank=True)
+    # monthly_orders = models.TextField(null=True, blank=True)
 
     @staticmethod
     def set_positions(date_pretty=get_today_pretty()):
