@@ -147,6 +147,41 @@ class CategoryTreeView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class CategoriesToExcelView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Category"])
+    def get(self, request: Request):
+        try:
+            authorize_Base_tariff(request)
+            date_pretty = get_today_pretty_fake()
+            # get all categoryanalytics with date_pretty
+            categories = (
+                CategoryAnalytics.objects.filter(date_pretty=date_pretty)
+                .values(
+                    "total_orders",
+                    "total_reviews",
+                    "total_products",
+                    "total_shops",
+                    "total_orders_amount",
+                    "average_purchase_price",
+                    "average_product_rating",
+                    "category__title_ru",
+                    "category__title",
+                )
+                .exclude(category__categoryId=1)
+                .order_by("-total_orders_amount")
+            )
+
+            return Response(status=status.HTTP_200_OK, data=categories)
+
+        except Exception as e:
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # Base tariff
 class CategoryProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]

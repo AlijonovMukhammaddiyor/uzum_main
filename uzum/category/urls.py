@@ -11,6 +11,7 @@ urlpatterns = [
     path("", (views.CategoryTreeView.as_view()), name="all-categories"),
     path("current/<int:category_id>/", views.CurrentCategoryView.as_view(), name="current-categories"),
     path("segmentation/", views.AllCategoriesSegmentation.as_view(), name="segmentation"),
+    path("toexcel/", views.CategoriesToExcelView.as_view(), name="segmentation"),
     path(
         "products/<int:category_id>/",
         views.CategoryProductsView.as_view(),

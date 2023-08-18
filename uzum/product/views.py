@@ -1022,3 +1022,25 @@ class GrowingProductsView(APIView):
         except Exception as e:
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ProductDiscoveryView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Product"])
+    def get(self, request: Request):
+        try:
+            categories = request.query_params.get("categories", "")
+            if not categories:
+                return Response({"error": "Categories not provided"}, status=status.HTTP_400_BAD_REQUEST)
+            min_avg_orders_count = request.query_params.get("min_avg_orders_count", 0)
+            max_avg_orders_count = request.query_params.get("max_avg_orders_count", 999999999)
+            min_total_orders_count = request.query_params.get("total_orders_count", 0)
+            max_total_orders_count = request.query_params.get("total_orders_count", 999999999)
+            # min_avg_
+
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
