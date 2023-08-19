@@ -662,7 +662,7 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                         FROM
                             product_productanalytics
                         WHERE
-                            date_pretty = '2023-08-16'
+                            date_pretty = %s
                         ) as today
                     INNER JOIN
                         (
@@ -672,7 +672,7 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                         FROM
                             product_productanalytics
                         WHERE
-                            date_pretty = '2023-08-15'
+                            date_pretty = %s
                         ) as yesterday
                     ON
                         today.product_id = yesterday.product_id
