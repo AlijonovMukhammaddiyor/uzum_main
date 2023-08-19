@@ -295,6 +295,7 @@ class ProductsToExcelView(APIView):
                 ProductAnalyticsView.objects.all()
                 .order_by("-orders_money")
                 .values(
+                    "product_id",
                     "product_title_ru",
                     "product_title",
                     "orders_amount",
