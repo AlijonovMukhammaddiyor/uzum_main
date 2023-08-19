@@ -5,7 +5,6 @@ import traceback
 from datetime import datetime, timedelta
 
 import pytz
-import xlsxwriter
 from django.db import connection
 from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
 from django.http import HttpResponse
@@ -986,7 +985,7 @@ class ShopProductsView(ListAPIView):
         shop = get_object_or_404(Shop, seller_id=seller_id)
 
         ordering = self.request.query_params.get("order", "desc")
-        column = self.request.query_params.get("column", "orders_amount")
+        column = self.request.query_params.get("column", "orders_money")
         search_columns = self.request.query_params.get("searches", "")  # default is empty string
         filters = self.request.query_params.get("filters", "")  # default is empty string
 
@@ -1353,7 +1352,7 @@ class ShopProductsByCategoryView(APIView):
             shop = Shop.objects.get(pk=seller_id)
             category = Category.objects.get(pk=category_id)
 
-            categories = Category.get_descendants(category, include_self=True)
+            categories = category.get_category_descendants(include_self=True)
             latest_product_analytics_orders_amount = Subquery(
                 ProductAnalytics.objects.filter(product__product_id=OuterRef("product_id"))
                 .order_by("-created_at")
