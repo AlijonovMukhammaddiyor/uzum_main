@@ -23,6 +23,7 @@ def prepareProductData(
     shop_analytics_done: dict,
     current_analytic: dict = None,
     category_sales_map: dict = None,
+    shop_links_and_titles: dict = None,
 ):
     try:
         result = None
@@ -75,6 +76,17 @@ def prepareProductData(
 
             shop_analytics_track[seller["id"]] = True
             shop_analytics_done[seller["id"]] = True
+
+            # check if seller title and link is changed
+            if seller["id"] in shop_links_and_titles and (
+                shop_links_and_titles[seller["id"]][0] != seller["link"]
+                or shop_links_and_titles[seller["id"]][1] != seller["title"]
+            ):
+                print("Seller title or link changed for", seller["id"])
+                shop = Shop.objects.get(seller_id=seller["id"])
+                shop.title = seller["title"]
+                shop.link = seller["link"]
+                shop.save()
 
         # badges
         badges_api = product_api["badges"]

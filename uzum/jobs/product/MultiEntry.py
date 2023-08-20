@@ -49,6 +49,7 @@ def create_products_from_api(
         shops_list = []
 
         shops = Shop.objects.all()
+        shop_links_and_titles = {shop.seller_id: [shop.link, shop.title] for shop in shops}
         shops_dict = {shop.seller_id: shop for shop in shops}
         latest_product_analytics = LatestProductAnalyticsView.objects.values(
             "product_id", "latest_orders_money", "latest_orders_amount"
@@ -82,6 +83,7 @@ def create_products_from_api(
                 shop_analytics_done=shop_analytics_done,
                 current_analytic=latest_product_analytics_dict.get(product["id"], None),
                 category_sales_map=category_sales_map,
+                shop_links_and_titles=shop_links_and_titles,
             )
 
             products_analytics.append(product_analytic)
