@@ -691,6 +691,9 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                 start_date = timezone.make_aware(
                     datetime.now() - timedelta(days=7), timezone=pytz.timezone("Asia/Tashkent")
                 ).replace(hour=0, minute=0, second=0, microsecond=0)
+                end_date = timezone.make_aware(
+                    datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
                 cursor.execute(
                     """
@@ -718,11 +721,11 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                     JOIN
                         shop_shop AS shop ON pp.shop_id = shop.seller_id        -- Adjust the table and column names as necessary
                     WHERE
-                        pa.product_id IN %s AND pa.created_at >= %s
+                        pa.product_id IN %s AND pa.created_at >= %s AND pa.created_at <= %s
                     ORDER BY
                         pa.product_id, pa.date_pretty DESC
                     """,
-                    [product_ids_tuple, start_date],
+                    [product_ids_tuple, start_date, end_date],
                 )
                 rows = dictfetchall(cursor)
 

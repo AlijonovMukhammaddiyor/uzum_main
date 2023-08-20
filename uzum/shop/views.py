@@ -1838,6 +1838,7 @@ class YesterdayTopsView(APIView):
             authorize_Base_tariff(request)
             date_pretty = get_today_pretty_fake()
             yesterday_pretty = get_day_before_pretty(date_pretty)
+            print(date_pretty, yesterday_pretty)
 
             def dictfetchall(cursor):
                 "Returns all rows from a cursor as a dict"

@@ -72,6 +72,7 @@ def prepareProductData(
                     "rating": seller["rating"],
                 }
             )
+
             shop_analytics_track[seller["id"]] = True
             shop_analytics_done[seller["id"]] = True
 
@@ -177,7 +178,7 @@ def prepareProductData(
                 len(product_api["skuList"] if len(product_api["skuList"]) > 0 else 1)
             )
         except Exception as e:
-            print(e)
+            print(e, product_api["skuList"], product_api["id"])
             traceback.print_exc()
             average_purchase_price = 0
         latest_orders_money = current_analytic["latest_orders_money"] if current_analytic else 0
