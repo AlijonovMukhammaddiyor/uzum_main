@@ -16,12 +16,13 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from uzum.category.models import Category
 
 from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.jobs.constants import PRODUCT_HEADER
@@ -214,7 +215,7 @@ class ProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     serializer_class = ProductAnalyticsViewSerializer
-    pagination_class = ExamplePagination
+    pagination_class = LimitOffsetPagination
 
     VALID_SORT_FIELDS = [
         "orders_amount",
@@ -286,13 +287,19 @@ class ProductsToExcelView(APIView):
     allowed_methods = ["GET"]
 
     @extend_schema(tags=["Product"])
-    def get(self, request: Request):
+    def get(self, request: Request, category_id: str):
         try:
             authorize_Base_tariff(request)
             start = time.time()
-
+            category = Category.objects.get(categoryId=category_id)
+            descendants = category.descendants
+            if not descendants:
+                descendants = [category_id]
+            else:
+                descendants = descendants.split(",")
+                descendants.append(category_id)
             products = (
-                ProductAnalyticsView.objects.all()
+                ProductAnalyticsView.objects.filter(category_id__in=descendants)
                 .order_by("-orders_money")
                 .values(
                     "product_id",
@@ -319,7 +326,7 @@ class ProductsToExcelView(APIView):
             )
         except Exception as e:
             traceback.print_exc()
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response([])
 
 
 # Base tariff
