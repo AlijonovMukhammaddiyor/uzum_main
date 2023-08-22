@@ -159,14 +159,16 @@ class BannerImpactView(APIView):
                 latest_date = date
 
             product_analytics = ProductAnalytics.objects.filter(
-                product=product, created_at__range=(earliest_date, latest_date)
+                product=product, created_at__range=[earliest_date, latest_date]
             )
 
             return Response(
                 {
                     "data": ProductAnalyticsSerializer(product_analytics, many=True).data,
                     "first_date": banner_dates["earliest_date"].strftime("%Y-%m-%d"),
-                    "last_date": banner_dates["latest_date"].strftime("%Y-%m-%d"),
+                    "last_date": banner_dates["latest_date"]
+                    .astimezone(pytz.timezone("Asia/Tashkent"))
+                    .strftime("%Y-%m-%d"),
                 },
                 status=status.HTTP_200_OK,
             )
