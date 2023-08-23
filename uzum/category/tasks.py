@@ -12,7 +12,7 @@ from asgiref.sync import async_to_sync
 from django.core.cache import cache
 from django.db import connection, transaction
 from django.db.models import Case, Value, When
-
+from django.utils import timezone
 from config import celery_app
 from uzum.banner.models import Banner
 from uzum.category.models import Category, CategoryAnalytics
@@ -93,7 +93,8 @@ def update_uzum_data(args=None, **kwargs):
         create_products_from_api(products_api, product_campaigns, shop_analytics_done, category_sales_map)
         time.sleep(10)
         del products_api
-    # Category.update_descendants()
+    Category.update_descendants()
+
     time.sleep(10)
 
     # add_russian_titles()
@@ -151,6 +152,7 @@ def update_uzum_data(args=None, **kwargs):
     time.sleep(60)
     print("Updating Analytics...")
     start = time.time()
+    vacuum_table("category_categoryanalytics")
     update_analytics(date_pretty)
     print(f"Analytics updated in {time.time() - start} seconds")
 
@@ -237,6 +239,7 @@ def update_analytics(date_pretty: str):
         yesterday_pretty = get_day_before_pretty(date_pretty)
         create_product_latestanalytics(yesterday_pretty)
         start = time.time()
+        vacuum_table("product_productanalytics")
         ProductAnalytics.update_analytics(date_pretty)
         print(f"ProductAnalytics updated in {time.time() - start} seconds")
         start = time.time()
@@ -682,78 +685,90 @@ def create_materialized_view(date_pretty_str):
     drop_sku_analytics_view()
     # drop product_avg_purchase_price_view if exists
     drop_product_avg_purchase_price_view()
-    # create sku analytics view
+    # drop product analytics monthly materialized view if exists
+    drop_product_analytics_monthly_materialized_view()
+    create_product_analytics_monthly_materialized_view(date_pretty_str)
     create_sku_analytics_materialized_view(date_pretty_str)
     # create product avg purchase price view
     create_product_avg_purchase_price_view(date_pretty_str)
+    # create product analytics monthly materialized view
 
     with connection.cursor() as cursor:
         cursor.execute(
             f"""
-        CREATE MATERIALIZED VIEW product_sku_analytics AS
-        SELECT
-            pa.date_pretty,
-            pa.product_id,
-            p.title AS product_title,
-            p.title_ru AS product_title_ru,  -- Added product_title_ru here
-            p.category_id,
-            c.title AS category_title,  -- Added category_title here
-            c.title_ru AS category_title_ru,  -- Added category_title_ru here
-            p.characteristics AS product_characteristics,
-            p.photos,
-            sh.title AS shop_title,
-            sh.link AS shop_link,
-            pa.available_amount AS product_available_amount,
-            pa.orders_amount,
-            pa.reviews_amount,
-            pa.orders_money,
-            pa.rating,
-            pa.position_in_category,
-            pa.position_in_shop,
-            pa.position,
-            jsonb_agg(
-                json_build_object(
-                    'badge_text', b.text,
-                    'badge_bg_color', b.background_color,
-                    'badge_text_color', b.text_color
-                )
-            )::text AS badges,
-            COALESCE(sa.sku_analytics, '[]') AS sku_analytics,  -- Added sku_analytics
-            COALESCE(avp.avg_purchase_price, 0) AS avg_purchase_price  -- Added avg_purchase_price here
-        FROM
-            product_productanalytics pa
-            JOIN product_product p ON pa.product_id = p.product_id
-            JOIN category_category c ON p.category_id = c."categoryId"  -- Added join with category table here
-            JOIN shop_shop sh ON p.shop_id = sh.seller_id
-            LEFT JOIN product_productanalytics_badges pb ON pa.id = pb.productanalytics_id
-            LEFT JOIN badge_badge b ON pb.badge_id = b.badge_id
-            LEFT JOIN sku_analytics_view sa ON pa.product_id = sa.product_id
-            LEFT JOIN product_avg_purchase_price_view avp ON pa.product_id = avp.product_id  -- Added join
-        WHERE
-            pa.date_pretty = '{date_pretty_str}'
-        GROUP BY
-            pa.date_pretty,
-            pa.product_id,
-            p.title,
-            p.title_ru,  -- Added product_title_ru here
-            p.category_id,
-            c.title,  -- Added category_title here
-            c.title_ru,  -- Added category_title_ru here
-            p.characteristics,
-            p.photos,
-            sh.title,
-            sh.link,
-            pa.available_amount,
-            pa.orders_amount,
-            pa.orders_money,
-            pa.reviews_amount,
-            pa.rating,
-            pa.position_in_category,
-            pa.position_in_shop,
-            pa.position,
-            sa.sku_analytics,
-            avp.avg_purchase_price;  -- Added avg_purchase_price here
-        """
+            CREATE MATERIALIZED VIEW product_sku_analytics AS
+            SELECT
+                pa.date_pretty,
+                pa.product_id,
+                p.title AS product_title,
+                p.created_at AS product_created_at,
+                p.title_ru AS product_title_ru,
+                p.category_id,
+                c.title AS category_title,
+                c.title_ru AS category_title_ru,
+                p.characteristics AS product_characteristics,
+                p.photos,
+                sh.title AS shop_title,
+                sh.link AS shop_link,
+                pa.available_amount AS product_available_amount,
+                pa.orders_amount,
+                pa.reviews_amount,
+                pa.orders_money,
+                pa.rating,
+                pa.position_in_category,
+                pa.position_in_shop,
+                pa.position,
+                jsonb_agg(
+                    json_build_object(
+                        'badge_text', b.text,
+                        'badge_bg_color', b.background_color,
+                        'badge_text_color', b.text_color
+                    )
+                )::text AS badges,
+                COALESCE(sa.sku_analytics, '[]') AS sku_analytics,
+                COALESCE(avp.avg_purchase_price, 0) AS avg_purchase_price,
+                pam.diff_orders_money AS diff_orders_money,  -- added from product_analytics_monthly
+                pam.diff_orders_amount AS diff_orders_amount,  -- added from product_analytics_monthly
+                pam.diff_reviews_amount AS diff_reviews_amount  -- added from product_analytics_monthly
+            FROM
+                product_productanalytics pa
+                JOIN product_product p ON pa.product_id = p.product_id
+                JOIN category_category c ON p.category_id = c."categoryId"
+                JOIN shop_shop sh ON p.shop_id = sh.seller_id
+                LEFT JOIN product_productanalytics_badges pb ON pa.id = pb.productanalytics_id
+                LEFT JOIN badge_badge b ON pb.badge_id = b.badge_id
+                LEFT JOIN sku_analytics_view sa ON pa.product_id = sa.product_id
+                LEFT JOIN product_avg_purchase_price_view avp ON pa.product_id = avp.product_id
+                LEFT JOIN product_analytics_monthly pam ON pa.product_id = pam.product_id  -- join with product_analytics_monthly
+            WHERE
+                pa.date_pretty = '{date_pretty_str}'
+            GROUP BY
+                pa.date_pretty,
+                pa.product_id,
+                p.title,
+                p.created_at,
+                p.title_ru,
+                p.category_id,
+                c.title,
+                c.title_ru,
+                p.characteristics,
+                p.photos,
+                sh.title,
+                sh.link,
+                pa.available_amount,
+                pa.orders_amount,
+                pa.orders_money,
+                pa.reviews_amount,
+                pa.rating,
+                pa.position_in_category,
+                pa.position_in_shop,
+                pa.position,
+                sa.sku_analytics,
+                avp.avg_purchase_price,
+                pam.diff_orders_money,  -- group by these new columns as well
+                pam.diff_orders_amount,
+                pam.diff_reviews_amount;
+            """
         )
 
     # drop sku analytics materialized view if exists
@@ -804,6 +819,85 @@ def create_product_avg_purchase_price_view(date_pretty_str):
                 sa.date_pretty = '{date_pretty_str}'
             GROUP BY
                 s.product_id
+            """
+        )
+
+
+def create_product_analytics_monthly_materialized_view(date_pretty):
+    thirty_days_ago = (
+        timezone.make_aware(datetime.now() - timedelta(days=30))
+        .astimezone(pytz.timezone("Asia/Tashkent"))
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+    )
+
+    # If date_pretty is a datetime object, convert it to a string
+    if isinstance(date_pretty, datetime):
+        date_pretty = date_pretty.strftime("%Y-%m-%d")
+
+    with connection.cursor() as cursor:
+        # Drop the materialized view if it exists
+        cursor.execute("DROP MATERIALIZED VIEW IF EXISTS product_analytics_monthly;")
+
+        cursor.execute(
+            """
+            CREATE MATERIALIZED VIEW product_analytics_monthly AS
+            WITH LatestEntries AS (
+                SELECT
+                    product_id,
+                    MAX(created_at) as latest_date
+                FROM
+                    product_productanalytics
+                WHERE
+                    created_at <= %s
+                GROUP BY
+                    product_id
+            )
+
+            , CurrentEntries AS (
+                SELECT
+                    product_id,
+                    orders_amount AS current_orders_amount,
+                    orders_money AS current_orders_money,
+                    reviews_amount AS current_reviews_amount
+                FROM
+                    product_productanalytics
+                WHERE
+                    date_pretty = %s
+            )
+
+            SELECT
+                CE.product_id,
+                LE.latest_date AS latest_date_30_days_ago,
+                COALESCE(PA.orders_amount, 0) AS orders_amount_30_days_ago,
+                COALESCE(PA.orders_money, 0) AS orders_money_30_days_ago,
+                COALESCE(PA.reviews_amount, 0) AS reviews_amount_30_days_ago,
+                CE.current_orders_amount,
+                CE.current_orders_money,
+                CE.current_reviews_amount,
+                CE.current_orders_amount - COALESCE(PA.orders_amount, 0) AS diff_orders_amount,
+                CE.current_orders_money - COALESCE(PA.orders_money, 0) AS diff_orders_money,
+                CE.current_reviews_amount - COALESCE(PA.reviews_amount, 0) AS diff_reviews_amount
+            FROM
+                CurrentEntries CE
+            LEFT JOIN
+                LatestEntries LE ON CE.product_id = LE.product_id
+            LEFT JOIN
+                product_productanalytics PA ON LE.product_id = PA.product_id AND LE.latest_date = PA.created_at;
+            """,
+            [thirty_days_ago, date_pretty],
+        )
+
+
+def vacuum_table(table_name):
+    with connection.cursor() as cursor:
+        cursor.execute(f"VACUUM (VERBOSE, ANALYZE) {table_name};")
+
+
+def drop_product_analytics_monthly_materialized_view():
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            DROP MATERIALIZED VIEW IF EXISTS product_analytics_monthly
             """
         )
 

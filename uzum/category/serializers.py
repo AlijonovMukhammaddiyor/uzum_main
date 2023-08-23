@@ -80,6 +80,10 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
             "category_title",
             "category_title_ru",
             "avg_purchase_price",
+            "diff_orders_amount",
+            "diff_orders_money",
+            "diff_reviews_amount",
+            "product_created_at",
         ]
 
     def to_representation(self, instance):

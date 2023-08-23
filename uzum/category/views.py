@@ -622,7 +622,9 @@ class SubcategoriesView(APIView):
             # for each category: title += "((category_id))"
             for child in children_analytics:
                 child["category_title"] += f"(({child['category_id']}))"
-                child["category_title_ru"] += f"(({child['category_id']}))"
+                child["category_title_ru"] = (
+                    child["category_title_ru"] if child["category_title_ru"] else child["category_title"]
+                ) + f"(({child['category_id']}))"
 
             return Response(
                 status=status.HTTP_200_OK,

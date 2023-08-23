@@ -398,6 +398,10 @@ class ProductAnalyticsView(models.Model):
     category_title_ru = models.CharField(max_length=255, null=True, blank=True)
     avg_purchase_price = models.FloatField(blank=True, null=True)
     orders_money = models.FloatField(blank=True, null=True, default=0.0)
+    diff_orders_amount = models.IntegerField(blank=True, null=True)
+    diff_reviews_amount = models.IntegerField(blank=True, null=True)
+    diff_orders_money = models.FloatField(blank=True, null=True)
+    product_created_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False

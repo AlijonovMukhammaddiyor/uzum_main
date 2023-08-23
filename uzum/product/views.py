@@ -1,3 +1,4 @@
+import json
 import time
 import traceback
 from datetime import date, datetime, timedelta
@@ -215,7 +216,8 @@ class ProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     serializer_class = ProductAnalyticsViewSerializer
-    pagination_class = LimitOffsetPagination
+    # pagination_class = LimitOffsetPagination
+    pagination_class = None
 
     VALID_SORT_FIELDS = [
         "orders_amount",
@@ -232,44 +234,71 @@ class ProductsView(ListAPIView):
     def get_queryset(self):
         try:
             start = time.time()
-            column = self.request.query_params.get("column", "orders_money")  # default is 'orders_amount'
-            order = self.request.query_params.get("order", "desc")  # default is 'asc'
-            search_columns = self.request.query_params.get("searches", "")  # default is empty string
-            filters = self.request.query_params.get("filters", "")  # default is empty string
+            # Extracting all query parameters
+            params = self.request.GET
 
-            # Validate sorting
-            if column not in self.VALID_SORT_FIELDS:
-                raise ValidationError({"error": f"Invalid column: {column}"})
+            # Dictionary to hold the actual ORM filters
+            orm_filters = {}
 
-            if order not in ["asc", "desc"]:
-                raise ValidationError({"error": f"Invalid order: {order}"})
+            # Extracting sorting parameters
+            column = params.get("column", None)  # Get the column to sort by
+            order = params.get("order", "")  # Get the order (asc/desc)
+            categories = params.get("categories", None)  # Get the categories to filter by
 
-            # Determine sorting order
-            if order == "desc":
-                column = "-" + column
+            if not categories:
+                # return empty queryset
+                return ProductAnalyticsView.objects.none()
 
-            # Build filter query
-            filter_query = Q()
-            if search_columns and filters:
-                search_columns = search_columns.split(",")
-                filters = filters.split("---")
+            categories = map(int, categories.split(","))
 
-                if len(search_columns) != len(filters):
-                    raise ValidationError({"error": "Number of search columns and filters does not match"})
+            for key, value in params.items():
+                if key in ["column", "order", "categories"]:
+                    continue  # Skip sorting parameters
 
-                for i in range(len(search_columns)):
-                    if search_columns[i] not in self.VALID_FILTER_FIELDS:
-                        raise ValidationError({"error": f"Invalid search column: {search_columns[i]}"})
+                if "__range" in key:
+                    # Splitting the values and converting to numbers
+                    min_val, max_val = map(int, value.strip("[]").split(","))
+                    orm_filters[key] = (min_val, max_val)
+                elif "__gte" in key or "__lte" in key:
+                    orm_filters[key] = int(value)
+                elif "__icontains" in key:
+                    orm_filters[key] = value
 
-                    # filter_query |= Q(**{f"{search_columns[i]}__icontains": filters[i]})
-                    # it should be And not Or and case insensitive
-                    filter_query &= Q(**{f"{search_columns[i]}__icontains": filters[i]})
+                if key.startswith("product_created_at"):
+                    # Convert the timestamp back to a datetime object with the correct timezone
+                    values = orm_filters.get(key)
+                    # check if values is list
+                    if values and isinstance(values, list):
+                        orm_filters[key] = [
+                            datetime.fromtimestamp(int(values[0]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
+                                hour=0, minute=0, second=0, microsecond=0
+                            ),
+                            datetime.fromtimestamp(int(values[1]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
+                                hour=23, minute=59, second=59, microsecond=999999
+                            ),
+                        ]
+                    elif values and key.endswith("gte"):
+                        orm_filters[key] = datetime.fromtimestamp(
+                            int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
+                        ).replace(hour=0, minute=0, second=0, microsecond=0)
+                    elif values and key.endswith("lte"):
+                        orm_filters[key] = datetime.fromtimestamp(
+                            int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
+                        ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
-            print("filter_query", filter_query)
+            print(orm_filters)
+            # # Now, use the orm_filters to query the database
+            queryset = ProductAnalyticsView.objects.filter(**orm_filters, category_id__in=categories)
+
+            print("len(queryset)", len(queryset))
+
+            if column:
+                order_prefix = "-" if order == "desc" else ""  # Add "-" prefix for descending order
+                queryset = queryset.order_by(order_prefix + column)
+
             # Query the database
-            data = ProductAnalyticsView.objects.filter(filter_query).order_by(column)
             print("Products query time", time.time() - start)
-            return data
+            return queryset
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -278,7 +307,16 @@ class ProductsView(ListAPIView):
     @extend_schema(tags=["Product"])
     def list(self, request: Request):
         authorize_Base_tariff(self.request)
-        return super().list(request)
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # Count the total number of rows in the queryset
+        total_count = queryset.count()
+
+        # Serialize the data
+        serializer = self.get_serializer(queryset, many=True)
+
+        # Return the serialized data along with the count
+        return Response({"count": total_count, "data": serializer.data if len(serializer.data) < 10000 else []})
 
 
 class ProductsToExcelView(APIView):

@@ -413,8 +413,13 @@ class CategoryAnalytics(models.Model):
         def calculate_growth_rate(metric, smoothing_window=7):
             daily_metrics = defaultdict(list)
 
+            category_ids = Category.objects.filter(
+                child_categories__isnull=True, categoryanalytics__date_pretty=get_today_pretty()
+            ).values_list("categoryId", flat=True)
+
             analytics_data = (
-                CategoryAnalytics.objects.filter(category__child_categories__isnull=True)
+                CategoryAnalytics.objects.filter(category_id__in=category_ids)
+                .exclude(date_pretty="2023-08-02")
                 .values("category", "created_at", metric)
                 .order_by("category", "created_at")
             )

@@ -118,14 +118,14 @@ def create_products_from_api(
             result = create_products_bulk(products_data)
             end = time.time()
             print(f"Time taken to create products: {end - start:.2f} secs")
-            time.sleep(3)
+            time.sleep(1)
         if len(product_skus) > 0:
             start = time.time()
             print(f"Creating skus... - {len(product_skus)}")
             create_skus_bulk(product_skus)
             end = time.time()
             print(f"Time taken to create skus: {end - start:.2f} secs")
-            time.sleep(3)
+            time.sleep(1)
 
         print(f"Creating product analytics... - {len(products_analytics)}")
         start = time.time()
