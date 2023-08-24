@@ -218,6 +218,16 @@ class CategoryAnalytics(models.Model):
             print("Error in get_yesterday_category_analytics: ", e)
             return None
 
+    def update_shops_with_sales_in_week(self):
+        """
+        Updates total_shops_with_sales and total_products_with_sales fields of the category
+        """
+        try:
+            # products =
+            pass
+        except Exception as e:
+            print("Error in update_shops_with_sales_in_week: ", e)
+
     @staticmethod
     def set_average_purchase_price(date_pretty=None):
         try:
@@ -362,33 +372,40 @@ class CategoryAnalytics(models.Model):
                             (pa.orders_amount - COALESCE(latest_pa.latest_orders_amount, 0)) AS difference
                         FROM
                             product_productanalytics AS pa
-                            JOIN product_product ON pa.product_id = product_product.product_id
-                            LEFT JOIN product_latest_analytics latest_pa ON pa.product_id = latest_pa.product_id
+                        INNER JOIN product_product ON pa.product_id = product_product.product_id
+                        LEFT JOIN product_latest_analytics latest_pa ON pa.product_id = latest_pa.product_id
                         WHERE pa.date_pretty = %s
+                    ),
+                    category_ids AS (
+                        SELECT
+                            "categoryId",
+                            CASE
+                                WHEN descendants IS NOT NULL THEN string_to_array(descendants, ',')::integer[]
+                                ELSE ARRAY[]::integer[]
+                            END AS descendant_ids
+                        FROM category_category
                     ),
                     shops_and_products_with_sales AS (
                         SELECT
-                            category_category."categoryId",
-                            COUNT(DISTINCT order_difference.shop_id) FILTER (WHERE order_difference.difference > 0) AS total_shops_with_sales,
-                            COUNT(DISTINCT order_difference.product_id) FILTER (WHERE order_difference.difference > 0) AS total_products_with_sales
+                            c."categoryId",
+                            COUNT(DISTINCT od.shop_id) FILTER (WHERE od.difference > 0) AS total_shops_with_sales,
+                            COUNT(DISTINCT od.product_id) FILTER (WHERE od.difference > 0) AS total_products_with_sales
                         FROM
-                            category_category
-                            LEFT JOIN product_product ON product_product.category_id = ANY (
-                                ARRAY[category_category."categoryId"] || CASE WHEN category_category.descendants IS NOT NULL THEN string_to_array(category_category.descendants, ',')::integer[] ELSE ARRAY[]::integer[] END
-                            )
-                            LEFT JOIN order_difference ON order_difference.product_id = product_product.product_id
+                            category_ids c
+                        LEFT JOIN product_product p ON p.category_id = ANY (ARRAY[c."categoryId"] || c.descendant_ids)
+                        LEFT JOIN order_difference od ON od.product_id = p.product_id
                         GROUP BY
-                            category_category."categoryId"
+                            c."categoryId"
                     )
                     UPDATE
                         category_categoryanalytics
                     SET
-                        total_shops_with_sales = shops_and_products_with_sales.total_shops_with_sales,
-                        total_products_with_sales = shops_and_products_with_sales.total_products_with_sales
+                        total_shops_with_sales = spws.total_shops_with_sales,
+                        total_products_with_sales = spws.total_products_with_sales
                     FROM
-                        shops_and_products_with_sales
+                        shops_and_products_with_sales spws
                     WHERE
-                        category_categoryanalytics.category_id = shops_and_products_with_sales."categoryId"
+                        category_categoryanalytics.category_id = spws."categoryId"
                         AND category_categoryanalytics.date_pretty = %s
                     """,
                     [date_pretty, date_pretty],

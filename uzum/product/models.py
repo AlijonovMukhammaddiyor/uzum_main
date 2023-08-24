@@ -1,3 +1,4 @@
+import gc
 import traceback
 import uuid
 from datetime import datetime
@@ -9,7 +10,7 @@ from django.core.cache import cache
 from django.db import connection, models
 from django.utils import timezone
 
-from uzum.utils.general import get_day_before_pretty, get_today_pretty
+from uzum.utils.general import get_day_before_pretty, get_today_pretty, get_today_pretty_fake
 
 
 class Product(models.Model):
@@ -230,14 +231,26 @@ class ProductAnalytics(models.Model):
 
     @staticmethod
     def set_top_growing_products():
+        gc.collect()
         # Set date range (last 30 days)
         end_date = pd.to_datetime(get_today_pretty()).tz_localize("UTC").astimezone(pytz.timezone("Asia/Tashkent"))
         start_date = end_date - pd.DateOffset(days=30)
 
-        # Retrieve product sales data for the last 30 days
-        sales_data = ProductAnalytics.objects.filter(created_at__range=[start_date, end_date]).values(
-            "product__product_id", "date_pretty", "orders_amount"
+        product_ids = Product.objects.filter(analytics__date_pretty=get_today_pretty_fake()).values_list(
+            "product_id", flat=True
         )
+        print("product_ids", len(product_ids))
+
+        product_ids = ProductAnalytics.objects.filter(
+            date_pretty=get_today_pretty_fake(), orders_amount__gte=100, product_id__in=product_ids
+        ).values_list("product_id", flat=True)
+
+        # Retrieve product sales data for the last 30 days
+        sales_data = ProductAnalytics.objects.filter(
+            created_at__range=[start_date, end_date], product_id__in=product_ids
+        ).values("product__product_id", "date_pretty", "orders_amount")
+
+        gc.collect()
 
         # Convert QuerySet to DataFrame
         sales_df = pd.DataFrame.from_records(sales_data)
@@ -246,7 +259,8 @@ class ProductAnalytics(models.Model):
         sales_df["date_pretty"] = pd.to_datetime(sales_df["date_pretty"])
 
         # Set date_pretty as index (required for rolling function)
-        sales_df = sales_df.set_index("date_pretty").sort_index()
+        sales_df.set_index("date_pretty", inplace=True)
+        sales_df.sort_index(inplace=True)
 
         for span in [3, 5, 7, 30]:
             sales_df[f"ema_{span}_days"] = sales_df.groupby("product__product_id")["orders_amount"].transform(
@@ -259,7 +273,7 @@ class ProductAnalytics(models.Model):
         sales_df["trend_5_to_30"] = sales_df["ema_5_days"] / sales_df["ema_30_days"]
 
         # Reset index (to allow the next operations)
-        sales_df = sales_df.reset_index()
+        sales_df.reset_index(inplace=True)
 
         # Get the last day (most recent) of EMA ratio for each product
         sales_df = sales_df.groupby("product__product_id").last()
@@ -285,6 +299,7 @@ class ProductAnalytics(models.Model):
         # set to cache with tieout 1 day
         print("setting top_growing_products to cache", len(top_growing_products), top_growing_products)
         cache.set("top_growing_products", top_growing_products, timeout=None)
+        gc.collect()
 
     @staticmethod
     def set_orders_money(date_pretty: str):

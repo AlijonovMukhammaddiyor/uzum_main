@@ -1100,7 +1100,7 @@ class StoppedProductsView(APIView):
                     SELECT MAX(pa2.created_at)
                     FROM product_productanalytics pa2
                     WHERE pa2.product_id = pa_inner.product_id
-                ) AND pa_inner.created_at <= NOW() - INTERVAL '2 days'
+                ) AND pa_inner.created_at <= NOW() - INTERVAL '1 days'
             ) pa ON p.product_id = pa.product_id
             LEFT JOIN sku_sku s ON p.product_id = s.product_id
             LEFT JOIN sku_skuanalytics ska ON s.sku = ska.sku_id AND pa.date_pretty = ska.date_pretty
@@ -1748,6 +1748,10 @@ class ShopsWithMostRevenueYesterdayView(APIView):
                     datetime.now() - timedelta(days=7), timezone=pytz.timezone("Asia/Tashkent")
                 ).replace(hour=0, minute=0, second=0, microsecond=0)
 
+                end_date = timezone.make_aware(
+                    datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+
                 cursor.execute(
                     """
                     SELECT
@@ -1766,11 +1770,11 @@ class ShopsWithMostRevenueYesterdayView(APIView):
                     ON
                         analytics.shop_id = shop.seller_id
                     WHERE
-                        analytics.shop_id IN %s AND analytics.created_at >= %s
+                        analytics.shop_id IN %s AND analytics.created_at >= %s AND analytics.created_at <= %s
                     ORDER BY
                         analytics.shop_id, analytics.date_pretty DESC
                     """,
-                    [shop_ids_tuple, start_date],
+                    [shop_ids_tuple, start_date, end_date],
                 )
                 rows = dictfetchall(cursor)
 
@@ -1838,7 +1842,6 @@ class YesterdayTopsView(APIView):
             authorize_Base_tariff(request)
             date_pretty = get_today_pretty_fake()
             yesterday_pretty = get_day_before_pretty(date_pretty)
-            print(date_pretty, yesterday_pretty)
 
             def dictfetchall(cursor):
                 "Returns all rows from a cursor as a dict"

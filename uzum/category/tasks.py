@@ -143,6 +143,7 @@ def update_uzum_data(args=None, **kwargs):
     bulk_remove_duplicate_shop_analytics(date_pretty)
     bulk_remove_duplicate_sku_analytics(date_pretty)
 
+    vacuum_table("category_categoryanalytics")
     update_category_with_sales(category_sales_map, date_pretty)
 
     # print("Updating Category Descendants...")
@@ -181,16 +182,28 @@ def update_category_with_sales(category_sales_map, date_pretty=get_today_pretty(
             descendants = [category_id]
             if category.category.descendants:
                 descendants.extend(map(int, category.category.descendants.split(",")))
+                descendants = list(set(descendants))
 
             # update total_products_with_sales
-            category.total_products_with_sales = sum(
-                len(category_sales_map.get(c_id, {}).get("products_with_sales", [])) for c_id in descendants
-            )
+            # category.total_products_with_sales = sum(
+            #     len(category_sales_map.get(c_id, {}).get("products_with_sales", [])) for c_id in descendants
+            # )
+            # first get all product ids in set to remove duplicates
+            product_ids = set()
+            for c_id in descendants:
+                product_ids.update(category_sales_map.get(c_id, {}).get("products_with_sales", []))
+
+            category.total_products_with_sales = len(product_ids)
 
             # update total_shops_with_sales
-            category.total_shops_with_sales = sum(
-                len(category_sales_map.get(c_id, {}).get("shops_with_sales", [])) for c_id in descendants
-            )
+            # category.total_shops_with_sales = sum(
+            #     len(category_sales_map.get(c_id, {}).get("shops_with_sales", [])) for c_id in descendants
+            # )
+            # first get all shop ids in set to remove duplicates
+            shop_ids = set()
+            for c_id in descendants:
+                shop_ids.update(category_sales_map.get(c_id, {}).get("shops_with_sales", []))
+            category.total_shops_with_sales = len(shop_ids)
 
             to_update.append(category)
 
@@ -688,6 +701,10 @@ def create_materialized_view(date_pretty_str):
     # drop product analytics monthly materialized view if exists
     drop_product_analytics_monthly_materialized_view()
     create_product_analytics_monthly_materialized_view(date_pretty_str)
+
+    # drop_product_analytics_weekly_materialized_view()
+    # create_product_analytics_weekly_materialized_view(date_pretty_str)
+
     create_sku_analytics_materialized_view(date_pretty_str)
     # create product avg purchase price view
     create_product_avg_purchase_price_view(date_pretty_str)
@@ -729,7 +746,10 @@ def create_materialized_view(date_pretty_str):
                 COALESCE(avp.avg_purchase_price, 0) AS avg_purchase_price,
                 pam.diff_orders_money AS diff_orders_money,  -- added from product_analytics_monthly
                 pam.diff_orders_amount AS diff_orders_amount,  -- added from product_analytics_monthly
-                pam.diff_reviews_amount AS diff_reviews_amount  -- added from product_analytics_monthly
+                pam.diff_reviews_amount AS diff_reviews_amount,  -- added from product_analytics_monthly
+                paw.weekly_orders_money AS weekly_orders_money,  -- added from product_analytics_weekly
+                paw.weekly_orders_amount AS weekly_orders_amount,  -- added from product_analytics_weekly
+                paw.weekly_reviews_amount AS weekly_reviews_amount  -- added from product_analytics_weekly
             FROM
                 product_productanalytics pa
                 JOIN product_product p ON pa.product_id = p.product_id
@@ -739,7 +759,8 @@ def create_materialized_view(date_pretty_str):
                 LEFT JOIN badge_badge b ON pb.badge_id = b.badge_id
                 LEFT JOIN sku_analytics_view sa ON pa.product_id = sa.product_id
                 LEFT JOIN product_avg_purchase_price_view avp ON pa.product_id = avp.product_id
-                LEFT JOIN product_analytics_monthly pam ON pa.product_id = pam.product_id  -- join with product_analytics_monthly
+                LEFT JOIN product_analytics_monthly pam ON pa.product_id = pam.product_id
+                LEFT JOIN product_analytics_weekly paw ON pa.product_id = paw.product_id
             WHERE
                 pa.date_pretty = '{date_pretty_str}'
             GROUP BY
@@ -767,7 +788,10 @@ def create_materialized_view(date_pretty_str):
                 avp.avg_purchase_price,
                 pam.diff_orders_money,  -- group by these new columns as well
                 pam.diff_orders_amount,
-                pam.diff_reviews_amount;
+                pam.diff_reviews_amount,
+                paw.weekly_orders_money,
+                paw.weekly_orders_amount,
+                paw.weekly_reviews_amount;
             """
         )
 
@@ -874,9 +898,74 @@ def create_product_analytics_monthly_materialized_view(date_pretty):
                 CE.current_orders_amount,
                 CE.current_orders_money,
                 CE.current_reviews_amount,
-                CE.current_orders_amount - COALESCE(PA.orders_amount, 0) AS diff_orders_amount,
-                CE.current_orders_money - COALESCE(PA.orders_money, 0) AS diff_orders_money,
-                CE.current_reviews_amount - COALESCE(PA.reviews_amount, 0) AS diff_reviews_amount
+                GREATEST(CE.current_orders_amount - COALESCE(PA.orders_amount, 0), 0) AS diff_orders_amount,  -- use GREATEST here
+                GREATEST(CE.current_orders_money - COALESCE(PA.orders_money, 0), 0) AS diff_orders_money,  -- and here
+                GREATEST(CE.current_reviews_amount - COALESCE(PA.reviews_amount, 0), 0) AS diff_reviews_amount  -- and here
+            FROM
+                CurrentEntries CE
+            LEFT JOIN
+                LatestEntries LE ON CE.product_id = LE.product_id
+            LEFT JOIN
+                product_productanalytics PA ON LE.product_id = PA.product_id AND LE.latest_date = PA.created_at;
+            """,
+            [thirty_days_ago, date_pretty],
+        )
+
+
+def create_product_analytics_weekly_materialized_view(date_pretty):
+    thirty_days_ago = (
+        timezone.make_aware(datetime.now() - timedelta(days=7))
+        .astimezone(pytz.timezone("Asia/Tashkent"))
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+    )
+
+    # If date_pretty is a datetime object, convert it to a string
+    if isinstance(date_pretty, datetime):
+        date_pretty = date_pretty.strftime("%Y-%m-%d")
+
+    with connection.cursor() as cursor:
+        # Drop the materialized view if it exists
+        cursor.execute("DROP MATERIALIZED VIEW IF EXISTS product_analytics_monthly;")
+
+        cursor.execute(
+            """
+            CREATE MATERIALIZED VIEW product_analytics_weekly AS
+            WITH LatestEntries AS (
+                SELECT
+                    product_id,
+                    MAX(created_at) as latest_date
+                FROM
+                    product_productanalytics
+                WHERE
+                    created_at <= %s
+                GROUP BY
+                    product_id
+            )
+
+            , CurrentEntries AS (
+                SELECT
+                    product_id,
+                    orders_amount AS current_orders_amount,
+                    orders_money AS current_orders_money,
+                    reviews_amount AS current_reviews_amount
+                FROM
+                    product_productanalytics
+                WHERE
+                    date_pretty = %s
+            )
+
+            SELECT
+                CE.product_id,
+                LE.latest_date AS latest_date_7_days_ago,
+                COALESCE(PA.orders_amount, 0) AS orders_amount_7_days_ago,
+                COALESCE(PA.orders_money, 0) AS orders_money_7_days_ago,
+                COALESCE(PA.reviews_amount, 0) AS reviews_amount_7_days_ago,
+                CE.current_orders_amount,
+                CE.current_orders_money,
+                CE.current_reviews_amount,
+                GREATEST(CE.current_orders_amount - COALESCE(PA.orders_amount, 0), 0) AS weekly_orders_amount,  -- use GREATEST here
+                GREATEST(CE.current_orders_money - COALESCE(PA.orders_money, 0), 0) AS weekly_orders_money,  -- and here
+                GREATEST(CE.current_reviews_amount - COALESCE(PA.reviews_amount, 0), 0) AS weekly_reviews_amount  -- and here
             FROM
                 CurrentEntries CE
             LEFT JOIN
@@ -891,6 +980,15 @@ def create_product_analytics_monthly_materialized_view(date_pretty):
 def vacuum_table(table_name):
     with connection.cursor() as cursor:
         cursor.execute(f"VACUUM (VERBOSE, ANALYZE) {table_name};")
+
+
+def drop_product_analytics_weekly_materialized_view():
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            DROP MATERIALIZED VIEW IF EXISTS product_analytics_weekly
+            """
+        )
 
 
 def drop_product_analytics_monthly_materialized_view():
