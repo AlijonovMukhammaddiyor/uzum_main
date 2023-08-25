@@ -83,6 +83,9 @@ class ProductAnalyticsViewSerializer(serializers.ModelSerializer):
             "diff_orders_amount",
             "diff_orders_money",
             "diff_reviews_amount",
+            "weekly_orders_amount",
+            "weekly_orders_money",
+            "weekly_reviews_amount",
             "product_created_at",
         ]
 

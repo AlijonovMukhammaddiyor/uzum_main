@@ -417,6 +417,9 @@ class ProductAnalyticsView(models.Model):
     diff_reviews_amount = models.IntegerField(blank=True, null=True)
     diff_orders_money = models.FloatField(blank=True, null=True)
     product_created_at = models.DateTimeField(blank=True, null=True)
+    weekly_orders_money = models.FloatField(blank=True, null=True)
+    weekly_orders_amount = models.IntegerField(blank=True, null=True)
+    weekly_reviews_amount = models.IntegerField(blank=True, null=True)
 
     class Meta:
         managed = False

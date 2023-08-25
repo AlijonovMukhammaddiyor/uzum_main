@@ -699,11 +699,11 @@ def create_materialized_view(date_pretty_str):
     # drop product_avg_purchase_price_view if exists
     drop_product_avg_purchase_price_view()
     # drop product analytics monthly materialized view if exists
-    drop_product_analytics_monthly_materialized_view()
+    # drop_product_analytics_monthly_materialized_view()
     create_product_analytics_monthly_materialized_view(date_pretty_str)
 
     # drop_product_analytics_weekly_materialized_view()
-    # create_product_analytics_weekly_materialized_view(date_pretty_str)
+    create_product_analytics_weekly_materialized_view(date_pretty_str)
 
     create_sku_analytics_materialized_view(date_pretty_str)
     # create product avg purchase price view
@@ -925,7 +925,7 @@ def create_product_analytics_weekly_materialized_view(date_pretty):
 
     with connection.cursor() as cursor:
         # Drop the materialized view if it exists
-        cursor.execute("DROP MATERIALIZED VIEW IF EXISTS product_analytics_monthly;")
+        cursor.execute("DROP MATERIALIZED VIEW IF EXISTS product_analytics_weekly;")
 
         cursor.execute(
             """
