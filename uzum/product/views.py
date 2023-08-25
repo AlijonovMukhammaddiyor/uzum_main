@@ -264,6 +264,14 @@ class ProductsView(ListAPIView):
                 elif "__icontains" in key:
                     orm_filters[key] = value
 
+                if key.startswith("orders_money") or key.startswith("diff_orders_money"):
+                    # divide by 1000
+                    values = orm_filters[key]
+                    if values and isinstance(values, list):
+                        orm_filters[key] = [int(value) / 1000.0 for value in values]
+                    elif values:
+                        orm_filters[key] = int(value) / 1000.0
+
                 if key.startswith("product_created_at"):
                     # Convert the timestamp back to a datetime object with the correct timezone
                     values = orm_filters.get(key)

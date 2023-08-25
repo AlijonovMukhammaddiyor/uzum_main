@@ -18,7 +18,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -187,7 +187,7 @@ class CategoryProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     serializer_class = ProductAnalyticsViewSerializer
-    pagination_class = CategoryProductsPagination
+    pagination_class = LimitOffsetPagination
     VALID_SEARCHES = ["shop_title", "product_title", "category_title"]
 
     def get_queryset(self):
@@ -196,31 +196,6 @@ class CategoryProductsView(ListAPIView):
         the category as determined by the category portion of the URL.
         """
         category_id = self.kwargs["category_id"]
-        ordering = self.request.query_params.get("order", "desc")
-        column = self.request.query_params.get("column", "orders_amount")
-        order_by_column = column
-        if ordering == "desc":
-            order_by_column = f"-{column}"
-
-        search_columns = self.request.query_params.get("searches", "")  # default is empty string
-        filters = self.request.query_params.get("filters", "")  # default is empty string
-
-        # Build filter query
-        filter_query = Q()
-        if search_columns and filters:
-            search_columns = search_columns.split(",")
-            filters = filters.split("---")
-
-            if len(search_columns) != len(filters):
-                raise ValidationError({"error": "Number of search columns and filters does not match"})
-
-            for i in range(len(search_columns)):
-                if search_columns[i] not in self.VALID_SEARCHES:
-                    raise ValidationError({"error": f"Invalid search column: {search_columns[i]}"})
-
-                filter_query &= Q(**{f"{search_columns[i]}__icontains": filters[i]})
-
-        # Get the category
         category = get_object_or_404(Category, pk=category_id)
         # Get the descendant category IDs as a list of integers
         if not category.descendants:
@@ -228,17 +203,88 @@ class CategoryProductsView(ListAPIView):
         else:
             descendant_ids = list(map(int, category.descendants.split(",")))
 
-        # Add the parent category ID to the list
-        descendant_ids.append(category_id)
+        params = self.request.GET
 
-        # Prepare base queryset
-        queryset = ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
+        # Dictionary to hold the actual ORM filters
+        orm_filters = {}
+        instant_filter = params.get("instant_filter", None)  # can be revenue, monthly_revenue, created_at
 
-        # Apply filters
-        queryset = queryset.filter(filter_query)
+        # Extracting sorting parameters
+        column = params.get("column", "orders_money")  # Get the column to sort by
+        order = params.get("order", "desc")  # Get the order (asc/desc)
+        categories = descendant_ids
 
-        # Apply ordering
-        queryset = queryset.order_by(order_by_column)
+        if not categories:
+            # return empty queryset
+            return ProductAnalyticsView.objects.none()
+
+        if not instant_filter:
+            for key, value in params.items():
+                if key in ["column", "order", "categories"]:
+                    continue  # Skip sorting parameters
+
+                if "__range" in key:
+                    # Splitting the values and converting to numbers
+                    min_val, max_val = map(int, value.strip("[]").split(","))
+                    orm_filters[key] = (min_val, max_val)
+                elif "__gte" in key or "__lte" in key:
+                    orm_filters[key] = int(value)
+                elif "__icontains" in key:
+                    orm_filters[key] = value
+
+                if key.startswith("orders_money") or key.startswith("diff_orders_money"):
+                    # divide by 1000
+                    values = orm_filters[key]
+                    if values and isinstance(values, list):
+                        orm_filters[key] = [int(value) / 1000.0 for value in values]
+                    elif values:
+                        orm_filters[key] = int(value) / 1000.0
+
+                if key.startswith("product_created_at"):
+                    # Convert the timestamp back to a datetime object with the correct timezone
+                    values = orm_filters.get(key)
+                    # check if values is list
+                    if values and isinstance(values, list):
+                        orm_filters[key] = [
+                            datetime.fromtimestamp(int(values[0]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
+                                hour=0, minute=0, second=0, microsecond=0
+                            ),
+                            datetime.fromtimestamp(int(values[1]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
+                                hour=23, minute=59, second=59, microsecond=999999
+                            ),
+                        ]
+                    elif values and key.endswith("gte"):
+                        orm_filters[key] = datetime.fromtimestamp(
+                            int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
+                        ).replace(hour=0, minute=0, second=0, microsecond=0)
+                    elif values and key.endswith("lte"):
+                        orm_filters[key] = datetime.fromtimestamp(
+                            int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
+                        ).replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        print(orm_filters)
+        order_prefix = "-" if order == "desc" else ""
+        # # Now, use the orm_filters to query the database
+        if not instant_filter:
+            queryset = ProductAnalyticsView.objects.filter(**orm_filters, category_id__in=categories)
+        if instant_filter == "revenue":
+            queryset = ProductAnalyticsView.objects.filter(category_id__in=categories).order_by(
+                "-orders_money", order_prefix + column
+            )[:100]
+        if instant_filter == "monthly_revenue":
+            queryset = ProductAnalyticsView.objects.filter(category_id__in=categories).order_by(
+                "-diff_orders_money", order_prefix + column
+            )[:100]
+        if instant_filter == "created_at":
+            queryset = ProductAnalyticsView.objects.filter(category_id__in=categories).order_by(
+                "-product_created_at", order_prefix + column
+            )[:100]
+
+        print("len(queryset)", len(queryset))
+
+        if column and not instant_filter:
+            order_prefix = "-" if order == "desc" else ""  # Add "-" prefix for descending order
+            queryset = queryset.order_by(order_prefix + column)
 
         return queryset
 
