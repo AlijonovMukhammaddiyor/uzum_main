@@ -215,8 +215,6 @@ class CategoryProductsView(ListAPIView):
         order = params.get("order", "desc")  # Get the order (asc/desc)
         categories = descendant_ids
 
-        print("categories", categories)
-
         if not categories:
             # return empty queryset
             return ProductAnalyticsView.objects.none()
@@ -282,8 +280,6 @@ class CategoryProductsView(ListAPIView):
             queryset = ProductAnalyticsView.objects.filter(category_id__in=categories).order_by(
                 "-product_created_at", order_prefix + column
             )[:100]
-
-        print("len(queryset)", len(queryset))
 
         if column and not instant_filter:
             order_prefix = "-" if order == "desc" else ""  # Add "-" prefix for descending order

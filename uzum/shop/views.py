@@ -234,7 +234,7 @@ class ShopsView(APIView):
 
     def get(self, request: Request, *args, **kwargs):
         try:
-            authorize_Base_tariff(request)
+            # authorize_Base_tariff(request)
             date_pretty = get_today_pretty_fake()
             page_number = int(request.query_params.get("page", 1))
             offset = (page_number - 1) * self.PAGE_SIZE
