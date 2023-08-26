@@ -203,6 +203,7 @@ class CategoryProductsView(ListAPIView):
         else:
             descendant_ids = list(map(int, category.descendants.split(",")))
 
+        descendant_ids.append(category_id)
         params = self.request.GET
 
         # Dictionary to hold the actual ORM filters
@@ -213,6 +214,8 @@ class CategoryProductsView(ListAPIView):
         column = params.get("column", "orders_money")  # Get the column to sort by
         order = params.get("order", "desc")  # Get the order (asc/desc)
         categories = descendant_ids
+
+        print("categories", categories)
 
         if not categories:
             # return empty queryset
@@ -923,28 +926,6 @@ class NicheSelectionView(APIView):
 
             search = request.query_params.get("search", "")
             today_pretty = get_today_pretty_fake()
-
-            # categories = (
-            #     Category.objects.filter(Q(ancestors__icontains=search) | Q(title__icontains=search))
-            #     .values(
-            #         "categoryId",
-            #         "title",
-            #         "title_ru",
-            #         "ancestors",
-            #         "ancestors_ru",
-            #         analytics=F("categoryanalytics__date_pretty"),
-            #         total_products=F("categoryanalytics__total_products"),
-            #         total_orders=F("categoryanalytics__total_orders"),
-            #         total_reviews=F("categoryanalytics__total_reviews"),
-            #         total_shops=F("categoryanalytics__total_shops"),
-            #         total_shops_with_sales=F("categoryanalytics__total_shops_with_sales"),
-            #         total_products_with_sales=F("categoryanalytics__total_products_with_sales"),
-            #         average_purchase_price=F("categoryanalytics__average_purchase_price"),
-            #         average_product_rating=F("categoryanalytics__average_product_rating"),
-            #         total_orders_amount=F("categoryanalytics__total_orders_amount"),
-            #     )
-            #     .filter(categoryanalytics__date_pretty=today_pretty)
-            # )
 
             categories = CategoryAnalytics.objects.filter(
                 Q(category__ancestors__icontains=search) | Q(category__title__icontains=search),
