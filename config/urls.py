@@ -13,6 +13,7 @@ from uzum.shop.views import UzumTotalOrders, UzumTotalProducts, UzumTotalRevenue
 from uzum.users.views import (
     CheckUserNameAndPhone,
     CodeVerificationView,
+    CustomTokenObtainPairView,
     CustomTokenRefreshView,
     GoogleView,
     LogoutView,
@@ -36,7 +37,7 @@ urlpatterns += [
     path("api/", include("config.api_router")),
     # DRF auth token
     # path("auth-token/", CustomObtainAuthToken.as_view()),
-    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/logout/", LogoutView.as_view(), name="token_logout"),
     path("api/token/civuiaubcyvsdcibhsvus/refresh/", CustomTokenRefreshView.as_view(), name="token_refresh"),
     path("api/token/verify/", TokenVerifyView.as_view(), name="token_verify"),

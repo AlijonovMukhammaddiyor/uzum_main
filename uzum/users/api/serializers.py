@@ -6,6 +6,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from uzum.referral.models import Referral
 from uzum.shop.models import Shop
@@ -154,29 +155,40 @@ class UserLoginSerializer(TokenObtainPairSerializer):
         token = super(UserLoginSerializer, cls).get_token(user)
 
         # Add custom claims
-        # token["user"] = {
-        #     "username": user.username,
-        #     "phone_number": user.phone_number,
-        #     "email": user.email,
-        #     "is_staff": user.is_staff,
-        #     "referral_code": user.referral_code,
-        #     "shop": user.shop,
-        # }
+        token["user"] = {
+            "username": user.username,
+            "referral_code": user.referral_code,
+            "tariff": user.tariff,
+        }
+
+        print("token: ", token)
 
         return token
 
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
-    refresh = None  # Remove the default refresh field
-
     def validate(self, attrs):
-        refresh = self.context["request"].COOKIES.get("refresh")  # Get the refresh token from cookies
+        # Let the default TokenRefreshSerializer handle the validation
+        data = super().validate(attrs)
 
-        if refresh is None:
-            raise InvalidToken("No valid token found in cookie")
+        # Decode the new access token without verification to get its payload
+        decoded_payload = AccessToken(data["access"]).payload
 
-        attrs["refresh"] = refresh
-        return super().validate(attrs)
+        # Assuming you have user_id in your payload (default behavior of simple jwt)
+        user = User.objects.get(id=decoded_payload["user_id"])
+
+        # Add custom claims to the payload
+        decoded_payload["username"] = user.username
+        decoded_payload["referral_code"] = getattr(user, "referral_code", None)
+
+        # Create a new access token with the modified payload
+        access_token = AccessToken()
+        access_token.payload = decoded_payload
+
+        # Update the access token in the data
+        data["access"] = str(access_token)
+
+        return data
 
 
 class CheckUserNameAndPhoneSerializer(serializers.Serializer):

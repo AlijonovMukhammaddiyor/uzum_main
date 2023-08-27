@@ -29,6 +29,7 @@ from config.settings.base import env
 from uzum.shop.models import Shop
 from uzum.users.api.serializers import (
     CheckUserNameAndPhoneSerializer,
+    CustomTokenRefreshSerializer,
     LogOutSerializer,
     PasswordRenewSerializer,
     UserLoginSerializer,
@@ -86,7 +87,7 @@ class GoogleView(APIView):
 
                 create_referral(referred_by, user)
 
-            token = RefreshToken.for_user(user)  # generate token without username & password
+            token = UserLoginSerializer.get_token(user)
             response = {}
             response["username"] = user.username
             response["access_token"] = str(token.access_token)
@@ -300,21 +301,18 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
         serializer.is_valid(raise_exception=True)
 
-        response = Response()
+        response = Response(serializer.validated_data, status=200)
 
         return response
 
 
 class CustomTokenRefreshView(TokenRefreshView):
-    @extend_schema(tags=["token"], operation_id="login")
+    serializer_class = CustomTokenRefreshSerializer
+
+    @extend_schema(tags=["token"], operation_id="refresh")
     def post(self, request, *args, **kwargs):
-        # First, let the original TokenRefreshView handle the refresh and get the response
-        response = super().post(request, *args, **kwargs)
-
-        # If you want, you can inspect the response here as well
-        # print("response.data: ", response.data)
-
-        return response
+        # Just let the original TokenRefreshView handle the refresh
+        return super().post(request, *args, **kwargs)
 
 
 class LogoutView(APIView):
