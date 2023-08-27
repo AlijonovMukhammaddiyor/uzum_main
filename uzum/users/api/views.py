@@ -14,7 +14,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .serializers import UserSerializer
+from .serializers import UserLoginSerializer, UserSerializer
 
 User = get_user_model()
 import logging
@@ -63,11 +63,11 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
 
             if response.status_code == status.HTTP_201_CREATED:
                 user = User.objects.get(username=response.data["username"])
-                refresh = RefreshToken.for_user(user)
+                token = UserLoginSerializer.get_token(user)
 
                 # Add refresh and access tokens to the response data
-                response.data["refresh_token"] = str(refresh)
-                response.data["access_token"] = str(refresh.access_token)
+                response.data["access_token"] = str(token.access_token)
+                response.data["refresh_token"] = str(token)
 
             return response
 
