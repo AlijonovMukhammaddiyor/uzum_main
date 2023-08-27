@@ -564,6 +564,7 @@ class ShopAnalyticsView(APIView):
                 return Response(status=status.HTTP_403_FORBIDDEN)
 
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=days + 1), timezone=pytz.timezone("Asia/Tashkent")
@@ -692,6 +693,7 @@ class ShopCompetitorsView(APIView):
             start = time.time()
             shop = get_object_or_404(Shop, seller_id=seller_id)
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             print(days, request.user)
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=int(days) + 1), timezone=pytz.timezone("Asia/Tashkent")
@@ -1219,6 +1221,7 @@ class ShopCategoryAnalyticsView(APIView):
             print("SHOP CATEGORY ANALYTICS")
 
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -1443,6 +1446,7 @@ class UzumTotalOrders(APIView):
         try:
             user: User = request.user
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             # start_date = timezone.make_aware(
             #     datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             # ).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1478,6 +1482,7 @@ class UzumTotalReviews(APIView):
         try:
             user: User = request.user
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             # start_date = timezone.make_aware(
             #     datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             # ).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1513,6 +1518,7 @@ class UzumTotalRevenue(APIView):
         try:
             user: User = request.user
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             # start_date = timezone.make_aware(
             #     datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             # ).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1540,6 +1546,7 @@ class UzumTotalProducts(APIView):
         try:
             user: User = request.user
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             now_tz = datetime.now().astimezone(pytz.timezone("Asia/Tashkent"))
             start_date = (now_tz - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
             end_date = now_tz.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -1572,6 +1579,8 @@ class UzumTotalShops(APIView):
         try:
             user: User = request.user
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
+
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)

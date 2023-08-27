@@ -580,12 +580,12 @@ class CategoryDailyAnalyticsView(APIView):
 
             user: User = request.user
 
-            range = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
-
+            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             start = time.time()
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
-                datetime.now() - timedelta(days=range + 1), timezone=pytz.timezone("Asia/Tashkent")
+                datetime.now() - timedelta(days=days + 1), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             category = Category.objects.get(categoryId=category_id)
@@ -1062,7 +1062,7 @@ class MainCategoriesAnalyticsView(APIView):
             user: User = request.user
 
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
-
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             start_date = timezone.make_aware(
                 datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),

@@ -402,7 +402,7 @@ class SingleProductAnalyticsView(APIView):
             print("SingleProductAnalyticsView")
             user: User = request.user
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
-
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
             start_date = timezone.make_aware(
                 datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),
@@ -497,7 +497,7 @@ class SimilarProductsViewByUzum(APIView):
 
             user: User = request.user
             days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 2
-
+            days = 90 if user.tariff == Tariffs.BUSINESS else days
             productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
             productIds.append(product_id)
 
