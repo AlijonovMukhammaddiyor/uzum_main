@@ -216,8 +216,8 @@ class ProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     serializer_class = ProductAnalyticsViewSerializer
-    # pagination_class = LimitOffsetPagination
-    pagination_class = None
+    pagination_class = LimitOffsetPagination
+    # pagination_class = None
 
     VALID_SORT_FIELDS = [
         "orders_amount",
@@ -323,16 +323,7 @@ class ProductsView(ListAPIView):
     @extend_schema(tags=["Product"])
     def list(self, request: Request):
         authorize_Base_tariff(self.request)
-        queryset = self.filter_queryset(self.get_queryset())
-
-        # Count the total number of rows in the queryset
-        total_count = queryset.count()
-
-        # Serialize the data
-        serializer = self.get_serializer(queryset, many=True)
-
-        # Return the serialized data along with the count
-        return Response({"count": total_count, "data": serializer.data if len(serializer.data) < 10000 else []})
+        return super().list(request)
 
 
 class ProductsToExcelView(APIView):
