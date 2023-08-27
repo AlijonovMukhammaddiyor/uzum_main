@@ -308,8 +308,6 @@ class ProductsView(ListAPIView):
             # # Now, use the orm_filters to query the database
             queryset = ProductAnalyticsView.objects.filter(**orm_filters, category_id__in=categories)
 
-            print("len(queryset)", len(queryset))
-
             if column:
                 order_prefix = "-" if order == "desc" else ""  # Add "-" prefix for descending order
                 queryset = queryset.order_by(order_prefix + column)
