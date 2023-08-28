@@ -2,6 +2,7 @@ import datetime
 import logging
 import traceback
 from datetime import timedelta
+import pytz
 import requests
 import json
 from django.contrib.auth.base_user import BaseUserManager
@@ -77,12 +78,21 @@ class GoogleView(APIView):
                 referred_by = None
                 if referred_by_code:
                     referred_by = get_referred_by(referred_by_code)
+
+                payment_date = (datetime.datetime.now() + datetime.timedelta(days=1)).astimezone(
+                    pytz.timezone("Asia/Tashkent")
+                )
+                if referred_by_code == "invest":
+                    payment_date = (datetime.datetime.now() + datetime.timedelta(days=7)).astimezone(
+                        pytz.timezone("Asia/Tashkent")
+                    )
                 user = User.objects.create(
                     username=data["email"],
                     email=data["email"],
                     referral_code=referral_code,
                     password=make_password(BaseUserManager().make_random_password()),
                     referred_by=referred_by,
+                    payment_date=payment_date,
                 )
 
                 create_referral(referred_by, user)
@@ -92,6 +102,8 @@ class GoogleView(APIView):
             response["username"] = user.username
             response["access_token"] = str(token.access_token)
             response["refresh_token"] = str(token)
+            response["referred_by"] = user.referred_by.referral_code if user.referred_by else None
+
             return Response(response)
         except Exception as e:
             print("Error in GoogleView: ", e)

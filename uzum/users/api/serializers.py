@@ -1,7 +1,9 @@
+from datetime import datetime, timedelta
 import traceback
 import uuid
 
 from django.contrib.auth import get_user_model
+import pytz
 from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
@@ -127,6 +129,15 @@ class UserSerializer(serializers.ModelSerializer):
             validated_data["referred_by"] = referred_by
             validated_data["is_staff"] = validated_data.get("is_staff", False)
             validated_data["fingerprint"] = validated_data.get("fingerprint", "")
+
+            if referred_by_code and referred_by_code == "invest":
+                # set to 1 week
+                validated_data["payment_date"] = (datetime.now() + timedelta(days=7)).astimezone(
+                    pytz.timezone("Asia/Tashkent")
+                )
+
+            logger.warning("Creating new user with data: ", validated_data)
+
             # Create the user instance.
             user = User.objects.create(**validated_data)
             user.set_password(password)
@@ -159,6 +170,7 @@ class UserLoginSerializer(TokenObtainPairSerializer):
             "username": user.username,
             "referral_code": user.referral_code,
             "tariff": user.tariff,
+            "referred_by": user.referred_by.referral_code if user.referred_by else None,
         }
 
         print("token: ", token)
@@ -180,6 +192,8 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
         # Add custom claims to the payload
         decoded_payload["username"] = user.username
         decoded_payload["referral_code"] = getattr(user, "referral_code", None)
+        decoded_payload["tariff"] = getattr(user, "tariff", "free")
+        decoded_payload["referred_by"] = user.referred_by.referral_code if user.referred_by else None
 
         # Create a new access token with the modified payload
         access_token = AccessToken()
