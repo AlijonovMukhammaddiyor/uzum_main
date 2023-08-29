@@ -189,3 +189,26 @@ def authorize_Business_tariff(request: Request):
             )
     except Exception as e:
         print("Error in check_user: ", e)
+
+
+def get_days_based_on_tariff(user):
+    try:
+        tariff = user.tariff
+        if tariff == Tariffs.FREE:
+            return 30
+
+        elif tariff == Tariffs.TRIAL:
+            return 30
+
+        elif tariff == Tariffs.BASE:
+            return 60
+
+        elif tariff == Tariffs.SELLER:
+            return 90
+
+        elif tariff == Tariffs.BUSINESS:
+            return 120
+
+    except Exception as e:
+        print("Error in get_days_based_on_tariff: ", e)
+        return 30
