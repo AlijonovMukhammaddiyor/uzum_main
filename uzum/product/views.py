@@ -360,6 +360,12 @@ class ProductsToExcelView(APIView):
                     "category_title_ru",
                     "avg_purchase_price",
                     "position_in_category",
+                    "diff_orders_amount",
+                    "diff_orders_money",
+                    "diff_reviews_amount",
+                    "weekly_orders_amount",
+                    "weekly_orders_money",
+                    "weekly_reviews_amount",
                 )
             )
 
