@@ -432,6 +432,7 @@ class LatestProductAnalyticsView(models.Model):
     latest_orders_money = models.DecimalField(max_digits=10, decimal_places=2)
     latest_average_purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     latest_orders_amount = models.IntegerField()
+    latest_available_amount = models.IntegerField()
 
     class Meta:
         managed = False
@@ -457,7 +458,8 @@ def create_product_latestanalytics(date_pretty: str):
             SELECT DISTINCT ON (product_id) product_id, created_at as last_updated_at,
                 orders_money as latest_orders_money,
                 average_purchase_price as latest_average_purchase_price,
-                orders_amount as latest_orders_amount
+                orders_amount as latest_orders_amount,
+                available_amount as latest_available_amount
             FROM product_productanalytics
             WHERE created_at <= '{date}'
             ORDER BY product_id, created_at DESC

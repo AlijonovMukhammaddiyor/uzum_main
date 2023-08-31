@@ -241,8 +241,8 @@ class ProductsView(ListAPIView):
             orm_filters = {}
 
             # Extracting sorting parameters
-            column = params.get("column", None)  # Get the column to sort by
-            order = params.get("order", "")  # Get the order (asc/desc)
+            column = params.get("column", "orders_money")  # Get the column to sort by
+            order = params.get("order", "desc")  # Get the order (asc/desc)
             categories = params.get("categories", None)  # Get the categories to filter by
 
             weekly = params.get("weekly", None)  # Get the categories to filter by
@@ -286,7 +286,8 @@ class ProductsView(ListAPIView):
                     # Convert the timestamp back to a datetime object with the correct timezone
                     values = orm_filters.get(key)
                     # check if values is list
-                    if values and isinstance(values, list):
+                    print("right")
+                    if values and isinstance(values, list) or isinstance(values, tuple):
                         orm_filters[key] = [
                             datetime.fromtimestamp(int(values[0]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
                                 hour=0, minute=0, second=0, microsecond=0
@@ -304,7 +305,7 @@ class ProductsView(ListAPIView):
                             int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
                         ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
-            print(orm_filters)
+            logger.warning("Product filters %s", orm_filters)
             # # Now, use the orm_filters to query the database
             queryset = ProductAnalyticsView.objects.filter(**orm_filters, category_id__in=categories)
 

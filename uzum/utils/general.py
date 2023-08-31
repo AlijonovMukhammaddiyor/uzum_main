@@ -195,19 +195,19 @@ def get_days_based_on_tariff(user):
     try:
         tariff = user.tariff
         if tariff == Tariffs.FREE:
-            return 30
+            return 31
 
         elif tariff == Tariffs.TRIAL:
-            return 30
+            return 31
 
         elif tariff == Tariffs.BASE:
-            return 60
+            return 62
 
         elif tariff == Tariffs.SELLER:
-            return 90
+            return 93
 
         elif tariff == Tariffs.BUSINESS:
-            return 120
+            return 124
 
     except Exception as e:
         print("Error in get_days_based_on_tariff: ", e)
