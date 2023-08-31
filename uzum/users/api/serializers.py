@@ -41,9 +41,6 @@ def get_random_string(length, username: str, phone_number: str):
 def get_referred_by(referral_code: str):
     try:
         print("code: ", referral_code)
-        users = User.objects.all()
-        for user in users:
-            print("user: ", user.referral_code)
 
         if referral_code:
             return User.objects.get(referral_code=referral_code)
@@ -139,7 +136,7 @@ class UserSerializer(serializers.ModelSerializer):
             logger.warning("Creating new user with data: ", validated_data)
 
             # Create the user instance.
-            user = User.objects.create(**validated_data)
+            user = User(**validated_data)
             user.set_password(password)
             user.save()
 
@@ -148,12 +145,12 @@ class UserSerializer(serializers.ModelSerializer):
             return user
         except ValueError as e:
             logger.error("ValueError in create: ", e)
-            raise serializers.ValidationError({"detail": str(e)})
+            raise e
         except Exception as e:
             print("Error in create: ", e)
             logger.error(traceback.format_exc())
             traceback.print_exc()
-            return None
+            return e
 
 
 class UserLoginSerializer(TokenObtainPairSerializer):

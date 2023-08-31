@@ -7,6 +7,7 @@ from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+import requests
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
@@ -107,27 +108,20 @@ class User(AbstractUser):
 @receiver(post_save, sender=User)
 def start_trial(sender, instance: User, created, **kwargs):
     if created:
-        channel_id = "C05K0MK0VG8"
-        slack_token = env("SLACK_BOT_TOKEN")
-        client = WebClient(token=slack_token)
+        webhook_url = "https://hooks.slack.com/services/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"
+
         block = [
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"Username - {instance.username}",
+                    "text": f"Username - {instance.username}\n Referred by - {instance.referred_by.username if instance.referred_by else 'No One'}\n Tariff - {instance.tariff}\n Is Google - {instance.authentication_method == 'GOOGLE'}",
                 },
             }
         ]
 
         try:
-            # Call the conversations.list method using the WebClient
-            client.chat_postMessage(
-                channel=channel_id,
-                text="New user signed up\n",
-                blocks=block
-                # You could also use a blocks[] array to send richer content
-            )
+            requests.post(webhook_url, json={"text": "New user signed up\n", "blocks": block})
 
         except SlackApiError as e:
             print(f"Error: {e}")

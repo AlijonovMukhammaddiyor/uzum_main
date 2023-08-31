@@ -34,7 +34,6 @@ from uzum.users.api.serializers import (
     LogOutSerializer,
     PasswordRenewSerializer,
     UserLoginSerializer,
-    UserSerializer,
     create_referral,
     get_random_string,
     get_referred_by,
