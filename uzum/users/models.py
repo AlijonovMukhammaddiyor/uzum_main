@@ -109,6 +109,7 @@ class User(AbstractUser):
 def start_trial(sender, instance: User, created, **kwargs):
     if created:
         webhook_url = "https://hooks.slack.com/services/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"
+        referral_webhook_url = "https://hooks.slack.com/services/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"
 
         block = [
             {
@@ -122,6 +123,14 @@ def start_trial(sender, instance: User, created, **kwargs):
 
         try:
             requests.post(webhook_url, json={"text": "New user signed up\n", "blocks": block})
+            if instance.referred_by and instance.referred_by.referral_code == "invest":
+                requests.post(
+                    referral_webhook_url,
+                    json={
+                        "text": "New user signed up",
+                        "blocks": block,
+                    },
+                )
 
         except SlackApiError as e:
             print(f"Error: {e}")
