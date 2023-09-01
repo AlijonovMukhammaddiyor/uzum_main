@@ -1544,7 +1544,7 @@ class UzumTotalProducts(APIView):
             now_tz = datetime.now().astimezone(pytz.timezone("Asia/Tashkent"))
             start_date = (now_tz - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
             end_date = now_tz.replace(hour=23, minute=59, second=59, microsecond=999999)
-            if now_tz.hour < 7:
+            if now_tz.hour < 5:
                 end_date = end_date - timedelta(days=1)  # end of yesterday
 
             product_analytics = ProductAnalytics.objects.only("created_at", "product__product_id").filter(
@@ -1577,16 +1577,20 @@ class UzumTotalShops(APIView):
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
-            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 5:
                 # end date is end of yesterday
-                end_date = timezone.make_aware(
-                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
-                ).replace(hour=23, minute=59, second=59, microsecond=999999)
-            else:
-                # end date is end of today
-                end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+                end_date = (datetime.now().astimezone(pytz.timezone("Asia/Tashkent")) - timedelta(days=1)).replace(
                     hour=23, minute=59, second=59, microsecond=999999
                 )
+            else:
+                # end date is end of today
+                end_date = (
+                    datetime.now()
+                    .astimezone(pytz.timezone("Asia/Tashkent"))
+                    .replace(hour=23, minute=59, second=59, microsecond=999999)
+                )
+
+            print(end_date)
 
             product_analytics = ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
             daily_totals = (
@@ -1608,6 +1612,7 @@ class UzumTotalShops(APIView):
             )
         except Exception as e:
             print(e)
+            traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
