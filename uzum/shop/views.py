@@ -1547,6 +1547,8 @@ class UzumTotalProducts(APIView):
             if now_tz.hour < 5:
                 end_date = end_date - timedelta(days=1)  # end of yesterday
 
+            print(end_date, "end_date")
+
             product_analytics = ProductAnalytics.objects.only("created_at", "product__product_id").filter(
                 created_at__range=[start_date, end_date]
             )
