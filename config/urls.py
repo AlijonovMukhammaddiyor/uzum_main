@@ -6,7 +6,7 @@ from django.views import defaults as default_views
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
+from rest_framework_simplejwt.views import TokenVerifyView
 
 from uzum.category.utils import seconds_until_next
 from uzum.shop.views import UzumTotalOrders, UzumTotalProducts, UzumTotalRevenue, UzumTotalReviews, UzumTotalShops

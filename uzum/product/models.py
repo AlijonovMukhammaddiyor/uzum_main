@@ -243,7 +243,7 @@ class ProductAnalytics(models.Model):
         print("product_ids", len(product_ids))
 
         product_ids = ProductAnalytics.objects.filter(
-            date_pretty=get_today_pretty_fake(), orders_amount__gte=100, product_id__in=product_ids
+            date_pretty=get_today_pretty_fake(), product_id__in=product_ids
         ).values_list("product_id", flat=True)
 
         # Retrieve product sales data for the last 30 days
@@ -294,6 +294,18 @@ class ProductAnalytics(models.Model):
 
         # Sort products by EMA ratio in descending order and take the top 100
         top_growing_products = sales_df.sort_values("score", ascending=False).head(100)
+
+        instances_to_update = list(
+            ProductAnalytics.objects.filter(
+                product__product_id__in=sales_df.index, date_pretty__in=sales_df["date_pretty"]
+            )
+        )
+
+        for instance in instances_to_update:
+            instance.score = sales_df.at[instance.product.product_id, "score"]
+
+        # Update the instances in bulk
+        ProductAnalytics.objects.bulk_update(instances_to_update, ["score"])
 
         # Return the list of top growing product IDs
         top_growing_products = top_growing_products.index.tolist()

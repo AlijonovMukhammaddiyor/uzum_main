@@ -1004,11 +1004,18 @@ class GrowingCategoriesView(APIView):
                 timezone=pytz.timezone("Asia/Tashkent"),
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
+            date_pretty = get_today_pretty_fake()
+
+            end_date = timezone.make_aware(
+                datetime.combine(date.today(), datetime.min.time()),
+                timezone=pytz.timezone("Asia/Tashkent"),
+            ).replace(hour=23, minute=59, second=59, microsecond=0)
+
             top_growing_categories = cache.get("top_categories_by_orders", [])
 
             categories = (
                 CategoryAnalytics.objects.select_related("product", "product__category", "product__shop")
-                .filter(category__categoryId__in=top_growing_categories, created_at__gte=start_date)
+                .filter(category__categoryId__in=top_growing_categories, created_at__range=[start_date, end_date])
                 .values(
                     "category__categoryId",
                     "category__title",

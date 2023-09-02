@@ -192,12 +192,27 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
         decoded_payload["tariff"] = getattr(user, "tariff", "free")
         decoded_payload["referred_by"] = user.referred_by.referral_code if user.referred_by else None
 
+        print("decoded_payload: ", decoded_payload)
         # Create a new access token with the modified payload
         access_token = AccessToken()
         access_token.payload = decoded_payload
 
         # Update the access token in the data
         data["access"] = str(access_token)
+
+        refresh_payload = RefreshToken(data["refresh"]).payload
+        refresh_payload["username"] = user.username
+        refresh_payload["referral_code"] = getattr(user, "referral_code", None)
+        refresh_payload["tariff"] = getattr(user, "tariff", "free")
+        refresh_payload["referred_by"] = user.referred_by.referral_code if user.referred_by else None
+        refresh_token = RefreshToken()
+        refresh_token.payload = refresh_payload
+        refresh_token.payload["user"] = {
+            "username": user.username,
+            "referral_code": user.referral_code,
+            "tariff": user.tariff,
+        }
+        data["refresh"] = str(refresh_token)
 
         return data
 
