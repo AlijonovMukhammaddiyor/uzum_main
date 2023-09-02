@@ -554,16 +554,25 @@ class SimilarProductsViewByUzum(APIView):
             )
 
             for product in analytics:
-                product["product__category__title"] += f"(({product['product__category__categoryId']}))"
-                product["product__shop__title"] += f"(({product['product__shop__link']}))"
-                product["product__title"] += f"(({product['product__product_id']}))"
+                try:
+                    # print(product["product__category__title"], product["product__category__categoryId"])
+                    product["product__category__title"] += f"(({product['product__category__categoryId']}))"
+                    product["product__shop__title"] += f"(({product['product__shop__link']}))"
+                    product["product__title"] += f"(({product['product__product_id']}))"
 
-                product["product__title_ru"] = (
-                    product["product__title_ru"]
-                    if product["product__title_ru"]
-                    else product["product__title"] + f"(({product['product__product_id']}))"
-                )
-                product["product__category__title_ru"] += f"(({product['product__category__categoryId']}))"
+                    product["product__title_ru"] = (
+                        product["product__title_ru"]
+                        if product["product__title_ru"]
+                        else product["product__title"] + f"(({product['product__product_id']}))"
+                    )
+                    product["product__category__title_ru"] = (
+                        product["product__category__title_ru"]
+                        if product["product__category__title_ru"]
+                        else product["product__category__title"] + f"(({product['product__category__categoryId']}))"
+                    )
+                except Exception as e:
+                    print(e)
+                    print(product)
 
             grouped_analytics = []
             for product_id, group in groupby(analytics, key=lambda x: x["product__product_id"]):
