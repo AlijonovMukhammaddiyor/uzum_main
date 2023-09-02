@@ -149,12 +149,12 @@ class SetShopsView(APIView):
 
                 shop_id = shop_ids[0]
                 shop = Shop.objects.get(link=shop_id)
-                account_id = shop.account_id
+                # account_id = shop.account_id
 
-                for shop_id in shop_ids:
-                    shop = Shop.objects.get(link=shop_id)
-                    if shop.account_id != account_id:
-                        return Response(status=400, data={"message": "Do'konlar bir xisobga tegishli bo'lishi kerak"})
+                # for shop_id in shop_ids:
+                #     shop = Shop.objects.get(link=shop_id)
+                #     if shop.account_id != account_id:
+                #         return Response(status=400, data={"message": "Do'konlar bir xisobga tegishli bo'lishi kerak"})
 
                 shop_id = shop_ids[0]
                 shop = Shop.objects.get(link=shop_id)
@@ -176,12 +176,12 @@ class SetShopsView(APIView):
 
                 shop_id = shop_ids[0]
                 shop = Shop.objects.get(link=shop_id)
-                account_id = shop.account_id
+                # account_id = shop.account_id
 
-                for shop_id in shop_ids:
-                    shop = Shop.objects.get(link=shop_id)
-                    if shop.account_id != account_id:
-                        return Response(status=400, data={"message": "Do'konlar bir xisobga tegishli bo'lishi kerak"})
+                # for shop_id in shop_ids:
+                #     shop = Shop.objects.get(link=shop_id)
+                #     if shop.account_id != account_id:
+                #         return Response(status=400, data={"message": "Do'konlar bir xisobga tegishli bo'lishi kerak"})
 
                 user.shops.clear()
 
