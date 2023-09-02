@@ -11,7 +11,8 @@ import requests
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import connection
-from django.db.models import Avg, Count, Prefetch, Q, Sum
+from django.db.models import Avg, Count, Prefetch, Q, Sum, F
+from django.db.models.functions import Abs
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -23,7 +24,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from uzum.category.models import Category
+from uzum.category.models import Category, CategoryAnalytics
 
 from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.jobs.constants import PRODUCT_HEADER
@@ -515,16 +516,40 @@ class SimilarProductsViewByUzum(APIView):
             start = time.time()
             authorize_Base_tariff(request)
 
-            user: User = request.user
-            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 2
-            days = 90 if user.tariff == Tariffs.BUSINESS else days
-            productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
-            productIds.append(product_id)
+            days = 100
 
             start_date = timezone.make_aware(
                 datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
             )
+
+            product = Product.objects.get(product_id=product_id)
+
+            product_analytics = ProductAnalytics.objects.filter(
+                product=product, date_pretty=get_today_pretty_fake()
+            ).first()
+
+            similar_products = (
+                ProductAnalytics.objects.filter(
+                    product__category=product.category, date_pretty=get_today_pretty_fake()
+                )
+                .exclude(product__shop__account_id=product.shop.account_id)
+                .annotate(
+                    diff_orders_money=Abs(F("orders_money") - product_analytics.orders_money),
+                    diff_avg_purchase_price=Abs(
+                        F("average_purchase_price") - product_analytics.average_purchase_price
+                    ),
+                )
+                .order_by("diff_orders_money", "diff_avg_purchase_price")[:100]
+                .values_list("product__product_id", flat=True)
+            )
+
+            if len(similar_products) < 10:
+                productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
+                productIds.append(product_id)
+            else:
+                productIds = list(similar_products)
+                productIds.append(product_id)
 
             analytics = (
                 ProductAnalytics.objects.select_related("product")
