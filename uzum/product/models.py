@@ -237,21 +237,16 @@ class ProductAnalytics(models.Model):
         end_date = pd.to_datetime(get_today_pretty()).tz_localize("UTC").astimezone(pytz.timezone("Asia/Tashkent"))
         start_date = end_date - pd.DateOffset(days=30)
 
-        product_ids = Product.objects.filter(analytics__date_pretty=get_today_pretty_fake()).values_list(
-            "product_id", flat=True
-        )
-        print("product_ids", len(product_ids))
-
         product_ids = ProductAnalytics.objects.filter(
-            date_pretty=get_today_pretty_fake(), product_id__in=product_ids
+            date_pretty=get_today_pretty(), orders_amount__gte=40
         ).values_list("product_id", flat=True)
+
+        print("product_ids", len(product_ids))
 
         # Retrieve product sales data for the last 30 days
         sales_data = ProductAnalytics.objects.filter(
             created_at__range=[start_date, end_date], product_id__in=product_ids
         ).values("product__product_id", "date_pretty", "orders_amount")
-
-        gc.collect()
 
         # Convert QuerySet to DataFrame
         sales_df = pd.DataFrame.from_records(sales_data)
@@ -263,6 +258,7 @@ class ProductAnalytics(models.Model):
         sales_df.set_index("date_pretty", inplace=True)
         sales_df.sort_index(inplace=True)
 
+        # Calculate Exponential Moving Averages for the given spans
         for span in [3, 5, 7, 30]:
             sales_df[f"ema_{span}_days"] = sales_df.groupby("product__product_id")["orders_amount"].transform(
                 lambda x: x.ewm(span=span).mean()
@@ -294,18 +290,45 @@ class ProductAnalytics(models.Model):
 
         # Sort products by EMA ratio in descending order and take the top 100
         top_growing_products = sales_df.sort_values("score", ascending=False).head(100)
+        print("Starting to update top_growing_products")
+        create_temp_table_sql = """
+        CREATE TEMPORARY TABLE temp_scores (
+            product_id INT PRIMARY KEY,
+            date_pretty DATE,
+            score FLOAT
+        );
+        """
 
-        instances_to_update = list(
-            ProductAnalytics.objects.filter(
-                product__product_id__in=sales_df.index, date_pretty__in=sales_df["date_pretty"]
+        with connection.cursor() as cursor:
+            cursor.execute(create_temp_table_sql)
+
+        # Step 2: Insert Data into the Temporary Table
+        # Convert your DataFrame's data into a list of tuples
+        data_tuples = list(zip(sales_df.index, sales_df["date_pretty"], sales_df["score"]))
+        print("data_tuples", len(data_tuples))
+
+        # values = ', '.join(map(str, data_tuples))
+        values = ", ".join(["(%s, %s, %s)"] * len(data_tuples))
+        insert_sql = f"""
+        INSERT INTO temp_scores (product_id, date_pretty, score) VALUES {values}
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(insert_sql, sum(data_tuples, ()))
+
+            # Step 3: Update the Main Table using a JOIN
+            cursor.execute(
+                """
+                    UPDATE product_productanalytics
+                    SET score = temp_scores.score
+                    FROM temp_scores
+                    WHERE product_productanalytics.product_id = temp_scores.product_id AND product_productanalytics.date_pretty = temp_scores.date_pretty::text
+                    """
             )
-        )
 
-        for instance in instances_to_update:
-            instance.score = sales_df.at[instance.product.product_id, "score"]
-
-        # Update the instances in bulk
-        ProductAnalytics.objects.bulk_update(instances_to_update, ["score"])
+        # Step 4: Drop the Temporary Table (Optional but recommended)
+        drop_temp_table_sql = "DROP TABLE temp_scores;"
+        with connection.cursor() as cursor:
+            cursor.execute(drop_temp_table_sql)
 
         # Return the list of top growing product IDs
         top_growing_products = top_growing_products.index.tolist()

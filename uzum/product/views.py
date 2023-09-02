@@ -261,6 +261,9 @@ class ProductsView(ListAPIView):
 
             categories = map(int, categories.split(","))
 
+            title_include_q_objects = Q()
+            title_exclude_q_objects = Q()
+
             for key, value in params.items():
                 if key in ["column", "order", "categories"]:
                     continue  # Skip sorting parameters
@@ -274,13 +277,32 @@ class ProductsView(ListAPIView):
                 elif "__icontains" in key:
                     orm_filters[key] = value
 
+                elif "title_include" in key:
+                    # we got list of keywords to include in either title or title_ru
+                    keywords = value.split("---")
+                    for keyword in keywords:
+                        if "ru" in key:
+                            title_include_q_objects |= Q(product_title_ru__icontains=keyword)
+                        else:
+                            title_include_q_objects |= Q(product_title__icontains=keyword)
+
+                elif "title_exclude" in key:
+                    keywords = value.split("---")
+                    # we got list of keywords to exclude in either title or title_ru
+                    for keyword in keywords:
+                        if "ru" in key:
+                            title_exclude_q_objects &= ~Q(product_title_ru__icontains=keyword)
+                        else:
+                            title_exclude_q_objects &= ~Q(product_title__icontains=keyword)
+
                 if key.startswith("orders_money") or key.startswith("diff_orders_money"):
                     # divide by 1000
                     values = orm_filters[key]
-                    if values and isinstance(values, list):
-                        orm_filters[key] = [int(value) / 1000.0 for value in values]
-                    elif values:
-                        orm_filters[key] = int(value) / 1000.0
+                    for keyword in keywords:
+                        if "ru" in key:
+                            title_exclude_q_objects &= ~Q(product_title_ru__iexact=keyword)
+                        else:
+                            title_exclude_q_objects &= ~Q(product_title__iexact=keyword)
 
                 if key.startswith("product_created_at"):
                     # Convert the timestamp back to a datetime object with the correct timezone
@@ -307,7 +329,9 @@ class ProductsView(ListAPIView):
 
             logger.warning("Product filters %s", orm_filters)
             # # Now, use the orm_filters to query the database
-            queryset = ProductAnalyticsView.objects.filter(**orm_filters, category_id__in=categories)
+            queryset = ProductAnalyticsView.objects.filter(
+                title_include_q_objects, title_exclude_q_objects, **orm_filters, category_id__in=categories
+            )
 
             if column:
                 order_prefix = "-" if order == "desc" else ""  # Add "-" prefix for descending order
@@ -315,7 +339,7 @@ class ProductsView(ListAPIView):
 
             # Query the database
             print("Products query time", time.time() - start)
-            return queryset
+            return queryset if queryset else ProductAnalyticsView.objects.none()
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -1022,19 +1046,22 @@ class GrowingProductsView(APIView):
                         raise ValidationError({"error": f"Invalid search column: {search_columns[i]}"})
 
                     filter_query &= Q(**{f"{search_columns[i]}__icontains": filters[i]})
-            page = int(request.query_params.get("page", 1))
             start_date = timezone.make_aware(
                 datetime.combine(date.today() - timedelta(days=30), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             top_growing_products = cache.get("top_growing_products", [])
-            paginator = Paginator(top_growing_products, 20)
-            product_ids_page = paginator.get_page(page)
+            product_ids_page = top_growing_products
+            page = request.query_params.get("page", 1)
+
+            pages = Paginator(product_ids_page, 20)
+
+            data = pages.get_page(page)
 
             products = (
                 ProductAnalytics.objects.select_related("product", "product__category", "product__shop")
-                .filter(product__product_id__in=product_ids_page, created_at__gte=start_date)
+                .filter(product__product_id__in=data, created_at__gte=start_date)
                 .filter(filter_query)
                 .values(
                     "product__product_id",
@@ -1056,6 +1083,7 @@ class GrowingProductsView(APIView):
                     "position_in_category",
                     "date_pretty",
                     "created_at",
+                    "score",
                 )
                 .order_by("product__product_id", "created_at")
             )
@@ -1121,7 +1149,7 @@ class GrowingProductsView(APIView):
             return Response(
                 {
                     "results": grouped_analytics,
-                    "count": products.count(),
+                    "count": 100,
                 },
                 status=status.HTTP_200_OK,
             )
