@@ -74,6 +74,10 @@ class GoogleView(APIView):
             except User.DoesNotExist:
                 referral_code = get_random_string(6, data["email"], data["email"])
                 referred_by_code = request.data.get("referred_by_code", None)
+                if not referral_code:
+                    user_query = request.data.get("user", None)
+                    if user_query:
+                        referred_by_code = user_query.get("referred_by_code", None)
                 referred_by = None
                 if referred_by_code:
                     referred_by = get_referred_by(referred_by_code)
