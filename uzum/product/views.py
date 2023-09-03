@@ -422,8 +422,7 @@ class SingleProductAnalyticsView(APIView):
             authorize_Base_tariff(request)
             print("SingleProductAnalyticsView")
             user: User = request.user
-            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
-            days = 90 if user.tariff == Tariffs.BUSINESS else days
+            days = 101
             # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
             start_date = timezone.make_aware(
                 datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),
