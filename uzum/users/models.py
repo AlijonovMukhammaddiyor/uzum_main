@@ -73,6 +73,8 @@ class User(AbstractUser):
         choices=AUTHENTICATION_METHODS,
         default=AUTHENTICATION_METHODS[0][0],
     )
+    favourite_shops = models.ManyToManyField("shop.Shop", blank=True, related_name="favourite_shops")
+    favourite_products = models.ManyToManyField("product.Product", blank=True, related_name="favourite_products")
 
     def get_absolute_url(self) -> str:
         """Get URL for user's detail view.

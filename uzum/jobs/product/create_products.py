@@ -155,6 +155,12 @@ def prepareProductData(
             if product.photos != json.dumps(extract_product_photos(product_api["photos"])):
                 product.photos = json.dumps(extract_product_photos(product_api["photos"]))
                 is_modified = True
+            if product.shop.seller_id != seller["id"]:
+                try:
+                    product.shop = Shop.objects.get(seller_id=seller["id"])
+                    is_modified = True
+                except Shop.DoesNotExist:
+                    print("Shop does not exist", seller["id"])
 
             if is_modified:
                 product.save()
