@@ -93,6 +93,10 @@ class GoogleView(APIView):
                     payment_date = (datetime.datetime.now() + datetime.timedelta(days=7)).astimezone(
                         pytz.timezone("Asia/Tashkent")
                     )
+                if referred_by_code == "681332":
+                    payment_date = (datetime.datetime.now() + datetime.timedelta(days=3)).astimezone(
+                        pytz.timezone("Asia/Tashkent")
+                    )
                 user = User.objects.create(
                     username=data["email"],
                     email=data["email"],

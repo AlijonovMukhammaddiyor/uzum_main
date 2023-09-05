@@ -132,6 +132,11 @@ class UserSerializer(serializers.ModelSerializer):
                 validated_data["payment_date"] = (datetime.now() + timedelta(days=7)).astimezone(
                     pytz.timezone("Asia/Tashkent")
                 )
+            if referred_by_code and referred_by_code == "681332":
+                # set to 1 week
+                validated_data["payment_date"] = (datetime.now() + timedelta(days=3)).astimezone(
+                    pytz.timezone("Asia/Tashkent")
+                )
 
             logger.warning("Creating new user with data: ", validated_data)
 
