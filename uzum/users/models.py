@@ -1,4 +1,5 @@
 from datetime import timedelta
+import uuid
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -75,6 +76,8 @@ class User(AbstractUser):
     )
     favourite_shops = models.ManyToManyField("shop.Shop", blank=True, related_name="favourite_shops")
     favourite_products = models.ManyToManyField("product.Product", blank=True, related_name="favourite_products")
+    telegram_token = models.UUIDField(default=uuid.uuid4, null=True, unique=True)
+    is_telegram_connected = models.BooleanField(default=False)
 
     def get_absolute_url(self) -> str:
         """Get URL for user's detail view.
@@ -112,6 +115,7 @@ def start_trial(sender, instance: User, created, **kwargs):
     if created:
         webhook_url = "https://hooks.slack.com/services/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"
         referral_webhook_url = "https://hooks.slack.com/services/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"
+        referrals_umarbek = "https://hooks.slack.com/services/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"
 
         block = [
             {
@@ -128,6 +132,15 @@ def start_trial(sender, instance: User, created, **kwargs):
             if instance.referred_by and instance.referred_by.referral_code == "invest":
                 requests.post(
                     referral_webhook_url,
+                    json={
+                        "text": "New user signed up",
+                        "blocks": block,
+                    },
+                )
+
+            if instance.referred_by and instance.referred_by.referral_code == "681332":
+                requests.post(
+                    referrals_umarbek,
                     json={
                         "text": "New user signed up",
                         "blocks": block,

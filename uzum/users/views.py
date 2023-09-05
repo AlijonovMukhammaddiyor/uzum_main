@@ -873,3 +873,16 @@ class UserDailyReport(APIView):
         except Exception as e:
             print("Error in UserDailyReport: ", e)
             return Response(status=500, data={"message": "Internal server error"})
+
+    def send_file_to_telegram_bot(self, chat_id, file_path):
+        bot_token = "YOUR_TELEGRAM_BOT_TOKEN"
+        send_document_url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+
+        with open(file_path, "rb") as doc_file:
+            payload = {
+                "chat_id": chat_id,
+                "document": doc_file,
+                "caption": "Here is your daily report.",  # Optional caption
+            }
+            response = requests.post(send_document_url, files=payload)
+            return response.json()
