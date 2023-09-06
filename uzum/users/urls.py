@@ -7,13 +7,13 @@ from uzum.users.views import (  # CodeVerificationView,; VerificationSendView,
     user_detail_view,
     user_redirect_view,
     user_update_view,
-    UserDailyReport,
     AddfavouriteProductView,
     AddfavouriteShopView,
     RemovefavouriteProductView,
     RemovefavouriteShopView,
     GetFavouriteProductsView,
     GetFavouriteShopsView,
+    TelegramBotView,
 )
 
 app_name = "users"
@@ -29,6 +29,6 @@ urlpatterns = [
     path("products/add", view=AddfavouriteProductView.as_view(), name="add_product"),
     path("products/remove", view=RemovefavouriteProductView.as_view(), name="remove_product"),
     path("products/get", view=GetFavouriteProductsView.as_view(), name="get_products"),
-    path("reports/", view=UserDailyReport.as_view(), name="reports"),
+    path("telegram-connect/", view=TelegramBotView.as_view(), name="reports"),
     path("<str:username>/", view=user_detail_view, name="detail"),
 ]

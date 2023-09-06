@@ -78,6 +78,7 @@ class User(AbstractUser):
     favourite_products = models.ManyToManyField("product.Product", blank=True, related_name="favourite_products")
     telegram_token = models.UUIDField(default=uuid.uuid4, null=True, unique=True)
     is_telegram_connected = models.BooleanField(default=False)
+    telegram_chat_id = models.CharField(max_length=255, null=True, blank=True)
 
     def get_absolute_url(self) -> str:
         """Get URL for user's detail view.

@@ -18,6 +18,7 @@ from uzum.users.views import (
     GoogleView,
     LogoutView,
     PasswordRenewView,
+    TelegramBotView,
     VerificationSendView,
 )
 
@@ -52,6 +53,7 @@ urlpatterns += [
     ),
     path("api/user/", include("uzum.users.urls", namespace="users")),
     path("api/category/", include("uzum.category.urls", namespace="category")),
+    path("telegram-connect/", view=TelegramBotView.as_view(), name="reports"),
     path("api/shop/", include("uzum.shop.urls", namespace="shop")),
     path("api/google/", GoogleView.as_view(), name="google"),
     path("api/product/", include("uzum.product.urls", namespace="product")),
