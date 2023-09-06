@@ -11,8 +11,8 @@ from uzum.shop.models import ShopAnalytics
 from uzum.users.models import User
 from uzum.utils.general import get_today_pretty, get_today_pretty_fake
 import io
-from openpyxl.styles import PatternFill, Border, Side, Font
-from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.styles import Font, Border, Side, PatternFill, Alignment
+from openpyxl.chart import LineChart, Reference
 
 
 def prepare_shop_statistics(user, shop):
@@ -45,18 +45,18 @@ def prepare_shop_statistics(user, shop):
                 "category_title",
                 "category_title_ru",
                 "orders_amount",
-                "product_available_amount",
-                "reviews_amount",
-                "rating",
-                "position_in_category",
-                "avg_purchase_price",
-                "orders_money",
                 "diff_orders_amount",
-                "diff_reviews_amount",
+                "weekly_orders_amount",
+                "orders_money",
                 "diff_orders_money",
                 "weekly_orders_money",
-                "weekly_orders_amount",
+                "reviews_amount",
+                "diff_reviews_amount",
                 "weekly_reviews_amount",
+                "avg_purchase_price",
+                "rating",
+                "position_in_category",
+                "product_available_amount",
             )
             .order_by("-orders_amount")
         )
@@ -113,6 +113,34 @@ def prepare_shop_statistics(user, shop):
                 if before_item
                 else item["product_available_amount"]
             )
+
+        desired_order = [
+            "product_id",
+            "product_title",
+            "product_title_ru",
+            "category_title",
+            "category_title_ru",
+            "orders_amount",
+            "diff_orders_amount",
+            "weekly_orders_amount",
+            "orders_count_yesterday",
+            "orders_money",
+            "diff_orders_money",
+            "weekly_orders_money",
+            "reviews_amount",
+            "diff_reviews_amount",
+            "weekly_reviews_amount",
+            "reviews_count_yesterday",
+            "avg_purchase_price",
+            "price_yesterday",
+            "rating",
+            "rating_yesterday",
+            "position_in_category",
+            "position_in_category_yesterday",
+            "product_available_amount",
+            "available_amount_yesterday",
+        ]
+        target_analytics = [{key: item[key] for key in desired_order} for item in target_analytics]
 
         # for each of orders_money, diff_orders_money, weekly_orders_money, multiply by 1000
         for item in target_analytics:
@@ -184,7 +212,7 @@ def apply_color_based_on_value(cell, min_val, max_val):
         pass
 
 
-def export_to_excel(shops_data, user):
+def export_to_excel(shops_data, products_data, user):
     try:
         # Define the path to save the Excel file
         output = io.BytesIO()
@@ -197,7 +225,7 @@ def export_to_excel(shops_data, user):
             "category_title": "НАЗВАНИЕ КАТЕГОРИИ",
             "category_title_ru": "НАЗВАНИЕ КАТЕГОРИИ RU",
             "orders_amount": "КОЛИЧЕСТВО ЗАКАЗОВ",
-            "product_available_amount": "ДОСТУПНОЕ КОЛИЧЕСТВО ПРОДУКТОВ",
+            "product_available_amount": "НАЛИЧИЕ ТОВАРА",
             "reviews_amount": "КОЛИЧЕСТВО ОТЗЫВОВ",
             "rating": "РЕЙТИНГ",
             "position_in_category": "ПОЗИЦИЯ В КАТЕГОРИИ",
@@ -230,6 +258,27 @@ def export_to_excel(shops_data, user):
             "categories": "КОЛИЧЕСТВО КАТЕГОРИЙ",
         }
 
+        product_column_mapping = {
+            "product_id": "ID ПРОДУКТА",
+            "product_title": "НАЗВАНИЕ ПРОДУКТА",
+            "product_title_ru": "НАЗВАНИЕ ПРОДУКТА RU",
+            "category_title": "НАЗВАНИЕ КАТЕГОРИИ",
+            "category_title_ru": "НАЗВАНИЕ КАТЕГОРИИ RU",
+            "orders_amount": "КОЛИЧЕСТВО ЗАКАЗОВ",
+            "diff_orders_amount": "КОЛИЧЕСТВЕ ЗАКАЗОВ (30 ДНЕЙ)",
+            "weekly_orders_amount": "ЕЖЕНЕДЕЛЬНОЕ КОЛИЧЕСТВО ЗАКАЗОВ",
+            "orders_money": "ОБЩАЯ ВЫРУЧКА",
+            "diff_orders_money": "ОБЩАЯ ВЫРУЧКА (30 ДНЕЙ)",
+            "weekly_orders_money": "ЕЖЕНЕДЕЛЬНАЯ ВЫРУЧКА",
+            "reviews_amount": "КОЛИЧЕСТВО ОТЗЫВОВ",
+            "diff_reviews_amount": "КОЛИЧЕСТВЕ ОТЗЫВОВ (30 ДНЕЙ)",
+            "weekly_reviews_amount": "ЕЖЕНЕДЕЛЬНОЕ КОЛИЧЕСТВО ОТЗЫВОВ",
+            "avg_purchase_price": "СРЕДНЯЯ ЦЕНА",
+            "rating": "РЕЙТИНГ",
+            "position_in_category": "ПОЗИЦИЯ В КАТЕГОРИИ",
+            "product_available_amount": "НАЛИЧИЕ ТОВАРА",
+        }
+
         # Create a new Excel writer object
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             for shop_name, data in shops_data.items():
@@ -256,25 +305,26 @@ def export_to_excel(shops_data, user):
                     .replace("]", "")
                 )
                 shop_df.to_excel(writer, sheet_name=valid_sheet_name, startrow=0, index=False)
+
                 products_df.to_excel(writer, sheet_name=valid_sheet_name, startrow=len(shop_df) + 2, index=False)
 
                 # Apply styling using openpyxl
                 ws = writer.sheets[valid_sheet_name]
+                for row in ws.iter_rows():
+                    ws.row_dimensions[row[0].row].height = 20
+
                 for column in ws.columns:
                     max_length = 0
                     column = [cell for cell in column]
                     for cell in column:
                         try:
-                            if len(str(cell.value)) > max_length:
-                                max_length = len(cell.value)
+                            # Check the length of the cell value and the header (cell in the first row)
+                            max_length = max(max_length, len(str(cell.value)), len(str(column[0].value)))
                             cell.font = Font(size=12)
                         except Exception as e:
                             pass
-                    adjusted_width = max_length + 2
+                    adjusted_width = max_length + 2  # Add 2 for a little extra space
                     ws.column_dimensions[column[0].column_letter].width = adjusted_width
-
-                for row in ws.iter_rows():
-                    ws.row_dimensions[row[0].row].height = 20
 
                 # Apply conditional formatting for columns with numbers
                 for col in ws.columns:
@@ -298,12 +348,198 @@ def export_to_excel(shops_data, user):
                     for cell in row:
                         cell.border = thin_border
 
-        # Reset the stream position to the beginning
+            # all products
+            ws = writer.book.create_sheet(title="ВСЕ ПРОДУКТЫ")
+
+            # Define colors for headers, data, and alternating product cards
+            header_fill = PatternFill(
+                start_color="4F81BD", end_color="4F81BD", fill_type="solid"
+            )  # Dark blue for headers
+            data_fill_1 = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")  # Light blue
+            data_fill_2 = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")  # White
+
+            header_font = Font(size=14, bold=True, color="FFFFFF")  # White font for headers
+            data_font = Font(size=12)
+            positive_fill = PatternFill(
+                start_color="C6E0B4", end_color="C6E0B4", fill_type="solid"
+            )  # Greenish for positive changes
+            negative_fill = PatternFill(
+                start_color="F8CBAD", end_color="F8CBAD", fill_type="solid"
+            )  # Pinkish for negative changes
+
+            row_num = 1
+            color_toggle = True
+            row_num = 1
+            for product_id, data in products_data.items():
+                current_data = data["current"]
+                latest_analytics = data["latest_analytics"]
+
+                current_fill = data_fill_1 if color_toggle else data_fill_2
+                color_toggle = not color_toggle
+
+                # id
+                ws[f"A{row_num}"] = "ID ПРОДУКТА"
+                ws[f"A{row_num}"].fill = header_fill
+                ws[f"A{row_num}"].font = header_font
+                ws[f"A{row_num}"].alignment = Alignment(horizontal="center")
+                ws[f"B{row_num}"] = current_data["product_id"]
+                ws[f"B{row_num}"].fill = current_fill
+                ws[f"B{row_num}"].font = data_font
+                row_num += 1
+
+                # Product Title
+                ws[f"A{row_num}"] = "НАЗВАНИЕ ПРОДУКТА UZ"
+                ws[f"B{row_num}"] = current_data["product_title"]
+                row_num += 1
+
+                # Product Title (RU)
+                ws[f"A{row_num}"] = "НАЗВАНИЕ ПРОДУКТА RU"
+                ws[f"B{row_num}"] = current_data["product_title_ru"] if current_data["product_title_ru"] else "-"
+                row_num += 1
+
+                # category
+                ws[f"A{row_num}"] = "НАЗВАНИЕ КАТЕГОРИИ UZ"
+                ws[f"B{row_num}"] = current_data["category_title"]
+                row_num += 1
+
+                # category (RU)
+                ws[f"A{row_num}"] = "НАЗВАНИЕ КАТЕГОРИИ RU"
+                ws[f"B{row_num}"] = current_data["category_title_ru"] if current_data["category_title_ru"] else "-"
+                row_num += 1
+
+                # shop
+                ws[f"A{row_num}"] = "НАЗВАНИЕ МАГАЗИНА"
+                ws[f"B{row_num}"] = current_data["shop_title"]
+                row_num += 1
+
+                # Orders
+                ws[f"A{row_num}"] = "КОЛИЧЕСТВО ЗАКАЗОВ"
+                ws[f"B{row_num}"] = current_data["orders_amount"]
+                row_num += 1
+
+                ws[f"A{row_num}"] = "КОЛИЧЕСТВЕ ЗАКАЗОВ (30 ДНЕЙ)"
+                ws[f"B{row_num}"] = current_data["diff_orders_amount"]
+
+                row_num += 1
+
+                ws[f"A{row_num}"] = "ЕЖЕНЕДЕЛЬНОЕ КОЛИЧЕСТВО ЗАКАЗОВ (7 ДНЕЙ)"
+                ws[f"B{row_num}"] = current_data["weekly_orders_amount"]
+                row_num += 1
+
+                # number od orders yesterday
+                ws[f"A{row_num}"] = "КОЛИЧЕСТВО ЗАКАЗОВ ВЧЕРА"
+                ws[f"B{row_num}"] = current_data["orders_amount"] - latest_analytics["orders_amount"]
+                row_num += 1
+
+                # orders_money: total revenue общая выручка
+                ws[f"A{row_num}"] = "ОБЩАЯ ВЫРУЧКА"
+                ws[f"B{row_num}"] = round(current_data["orders_money"]) * 1000
+                row_num += 1
+
+                ws[f"A{row_num}"] = "ОБЩАЯ ВЫРУЧКА (30 ДНЕЙ)"
+                ws[f"B{row_num}"] = round(current_data["diff_orders_money"]) * 1000
+                row_num += 1
+
+                ws[f"A{row_num}"] = "ЕЖЕНЕДЕЛЬНАЯ ВЫРУЧКА (7 ДНЕЙ)"
+                ws[f"B{row_num}"] = round(current_data["weekly_orders_money"]) * 1000
+                row_num += 1
+
+                # Reviews
+                ws[f"A{row_num}"] = "КОЛИЧЕСТВО ОТЗЫВОВ"
+                ws[f"B{row_num}"] = current_data["reviews_amount"]
+                row_num += 1
+
+                ws[f"A{row_num}"] = "КОЛИЧЕСТВЕ ОТЗЫВОВ (30 ДНЕЙ)"
+                ws[f"B{row_num}"] = current_data["diff_reviews_amount"]
+                row_num += 1
+
+                ws[f"A{row_num}"] = "ЕЖЕНЕДЕЛЬНОЕ КОЛИЧЕСТВО ОТЗЫВОВ (7 ДНЕЙ)"
+                ws[f"B{row_num}"] = current_data["weekly_reviews_amount"]
+                row_num += 1
+
+                ws[f"A{row_num}"] = "КОЛИЧЕСТВО ОТЗЫВОВ ВЧЕРА"
+                ws[f"B{row_num}"] = current_data["reviews_amount"] - latest_analytics["reviews_amount"]
+                row_num += 1
+
+                # Rating
+                ws[f"A{row_num}"] = "РЕЙТИНГ:"
+                ws[f"B{row_num}"] = current_data["rating"]
+                row_num += 1
+
+                ws[f"A{row_num}"] = "ИЗМЕНЕНИЕ РЕЙТИНГА ВЧЕРА:"
+                ws[f"B{row_num}"] = current_data["rating"] - latest_analytics["rating"]
+                change_rating_cell = ws[f"B{row_num}"]
+                if change_rating_cell.value < 0:
+                    change_rating_cell.fill = negative_fill
+                elif change_rating_cell.value > 0:
+                    change_rating_cell.fill = positive_fill
+                row_num += 1
+
+                # Position in Category
+                ws[f"A{row_num}"] = "ПОЗИЦИЯ В КАТЕГОРИИ:"
+                ws[f"B{row_num}"] = current_data["position_in_category"]
+                row_num += 1
+
+                ws[f"A{row_num}"] = "ИЗМЕНЕНИЕ ПОЗИЦИИ В КАТЕГОРИИ ВЧЕРА:"
+                ws[f"B{row_num}"] = current_data["position_in_category"] - latest_analytics["position_in_category"]
+                change_position_cell = ws[f"B{row_num}"]
+                if change_position_cell.value < 0:
+                    change_position_cell.fill = negative_fill
+                elif change_position_cell.value > 0:
+                    change_position_cell.fill = positive_fill
+                row_num += 1
+
+                # Average Purchase Price
+                ws[f"A{row_num}"] = "СРЕДНЯЯ ЦЕНА:"
+                ws[f"B{row_num}"] = round(round(current_data["avg_purchase_price"]) / 100) * 100
+                row_num += 1
+
+                ws[f"A{row_num}"] = "ИЗМЕНЕНИЕ ЦЕНЫ ВЧЕРА:"
+                ws[f"B{row_num}"] = round(round(current_data["avg_purchase_price"]) / 100) * 100 - (
+                    round(round(latest_analytics["average_purchase_price"]) / 100) * 100
+                )
+                change_price_cell = ws[f"B{row_num}"]
+
+                if change_price_cell.value < 0:
+                    change_price_cell.fill = negative_fill
+                elif change_price_cell.value > 0:
+                    change_price_cell.fill = positive_fill
+
+                row_num += 1
+
+                # Available Amount
+                ws[f"A{row_num}"] = "НАЛИЧИЕ ТОВАРА:"
+                ws[f"B{row_num}"] = current_data["product_available_amount"]
+
+                row_num += 4
+
+            for column in ws.columns:
+                for cell in column:
+                    cell.border = Border(
+                        left=Side(style="double"),
+                        right=Side(style="double"),
+                        top=Side(style="double"),
+                        bottom=Side(style="double"),
+                    )
+
+            # Adjust column widths
+            for column in ws.columns:
+                max_length = 0
+                column = [cell for cell in column]
+                for cell in column:
+                    try:
+                        max_length = max(max_length, len(str(cell.value)))
+                    except Exception as e:
+                        pass
+                adjusted_width = max_length + 2
+                ws.column_dimensions[column[0].column_letter].width = adjusted_width
+
         output.seek(0)
 
         return output
     except Exception as e:
         print("Error in export_to_excel: ", e)
+        traceback.print_exc()
         return None
 
 
@@ -326,7 +562,7 @@ def send_reports_to_all():
                 shop_analytics_dict = {
                     "total_products": latest_analytics.total_products,
                     "total_orders": latest_analytics.total_orders,
-                    "total_revenue": latest_analytics.total_revenue,
+                    "total_revenue": round(latest_analytics.total_revenue) * 1000,
                     "total_reviews": latest_analytics.total_reviews,
                     "average_purchase_price": latest_analytics.average_purchase_price,
                     "rating": latest_analytics.rating,
@@ -342,8 +578,65 @@ def send_reports_to_all():
                     "products_analytics_of_shop": shop_data,
                 }
 
+            all_products_data = {}
+
+            all_products_current = (
+                ProductAnalyticsView.objects.filter(
+                    product_id__in=favourite_products.values_list("product_id", flat=True)
+                )
+                .values(
+                    "product_id",
+                    "product_title",
+                    "product_title_ru",
+                    "category_title",
+                    "category_title_ru",
+                    "shop_title",
+                    "shop_title",
+                    "orders_amount",
+                    "diff_orders_amount",
+                    "weekly_orders_amount",
+                    "orders_money",
+                    "diff_orders_money",
+                    "weekly_orders_money",
+                    "reviews_amount",
+                    "diff_reviews_amount",
+                    "weekly_reviews_amount",
+                    "avg_purchase_price",
+                    "rating",
+                    "position_in_category",
+                    "product_available_amount",
+                )
+                .order_by("-orders_amount")
+            )
+
+            for product in favourite_products:
+                analytics = (
+                    ProductAnalytics.objects.filter(product=product)
+                    .order_by("-created_at")
+                    .values(
+                        "orders_amount",
+                        "reviews_amount",
+                        "position_in_category",
+                        "orders_money",
+                        "average_purchase_price",
+                        "available_amount",
+                        "date_pretty",
+                    )
+                )
+
+                if analytics.count() > 1:
+                    # get the analytics for the previous day
+                    latest_analytics = analytics[1]
+                    # change the orders_money by multiplying by 1000
+                if product:
+                    all_products_data[product.product_id] = {
+                        "date_pretty": get_today_pretty(),
+                        "current": all_products_current.filter(product_id=product.product_id).first(),
+                        "latest_analytics": latest_analytics,
+                    }
+
             # Export the combined shop data to Excel
-            file_path = export_to_excel(all_shop_data, user)
+            file_path = export_to_excel(all_shop_data, all_products_data, user)
 
             send_file_to_telegram_bot(user.telegram_chat_id, file_path)
 
@@ -384,13 +677,12 @@ def send_to_single_user(user):
             shop_analytics_dict = {
                 "total_products": latest_analytics.total_products,
                 "total_orders": latest_analytics.total_orders,
-                "total_revenue": latest_analytics.total_revenue,
+                "total_revenue": round(latest_analytics.total_revenue) * 1000,
                 "total_reviews": latest_analytics.total_reviews,
                 "average_purchase_price": latest_analytics.average_purchase_price,
-                "average_order_price": latest_analytics.average_order_price,
                 "rating": latest_analytics.rating,
                 "position": latest_analytics.position,
-                "date_pretty": latest_analytics.date_pretty,
+                "categories": latest_analytics.categories.all().count(),
             }
 
             # Fetch the daily product analytics for the shop
@@ -401,8 +693,64 @@ def send_to_single_user(user):
                 "products_analytics_of_shop": shop_data,
             }
 
+        all_products_data = {}
+
+        all_products_current = (
+            ProductAnalyticsView.objects.filter(product_id__in=favourite_products.values_list("product_id", flat=True))
+            .values(
+                "product_id",
+                "product_title",
+                "product_title_ru",
+                "category_title",
+                "category_title_ru",
+                "shop_title",
+                "orders_amount",
+                "diff_orders_amount",
+                "weekly_orders_amount",
+                "orders_money",
+                "diff_orders_money",
+                "weekly_orders_money",
+                "reviews_amount",
+                "diff_reviews_amount",
+                "weekly_reviews_amount",
+                "avg_purchase_price",
+                "rating",
+                "position_in_category",
+                "product_available_amount",
+            )
+            .order_by("-orders_amount")
+        )
+
+        for product in favourite_products:
+            analytics = (
+                ProductAnalytics.objects.filter(product=product)
+                .order_by("-created_at")
+                .values(
+                    "orders_amount",
+                    "reviews_amount",
+                    "position_in_category",
+                    "orders_money",
+                    "rating",
+                    "average_purchase_price",
+                    "available_amount",
+                    "date_pretty",
+                )
+            )
+
+            if analytics.count() > 1:
+                # get the analytics for the previous day
+                latest_analytics = analytics[1]
+
+            if product:
+                all_products_data[product.product_id] = {
+                    "date_pretty": get_today_pretty(),
+                    "current": all_products_current.filter(product_id=product.product_id).first(),
+                    "latest_analytics": latest_analytics,
+                }
+
         # Export the combined shop data to Excel
-        file_path = export_to_excel(all_shop_data, user)
+        file_path = export_to_excel(all_shop_data, all_products_data, user)
+
         send_file_to_telegram_bot(user.telegram_chat_id, file_path)
 
     except Exception as e:

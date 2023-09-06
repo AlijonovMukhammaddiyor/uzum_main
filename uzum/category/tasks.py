@@ -34,6 +34,7 @@ from uzum.product.models import Product, ProductAnalytics, create_product_latest
 from uzum.review.models import PopularSeaches
 from uzum.shop.models import Shop, ShopAnalytics
 from uzum.sku.models import SkuAnalytics
+from uzum.users.tasks import send_reports_to_all
 from uzum.utils.general import get_day_before_pretty, get_today_pretty
 
 
@@ -158,6 +159,10 @@ def update_uzum_data(args=None, **kwargs):
     print(f"Analytics updated in {time.time() - start} seconds")
 
     print("Uzum data updated...")
+    print("Sendinf reports")
+    start = time.time()
+    send_reports_to_all()
+    print(f"Reports sent in {time.time() - start} seconds")
     return True
 
 

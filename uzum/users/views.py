@@ -644,7 +644,7 @@ class TelegramBotView(APIView):
 
             # User starts the bot
             if text == "/start":
-                self.send_message(chat_id, "Hello! Please provide your unique token to link your account.")
+                self.send_message(chat_id, "Укажите свой уникальный токен для привязки вашей учетной записи.")
                 return Response(status=200, data={"status": "ok"})
 
             if text != "/request":
@@ -652,28 +652,34 @@ class TelegramBotView(APIView):
                 try:
                     user = User.objects.get(telegram_token=text)
 
-                    # If the user's telegram_chat_id is already set, inform them
-                    if user.telegram_chat_id:
-                        self.send_message(chat_id, "Your account is already linked!")
+                    if user.tariff == Tariffs.FREE or user.tariff == Tariffs.TRIAL:
+                        self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию.")
                     else:
-                        user.telegram_chat_id = chat_id
-                        user.is_telegram_connected = True
-                        user.save()
-                        self.send_message(chat_id, "Successfully linked your account!")
+                        # If the user's telegram_chat_id is already set, inform them
+                        if user.telegram_chat_id:
+                            self.send_message(chat_id, "Ваш аккаунт уже привязан!")
+                        else:
+                            user.telegram_chat_id = chat_id
+                            user.is_telegram_connected = True
+                            user.save()
+                            self.send_message(chat_id, "Successfully linked your account!")
 
                 except User.DoesNotExist:
                     self.send_message(chat_id, "Invalid token. Please try again.")
 
             if text == "/request":
-                # first check if the user is registered, if not - inform them
-                # if they are registered, send the report
-                try:
-                    user = User.objects.get(telegram_chat_id=chat_id)
-                    # user is registered, send the report
-                    # get the user's shops
-                    send_to_single_user(user)
-                except User.DoesNotExist:
-                    self.send_message(chat_id, "You are not registered in our system. Please register first.")
+                if user.tariff == Tariffs.FREE or user.tariff == Tariffs.TRIAL:
+                    self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию.")
+                else:
+                    # first check if the user is registered, if not - inform them
+                    # if they are registered, send the report
+                    try:
+                        user = User.objects.get(telegram_chat_id=chat_id)
+                        # user is registered, send the report
+                        # get the user's shops
+                        send_to_single_user(user)
+                    except User.DoesNotExist:
+                        self.send_message(chat_id, "You are not registered in our system. Please register first.")
 
             return Response(status=200, data={"status": "ok"})
 
