@@ -884,11 +884,11 @@ class TelegramBotView(APIView):
                 self.send_message(chat_id, "Укажите свой уникальный токен для привязки вашей учетной записи.")
                 return Response(status=200, data={"status": "ok"})
 
-            if not request.user.telegram_chat_id:
-                self.send_message(
-                    chat_id, "Вы не подключились к боту Telegram с помощью предоставленного нами уникального токена."
-                )
-                return Response(status=200, data={"status": "ok"})
+            # if not request.user.telegram_chat_id:
+            #     self.send_message(
+            #         chat_id, "Вы не подключились к боту Telegram с помощью предоставленного нами уникального токена."
+            #     )
+            #     return Response(status=200, data={"status": "ok"})
 
             user = User.objects.get(telegram_chat_id=chat_id)
 
