@@ -942,4 +942,9 @@ class TelegramBotView(APIView):
         except Exception as e:
             print("Error in TelegramConnectView: ", e)
             traceback.print_exc()
-            return Response(status=500, data={"message": "Произошла ошибка"})
+            return Response(
+                status=200,
+                data={
+                    "message": "Вы не подключились к боту Telegram с помощью предоставленного нами уникального токена."
+                },
+            )
