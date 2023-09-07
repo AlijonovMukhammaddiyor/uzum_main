@@ -244,7 +244,7 @@ class AddfavouriteShopView(APIView):
                     },
                 )
 
-            if user.tariff == Tariffs.BASE:
+            if user.tariff == Tariffs.BASE or user.tariff == Tariffs.TRIAL:
                 if user.favourite_shops.all().count() >= self.BASE_LIMIT:
                     return Response(
                         status=400,
@@ -458,7 +458,7 @@ class AddfavouriteProductView(APIView):
                     },
                 )
 
-            if user.tariff == Tariffs.BASE:
+            if user.tariff == Tariffs.BASE or user.tariff == Tariffs.TRIAL:
                 if user.favourite_products.all().count() >= self.BASE_LIMIT:
                     return Response(
                         status=400,
@@ -886,7 +886,7 @@ class TelegramBotView(APIView):
                 # Check if the text is a valid token in your database
                 try:
                     user = User.objects.get(telegram_chat_id=chat_id)
-                    if user.tariff == Tariffs.FREE or user.tariff == Tariffs.TRIAL:
+                    if user.tariff == Tariffs.FREE:
                         self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию.")
                     else:
                         # If the user's telegram_chat_id is already set, inform them
@@ -902,7 +902,7 @@ class TelegramBotView(APIView):
                     self.send_message(chat_id, "Invalid token. Please try again.")
 
             if text == "/request":
-                if user.tariff == Tariffs.FREE or user.tariff == Tariffs.TRIAL:
+                if user.tariff == Tariffs.FREE:
                     self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию....")
                 else:
                     # first check if the user is registered, if not - inform them

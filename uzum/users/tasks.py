@@ -553,7 +553,7 @@ def export_to_excel(shops_data, products_data, user):
 
 def send_reports_to_all():
     try:
-        users = User.objects.filter(is_telegram_connected=True)
+        users = User.objects.filter(is_telegram_connected=True).exclude(tariff="free")
 
         for user in users:
             # Generate the report for the user
