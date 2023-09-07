@@ -355,6 +355,8 @@ class GetFavouriteShopsView(APIView):
         """
         try:
             user: User = request.user
+            if user.favourite_shops.all().count() == 0:
+                return Response(status=200, data=[])
             only_links = request.GET.get("only_links", False)
             # Convert the list of shop IDs to a comma-separated string
             shop_ids = user.favourite_shops.values_list("link", flat=True)
@@ -562,6 +564,8 @@ class GetFavouriteProductsView(APIView):
         """
         try:
             user: User = request.user
+            if user.favourite_products.all().count() == 0:
+                return Response(status=200, data=[])
             product_ids = user.favourite_products.values_list("product_id", flat=True)
             only_ids = request.GET.get("only_ids", False)
             # Convert the list of product IDs to a comma-separated string
