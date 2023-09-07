@@ -905,6 +905,11 @@ class TelegramBotView(APIView):
                 if user.tariff == Tariffs.FREE:
                     self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию....")
                 else:
+                    favourite_shops = user.favourite_shops.all()
+                    favourite_products = user.favourite_products.all()
+
+                    if len(favourite_shops) == 0 and len(favourite_products) == 0:
+                        self.send_message(chat_id, "Вы не выбрали ни одного магазина или товара.")
                     # first check if the user is registered, if not - inform them
                     # if they are registered, send the report
                     try:
