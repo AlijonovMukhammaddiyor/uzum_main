@@ -11,13 +11,19 @@ from rest_framework_simplejwt.views import TokenVerifyView
 from uzum.category.utils import seconds_until_next
 from uzum.shop.views import UzumTotalOrders, UzumTotalProducts, UzumTotalRevenue, UzumTotalReviews, UzumTotalShops
 from uzum.users.views import (
+    AddfavouriteProductView,
+    AddfavouriteShopView,
     CheckUserNameAndPhone,
     CodeVerificationView,
     CustomTokenObtainPairView,
     CustomTokenRefreshView,
+    GetFavouriteProductsView,
+    GetFavouriteShopsView,
     GoogleView,
     LogoutView,
     PasswordRenewView,
+    RemovefavouriteProductView,
+    RemovefavouriteShopView,
     TelegramBotView,
     VerificationSendView,
 )
@@ -54,6 +60,12 @@ urlpatterns += [
     path("api/user/", include("uzum.users.urls", namespace="users")),
     path("api/category/", include("uzum.category.urls", namespace="category")),
     path("telegram-connect/", view=TelegramBotView.as_view(), name="reports"),
+    path("api/bot/shops/add/", view=AddfavouriteShopView.as_view(), name="add_shop"),
+    path("api/bot/shops/remove/", view=RemovefavouriteShopView.as_view(), name="remove_shop"),
+    path("api/bot/shops/get", view=GetFavouriteShopsView.as_view(), name="get_shops"),
+    path("api/bot/products/add/", view=AddfavouriteProductView.as_view(), name="add_product"),
+    path("api/bot/products/remove/", view=RemovefavouriteProductView.as_view(), name="remove_product"),
+    path("api/bot/products/get", view=GetFavouriteProductsView.as_view(), name="get_products"),
     path("api/shop/", include("uzum.shop.urls", namespace="shop")),
     path("api/google/", GoogleView.as_view(), name="google"),
     path("api/product/", include("uzum.product.urls", namespace="product")),

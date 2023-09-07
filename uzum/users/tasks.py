@@ -88,9 +88,17 @@ def prepare_shop_statistics(user, shop):
         for item in target_analytics:
             before_item = before_analytics_dict.get(item["product_id"], None)
 
-            item["orders_count_yesterday"] = calculate_diff(item["orders_amount"], before_item["orders_amount"])
+            item["orders_count_yesterday"] = (
+                calculate_diff(item["orders_amount"], before_item["orders_amount"])
+                if before_item
+                else item["orders_amount"]
+            )
 
-            item["reviews_count_yesterday"] = calculate_diff(item["reviews_amount"], before_item["reviews_amount"])
+            item["reviews_count_yesterday"] = (
+                calculate_diff(item["reviews_amount"], before_item["reviews_amount"])
+                if before_item
+                else item["reviews_amount"]
+            )
 
             item["rating_yesterday"] = (
                 calculate_diff(item["rating"], before_item["rating"]) if before_item else item["rating"]
@@ -648,11 +656,11 @@ def send_reports_to_all():
 def send_file_to_telegram_bot(chat_id, file_stream):
     bot_token = "6419033506:AAETG8prNWtydbqFEdiiFa-z_YxRaRSbzA8"
     send_document_url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
-
-    data = {"chat_id": int(chat_id), "caption": "Here is your daily report."}
+    date_pretty = get_today_pretty()
+    data = {"chat_id": int(chat_id), "caption": "Вот ваш ежедневный отчет."}
     files = {
         "document": (
-            f"report-{chat_id}.xlsx",
+            f"отчет-{date_pretty}.xlsx",
             file_stream,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         ),

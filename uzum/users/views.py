@@ -230,35 +230,71 @@ class AddfavouriteShopView(APIView):
         """
         try:
             data = request.data
-            shop_id = data.get("shop_id")
-            if not shop_id:
-                return Response(status=400, data={"message": "Do'kon tanlanmagan"})
+            link = data.get("link")
+            if not link:
+                return Response(status=400, data={"message": "Do'kon tanlanmagan", "message_ru": "Магазин не выбран"})
             user: User = request.user
 
             if user.tariff == Tariffs.FREE:
-                return Response(status=400, data={"message": "Do'konlarni yangilash uchun Pro paketga o'ting"})
+                return Response(
+                    status=400,
+                    data={
+                        "message": "Do'konlarni yangilash uchun Pro paketga o'ting",
+                        "message_ru": "Для обновления магазинов перейдите на Pro пакет",
+                    },
+                )
 
             if user.tariff == Tariffs.BASE:
                 if user.favourite_shops.all().count() >= self.BASE_LIMIT:
-                    return Response(status=400, data={"message": "Siz 1 dan ortiq do'konni tanlay olmaysiz"})
+                    return Response(
+                        status=400,
+                        data={
+                            "message": "Siz 1 dan ortiq do'konni tanlay olmaysiz",
+                            "message_ru": "Вы не можете выбрать более 1 магазина",
+                        },
+                    )
 
             if user.tariff == Tariffs.SELLER:
                 if user.favourite_shops.all().count() >= self.SELLER_LIMIT:
-                    return Response(status=400, data={"message": "Siz 4 dan ortiq do'konni tanlay olmaysiz"})
+                    return Response(
+                        status=400,
+                        data={
+                            "message": "Siz 4 dan ortiq do'konni tanlay olmaysiz",
+                            "message_ru": "Вы не можете выбрать более 4 магазинов",
+                        },
+                    )
 
             if user.tariff == Tariffs.BUSINESS:
                 if user.favourite_shops.all().count() >= self.BUSINESS_LIMIT:
-                    return Response(status=400, data={"message": "Siz 10 dan ortiq do'konni tanlay olmaysiz"})
+                    return Response(
+                        status=400,
+                        data={
+                            "message": "Siz 10 dan ortiq do'konni tanlay olmaysiz",
+                            "message_ru": "Вы не можете выбрать более 10 магазинов",
+                        },
+                    )
 
-            shop = Shop.objects.get(seller_id=shop_id)
+            shop = Shop.objects.get(link=link)
             user.favourite_shops.add(shop)
             user.save()
 
-            return Response(status=200, data={"message": "Shop successfully added to favourites"})
+            return Response(
+                status=200,
+                data={
+                    "message": "Shop successfully added to favourites",
+                    "message_ru": "Магазин успешно добавлен в избранное",
+                },
+            )
         except Exception as e:
             print("Error in AddfavouriteShopView: ", e)
             traceback.print_exc()
-            return Response(status=500, data={"message": "Xatolik yuz berdi. Iltimos, qayta urinib ko'ring."})
+            return Response(
+                status=500,
+                data={
+                    "message": "Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
+                    "message_ru": "Произошла ошибка. Пожалуйста, попробуйте еще раз.",
+                },
+            )
 
 
 class RemovefavouriteShopView(APIView):
@@ -276,20 +312,32 @@ class RemovefavouriteShopView(APIView):
         """
         try:
             data = request.data
-            shop_id = data.get("shop_id")
-            if not shop_id:
-                return Response(status=400, data={"message": "Do'kon tanlanmagan"})
+            link = data.get("link")
+            if not link:
+                return Response(status=400, data={"message": "Do'kon tanlanmagan", "message_ru": "Магазин не выбран"})
             user: User = request.user
 
-            shop = Shop.objects.get(seller_id=shop_id)
+            shop = Shop.objects.get(link=link)
             user.favourite_shops.remove(shop)
             user.save()
 
-            return Response(status=200, data={"message": "Shop successfully removed from favourites"})
+            return Response(
+                status=200,
+                data={"message": "Do'kon muvaffaqiyatli o'chirildi", "message_ru": "Магазин успешно удален"},
+            )
         except Exception as e:
             print("Error in RemovefavouriteShopView: ", e)
             traceback.print_exc()
-            return Response(status=500, data={"message": "Xatolik yuz berdi. Iltimos, qayta urinib ko'ring."})
+            return Response(
+                status=500,
+                data={
+                    "message": "Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
+                    "message_ru": "Произошла ошибка. Пожалуйста, попробуйте еще раз.",
+                },
+            )
+
+
+from django.db import connection
 
 
 class GetFavouriteShopsView(APIView):
@@ -298,7 +346,7 @@ class GetFavouriteShopsView(APIView):
 
     def get(self, request: Request):
         """
-        Get the user's favourite shops
+        Get the user's favourite shops along with their latest analytics using raw SQL
         Args:
             request (Request): _description_
 
@@ -307,9 +355,71 @@ class GetFavouriteShopsView(APIView):
         """
         try:
             user: User = request.user
-            shops = user.favourite_shops.all()
-            shops = [{"id": shop.seller_id, "name": shop.title} for shop in shops]
-            return Response(status=200, data={"shops": shops})
+            only_links = request.GET.get("only_links", False)
+            # Convert the list of shop IDs to a comma-separated string
+            shop_ids = user.favourite_shops.values_list("link", flat=True)
+            shop_ids_str = ",".join(map(str, shop_ids))
+
+            if only_links:
+                return Response(status=200, data={"shops": shop_ids})
+
+            shop_ids_str = ",".join([f"'{link}'" for link in shop_ids])
+
+            # Raw SQL query to fetch the latest analytics for each shop
+            sql = f"""
+            SELECT
+                s.seller_id AS shop_id,
+                s.title AS shop_name,
+                s.link AS shop_link,
+                a.total_products,
+                a.total_orders,
+                a.total_revenue,
+                a.total_reviews,
+                a.average_purchase_price,
+                a.average_order_price,
+                a.rating,
+                a.position
+            FROM shop_shop s
+            LEFT JOIN (
+                SELECT
+                    shop_id,
+                    total_products,
+                    total_orders,
+                    total_revenue,
+                    total_reviews,
+                    average_purchase_price,
+                    average_order_price,
+                    rating,
+                    position
+                FROM shop_shopanalytics
+                WHERE created_at = (
+                    SELECT MAX(created_at)
+                    FROM shop_shopanalytics sa2
+                    WHERE sa2.shop_id = shop_shopanalytics.shop_id
+                )
+            ) a ON s.seller_id = a.shop_id
+            WHERE s.link IN ({shop_ids_str})
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql)
+                rows = cursor.fetchall()
+
+            shops_data = [
+                {
+                    "shop_title": row[1] + "((" + row[2] + "))",
+                    "total_products": row[3],
+                    "total_orders": row[4],
+                    "total_revenue": row[5],
+                    "total_reviews": row[6],
+                    "average_purchase_price": row[7],
+                    "rating": row[9],
+                    "position": row[10],
+                }
+                for row in rows
+            ]
+
+            return Response(status=200, data={"shops": shops_data})
         except Exception as e:
             print("Error in GetFavouriteShopsView: ", e)
             traceback.print_exc()
@@ -336,33 +446,65 @@ class AddfavouriteProductView(APIView):
             data = request.data
             product_id = data.get("product_id")
             if not product_id:
-                return Response(status=400, data={"message": "Mahsulot tanlanmagan"})
+                return Response(status=400, data={"message": "Mahsulot tanlanmagan", "message_ru": "Товар не выбран"})
             user: User = request.user
 
             if user.tariff == Tariffs.FREE:
-                return Response(status=400, data={"message": "Mahsulotlarni yangilash uchun Pro paketga o'ting"})
+                return Response(
+                    status=400,
+                    data={
+                        "message": "Mahsulotlarni tanlash uchun boshqa paketga o'ting",
+                        "message_ru": "Для выбора товаров перейдите на другой пакет",
+                    },
+                )
 
             if user.tariff == Tariffs.BASE:
                 if user.favourite_products.all().count() >= self.BASE_LIMIT:
-                    return Response(status=400, data={"message": "Siz 20 dan ortiq mahsulotni tanlay olmaysiz"})
+                    return Response(
+                        status=400,
+                        data={
+                            "message": "Siz 20 dan ortiq mahsulotni tanlay olmaysiz",
+                            "message_ru": "Вы не можете выбрать более 20 товаров",
+                        },
+                    )
 
             if user.tariff == Tariffs.SELLER:
                 if user.favourite_products.all().count() >= self.SELLER_LIMIT:
-                    return Response(status=400, data={"message": "Siz 50 dan ortiq mahsulotni tanlay olmaysiz"})
+                    return Response(
+                        status=400,
+                        data={
+                            "message": "Siz 50 dan ortiq mahsulotni tanlay olmaysiz",
+                            "message_ru": "Вы не можете выбрать более 50 товаров",
+                        },
+                    )
 
             if user.tariff == Tariffs.BUSINESS:
                 if user.favourite_products.all().count() >= self.BUSINESS_LIMIT:
-                    return Response(status=400, data={"message": "Siz 100 dan ortiq mahsulotni tanlay olmaysiz"})
+                    return Response(
+                        status=400,
+                        data={
+                            "message": "Siz 100 dan ortiq mahsulotni tanlay olmaysiz",
+                            "message_ru": "Вы не можете выбрать более 100 товаров",
+                        },
+                    )
 
             product = Product.objects.get(product_id=product_id)
             user.favourite_products.add(product)
             user.save()
 
-            return Response(status=200, data={"message": "Product successfully added to favourites"})
+            return Response(
+                status=200, data={"message": "Mahsulot muvaffaqiyatli tanlandi", "message_ru": "Товар успешно выбран"}
+            )
         except Exception as e:
             print("Error in AddfavouriteProductView: ", e)
             traceback.print_exc()
-            return Response(status=500, data={"message": "Xatolik yuz berdi. Iltimos, qayta urinib ko'ring."})
+            return Response(
+                status=500,
+                data={
+                    "message": "Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
+                    "message_ru": "Произошла ошибка. Пожалуйста, попробуйте еще раз.",
+                },
+            )
 
 
 class RemovefavouriteProductView(APIView):
@@ -382,18 +524,27 @@ class RemovefavouriteProductView(APIView):
             data = request.data
             product_id = data.get("product_id")
             if not product_id:
-                return Response(status=400, data={"message": "Mahsulot tanlanmagan"})
+                return Response(status=400, data={"message": "Mahsulot tanlanmagan", "message_ru": "Товар не выбран"})
             user: User = request.user
 
             product = Product.objects.get(product_id=product_id)
             user.favourite_products.remove(product)
             user.save()
 
-            return Response(status=200, data={"message": "Product successfully removed from favourites"})
+            return Response(
+                status=200,
+                data={"message": "Mahsulot muvaffaqiyatli o'chirildi", "message_ru": "Товар успешно удален"},
+            )
         except Exception as e:
             print("Error in RemovefavouriteProductView: ", e)
             traceback.print_exc()
-            return Response(status=500, data={"message": "Xatolik yuz berdi. Iltimos, qayta urinib ko'ring."})
+            return Response(
+                status=500,
+                data={
+                    "message": "Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
+                    "message_ru": "Произошла ошибка. Пожалуйста, попробуйте еще раз.",
+                },
+            )
 
 
 class GetFavouriteProductsView(APIView):
@@ -402,7 +553,7 @@ class GetFavouriteProductsView(APIView):
 
     def get(self, request: Request):
         """
-        Get the user's favourite products
+        Get the user's favourite products along with their latest analytics using raw SQL
         Args:
             request (Request): _description_
 
@@ -411,9 +562,91 @@ class GetFavouriteProductsView(APIView):
         """
         try:
             user: User = request.user
-            products = user.favourite_products.all()
-            products = [{"id": product.product_id, "name": product.title} for product in products]
-            return Response(status=200, data={"products": products})
+            product_ids = user.favourite_products.values_list("product_id", flat=True)
+            only_ids = request.GET.get("only_ids", False)
+            # Convert the list of product IDs to a comma-separated string
+            product_ids_str = ",".join(map(str, product_ids))
+
+            if only_ids:
+                return Response(status=200, data={"products": product_ids})
+
+            # Raw SQL query to fetch the latest analytics for each product
+            sql = f"""
+                SELECT
+                    p.product_id AS product_id,
+                    p.title AS product_name,
+                    p.title_ru AS product_name_ru,
+                    p.photos AS product_photo,
+                    c.title AS category_title,
+                    c.title_ru AS category_title_ru,
+                    c."categoryId" AS category_id,
+                    s.title AS shop_title,
+                    s.link AS link,
+                    a.available_amount,
+                    a.reviews_amount,
+                    a.rating,
+                    a.orders_amount,
+                    a.orders_money,
+                    a.position_in_shop,
+                    a.position_in_category,
+                    a.position,
+                    a.average_purchase_price,
+                    a.score
+                FROM product_product p
+                LEFT JOIN category_category c ON p.category_id = c."categoryId"
+                LEFT JOIN shop_shop s ON p.shop_id = s.seller_id
+                LEFT JOIN (
+                    SELECT
+                        product_id,
+                        available_amount,
+                        reviews_amount,
+                        rating,
+                        orders_amount,
+                        orders_money,
+                        position_in_shop,
+                        position_in_category,
+                        position,
+                        average_purchase_price,
+                        score
+                    FROM product_productanalytics
+                    WHERE created_at = (
+                        SELECT MAX(created_at)
+                        FROM product_productanalytics pa2
+                        WHERE pa2.product_id = product_productanalytics.product_id
+                    )
+                ) a ON p.product_id = a.product_id
+                WHERE p.product_id IN ({product_ids_str})
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql)
+                rows = cursor.fetchall()
+
+            products_data = [
+                {
+                    "product_id": row[0],
+                    "product_title": row[1] + "((" + str(row[0]) + "))",
+                    "product_title_ru": (row[2] if row[2] else row[1]) + "((" + str(row[0]) + "))",
+                    "category_title": row[3] + "((" + str(row[6]) + "))",
+                    "category_title_ru": (row[4] if row[4] else row[3]) + "((" + str(row[6]) + "))",
+                    "category_id": row[6],
+                    "shop_title": row[7] + "((" + row[8] + "))",
+                    "shop_link": row[8],
+                    "available_amount": row[9],
+                    "reviews_amount": row[10],
+                    "rating": row[11],
+                    "orders_amount": row[12],
+                    "orders_money": row[13],
+                    "position_in_shop": row[14],
+                    "position_in_category": row[15],
+                    "position": row[16],
+                    "average_purchase_price": row[17],
+                    "photos": row[3],
+                }
+                for row in rows
+            ]
+
+            return Response(status=200, data={"products": products_data})
         except Exception as e:
             print("Error in GetFavouriteProductsView: ", e)
             traceback.print_exc()
@@ -647,11 +880,12 @@ class TelegramBotView(APIView):
                 self.send_message(chat_id, "Укажите свой уникальный токен для привязки вашей учетной записи.")
                 return Response(status=200, data={"status": "ok"})
 
+            user = User.objects.get(telegram_chat_id=chat_id)
+
             if text != "/request":
                 # Check if the text is a valid token in your database
                 try:
-                    user = User.objects.get(telegram_token=text)
-
+                    user = User.objects.get(telegram_chat_id=chat_id)
                     if user.tariff == Tariffs.FREE or user.tariff == Tariffs.TRIAL:
                         self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию.")
                     else:
@@ -662,27 +896,37 @@ class TelegramBotView(APIView):
                             user.telegram_chat_id = chat_id
                             user.is_telegram_connected = True
                             user.save()
-                            self.send_message(chat_id, "Successfully linked your account!")
+                            self.send_message(chat_id, "Ваш аккаунт успешно привязан!")
 
                 except User.DoesNotExist:
                     self.send_message(chat_id, "Invalid token. Please try again.")
 
             if text == "/request":
                 if user.tariff == Tariffs.FREE or user.tariff == Tariffs.TRIAL:
-                    self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию.")
+                    self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию....")
                 else:
                     # first check if the user is registered, if not - inform them
                     # if they are registered, send the report
                     try:
                         user = User.objects.get(telegram_chat_id=chat_id)
-                        # user is registered, send the report
-                        # get the user's shops
+                        self.send_message(chat_id, "Ваш отчет готовится. Пожалуйста, подождите немного.")
                         send_to_single_user(user)
                     except User.DoesNotExist:
-                        self.send_message(chat_id, "You are not registered in our system. Please register first.")
+                        self.send_message(
+                            chat_id,
+                            "Вы не подключились к боту Telegram с помощью предоставленного нами уникального токена.",
+                        )
 
             return Response(status=200, data={"status": "ok"})
+        except User.DoesNotExist as e:
+            return Response(
+                status=200,
+                data={
+                    "message": "Вы не подключились к боту Telegram с помощью предоставленного нами уникального токена."
+                },
+            )
 
         except Exception as e:
             print("Error in TelegramConnectView: ", e)
-            return Response(status=500, data={"message": "Internal server error"})
+            traceback.print_exc()
+            return Response(status=500, data={"message": "Произошла ошибка"})

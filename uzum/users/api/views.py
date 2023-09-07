@@ -119,3 +119,19 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
         del data["is_staff"]
         # print("after pop: ", data)
         return Response(status=status.HTTP_200_OK, data=data)
+
+    @action(detail=False)
+    def myTelegramToken(self, request: HttpRequest):
+        """
+        This method returns the currently authenticated user telegram token.
+        Args:
+            request (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        # start = time.time()
+
+        data = {"telegram_token": request.user.telegram_token}
+        # print("after pop: ", data)
+        return Response(status=status.HTTP_200_OK, data=data)
