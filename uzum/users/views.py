@@ -913,7 +913,11 @@ class TelegramBotView(APIView):
                     favourite_products = user.favourite_products.all()
 
                     if len(favourite_shops) == 0 and len(favourite_products) == 0:
-                        self.send_message(chat_id, "Вы не выбрали ни одного магазина или товара.")
+                        self.send_message(
+                            chat_id,
+                            "Вы не выбрали ни один магазин или товар. Пожалуйста, перейдите на страницы «Товары» или «Магазины» и выберите конкурентов.",
+                        )
+                        return Response(status=200, data={"status": "ok"})
                     # first check if the user is registered, if not - inform them
                     # if they are registered, send the report
                     try:
