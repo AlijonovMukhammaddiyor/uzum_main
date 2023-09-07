@@ -142,12 +142,12 @@ def prepare_shop_statistics(user, shop):
         # for each of orders_money, diff_orders_money, weekly_orders_money, multiply by 1000
         for item in target_analytics:
             for key in ["orders_money", "diff_orders_money", "weekly_orders_money"]:
-                if item[key] is not None:
+                if key in item and item[key] is not None:
                     item[key] = round(item[key]) * 1000
 
         for item in target_analytics:
             for key in ["avg_purchase_price", "price_yesterday"]:
-                if item[key] is not None:
+                if key in item and item[key] is not None:
                     item[key] = (round(item[key]) / 100) * 100
 
         final_res = target_analytics
@@ -409,10 +409,10 @@ def export_to_excel(shops_data, products_data, user):
                 ws[f"B{row_num}"] = current_data["shop_title"]
                 row_num += 1
 
-                # Orders
-                ws[f"A{row_num}"] = "КОЛИЧЕСТВО ЗАКАЗОВ"
-                ws[f"B{row_num}"] = current_data["orders_amount"]
-                row_num += 1
+                # # Orders
+                # ws[f"A{row_num}"] = "КОЛИЧЕСТВО ЗАКАЗОВ"
+                # ws[f"B{row_num}"] = current_data["orders_amount"]
+                # row_num += 1
 
                 ws[f"A{row_num}"] = "КОЛИЧЕСТВЕ ЗАКАЗОВ (30 ДНЕЙ)"
                 ws[f"B{row_num}"] = current_data["diff_orders_amount"]
@@ -428,10 +428,10 @@ def export_to_excel(shops_data, products_data, user):
                 ws[f"B{row_num}"] = current_data["orders_amount"] - latest_analytics["orders_amount"]
                 row_num += 1
 
-                # orders_money: total revenue общая выручка
-                ws[f"A{row_num}"] = "ОБЩАЯ ВЫРУЧКА"
-                ws[f"B{row_num}"] = round(current_data["orders_money"]) * 1000
-                row_num += 1
+                # # orders_money: total revenue общая выручка
+                # ws[f"A{row_num}"] = "ОБЩАЯ ВЫРУЧКА"
+                # ws[f"B{row_num}"] = round(current_data["orders_money"]) * 1000
+                # row_num += 1
 
                 ws[f"A{row_num}"] = "ОБЩАЯ ВЫРУЧКА (30 ДНЕЙ)"
                 ws[f"B{row_num}"] = round(current_data["diff_orders_money"]) * 1000
@@ -441,10 +441,10 @@ def export_to_excel(shops_data, products_data, user):
                 ws[f"B{row_num}"] = round(current_data["weekly_orders_money"]) * 1000
                 row_num += 1
 
-                # Reviews
-                ws[f"A{row_num}"] = "КОЛИЧЕСТВО ОТЗЫВОВ"
-                ws[f"B{row_num}"] = current_data["reviews_amount"]
-                row_num += 1
+                # # Reviews
+                # ws[f"A{row_num}"] = "КОЛИЧЕСТВО ОТЗЫВОВ"
+                # ws[f"B{row_num}"] = current_data["reviews_amount"]
+                # row_num += 1
 
                 ws[f"A{row_num}"] = "КОЛИЧЕСТВЕ ОТЗЫВОВ (30 ДНЕЙ)"
                 ws[f"B{row_num}"] = current_data["diff_reviews_amount"]
@@ -463,28 +463,28 @@ def export_to_excel(shops_data, products_data, user):
                 ws[f"B{row_num}"] = current_data["rating"]
                 row_num += 1
 
-                ws[f"A{row_num}"] = "ИЗМЕНЕНИЕ РЕЙТИНГА ВЧЕРА:"
-                ws[f"B{row_num}"] = current_data["rating"] - latest_analytics["rating"]
-                change_rating_cell = ws[f"B{row_num}"]
-                if change_rating_cell.value < 0:
-                    change_rating_cell.fill = negative_fill
-                elif change_rating_cell.value > 0:
-                    change_rating_cell.fill = positive_fill
-                row_num += 1
+                # ws[f"A{row_num}"] = "ИЗМЕНЕНИЕ РЕЙТИНГА ВЧЕРА:"
+                # ws[f"B{row_num}"] = current_data["rating"] - latest_analytics["rating"]
+                # change_rating_cell = ws[f"B{row_num}"]
+                # if change_rating_cell.value < 0:
+                #     change_rating_cell.fill = negative_fill
+                # elif change_rating_cell.value > 0:
+                #     change_rating_cell.fill = positive_fill
+                # row_num += 1
 
-                # Position in Category
-                ws[f"A{row_num}"] = "ПОЗИЦИЯ В КАТЕГОРИИ:"
-                ws[f"B{row_num}"] = current_data["position_in_category"]
-                row_num += 1
+                # # Position in Category
+                # ws[f"A{row_num}"] = "ПОЗИЦИЯ В КАТЕГОРИИ:"
+                # ws[f"B{row_num}"] = current_data["position_in_category"]
+                # row_num += 1
 
-                ws[f"A{row_num}"] = "ИЗМЕНЕНИЕ ПОЗИЦИИ В КАТЕГОРИИ ВЧЕРА:"
-                ws[f"B{row_num}"] = current_data["position_in_category"] - latest_analytics["position_in_category"]
-                change_position_cell = ws[f"B{row_num}"]
-                if change_position_cell.value < 0:
-                    change_position_cell.fill = negative_fill
-                elif change_position_cell.value > 0:
-                    change_position_cell.fill = positive_fill
-                row_num += 1
+                # ws[f"A{row_num}"] = "ИЗМЕНЕНИЕ ПОЗИЦИИ В КАТЕГОРИИ ВЧЕРА:"
+                # ws[f"B{row_num}"] = current_data["position_in_category"] - latest_analytics["position_in_category"]
+                # change_position_cell = ws[f"B{row_num}"]
+                # if change_position_cell.value < 0:
+                #     change_position_cell.fill = negative_fill
+                # elif change_position_cell.value > 0:
+                #     change_position_cell.fill = positive_fill
+                # row_num += 1
 
                 # Average Purchase Price
                 ws[f"A{row_num}"] = "СРЕДНЯЯ ЦЕНА:"
