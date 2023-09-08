@@ -577,25 +577,25 @@ class GetFavouriteProductsView(APIView):
             # Raw SQL query to fetch the latest analytics for each product
             sql = f"""
                 SELECT
-                    p.product_id AS product_id,
-                    p.title AS product_name,
-                    p.title_ru AS product_name_ru,
-                    p.photos AS product_photo,
-                    c.title AS category_title,
-                    c.title_ru AS category_title_ru,
-                    c."categoryId" AS category_id,
-                    s.title AS shop_title,
-                    s.link AS link,
-                    a.available_amount,
-                    a.reviews_amount,
-                    a.rating,
-                    a.orders_amount,
-                    a.orders_money,
-                    a.position_in_shop,
-                    a.position_in_category,
-                    a.position,
-                    a.average_purchase_price,
-                    a.score
+                    p.product_id AS product_id, -- 0
+                    p.title AS product_name, -- 1
+                    p.title_ru AS product_name_ru, -- 2
+                    p.photos AS product_photo, -- 3
+                    c.title AS category_title, -- 4
+                    c.title_ru AS category_title_ru, -- 5
+                    c."categoryId" AS category_id, -- 6
+                    s.title AS shop_title, -- 7
+                    s.link AS link, -- 8
+                    a.available_amount, -- 9
+                    a.reviews_amount, -- 10
+                    a.rating, -- 11
+                    a.orders_amount, -- 12
+                    a.orders_money, -- 13
+                    a.position_in_shop, -- 14
+                    a.position_in_category, -- 15
+                    a.position, -- 16
+                    a.average_purchase_price, -- 17
+                    a.score -- 18
                 FROM product_product p
                 LEFT JOIN category_category c ON p.category_id = c."categoryId"
                 LEFT JOIN shop_shop s ON p.shop_id = s.seller_id
@@ -631,8 +631,8 @@ class GetFavouriteProductsView(APIView):
                     "product_id": row[0],
                     "product_title": row[1] + "((" + str(row[0]) + "))",
                     "product_title_ru": (row[2] if row[2] else row[1]) + "((" + str(row[0]) + "))",
-                    "category_title": row[3] + "((" + str(row[6]) + "))",
-                    "category_title_ru": (row[4] if row[4] else row[3]) + "((" + str(row[6]) + "))",
+                    "category_title": row[4] + "((" + str(row[6]) + "))",
+                    "category_title_ru": (row[5] if row[5] else row[4]) + "((" + str(row[6]) + "))",
                     "category_id": row[6],
                     "shop_title": row[7] + "((" + row[8] + "))",
                     "shop_link": row[8],
