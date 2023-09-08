@@ -201,10 +201,10 @@ def get_days_based_on_tariff(user):
             return 101
 
         elif tariff == Tariffs.BASE:
-            return 101
+            return 110
 
         elif tariff == Tariffs.SELLER:
-            return 101
+            return 110
 
         elif tariff == Tariffs.BUSINESS:
             return 110
