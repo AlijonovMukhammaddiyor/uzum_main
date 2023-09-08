@@ -646,7 +646,7 @@ def send_file_to_telegram_bot(chat_id, file_stream):
     bot_token = "6419033506:AAETG8prNWtydbqFEdiiFa-z_YxRaRSbzA8"
     send_document_url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
     date_pretty = get_today_pretty()
-    data = {"chat_id": int(chat_id), "caption": "Вот ваш ежедневный отчет."}
+    data = {"chat_id": int(chat_id), "caption": "Вот ваш ежедневный отчет. Этот файл Excel содержит несколько листов."}
     files = {
         "document": (
             f"отчет-{date_pretty}.xlsx",
