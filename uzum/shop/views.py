@@ -1123,7 +1123,9 @@ class StoppedProductsView(APIView):
                 row["title_ru"] = (row["title_ru"] if row["title_ru"] else row["title"]) + f'(({row["product_id"]}))'
                 row["title"] = row["title"] + f'(({row["product_id"]}))'
                 row["category_title"] = row["category_title"] + f'(({row["category_id"]}))'
-                row["category_title_ru"] = row["category_title_ru"] + f'(({row["category_id"]}))'
+                row["category_title_ru"] = (
+                    row["category_title_ru"] if row["category_title_ru"] else row["category_title"]
+                ) + f'(({row["category_id"]}))'
 
             print(f"STOPPED PRODUCTS: {time.time() - start} seconds")
             return Response(data=result, status=status.HTTP_200_OK)
