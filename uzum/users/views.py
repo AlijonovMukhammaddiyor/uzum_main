@@ -890,9 +890,7 @@ class TelegramBotView(APIView):
             #     )
             #     return Response(status=200, data={"status": "ok"})
 
-            user = User.objects.get(telegram_chat_id=chat_id)
-
-            if text != "/request":
+            if text != "/request" and chat_id:
                 # Check if the text is a valid token in your database
                 try:
                     user = User.objects.get(telegram_chat_id=chat_id)
@@ -909,9 +907,12 @@ class TelegramBotView(APIView):
                             self.send_message(chat_id, "Ваш аккаунт успешно привязан!")
 
                 except User.DoesNotExist:
-                    self.send_message(chat_id, "Invalid token. Please try again.")
+                    self.send_message(
+                        chat_id, "Неверный токен. Пожалуйста, попробуйте еще раз или свяжитесь с администратором."
+                    )
 
-            if text == "/request":
+            elif text == "/request":
+                user = User.objects.get(telegram_chat_id=chat_id)
                 if user.tariff == Tariffs.FREE:
                     self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию....")
                 else:
@@ -935,6 +936,10 @@ class TelegramBotView(APIView):
                             chat_id,
                             "Вы не подключились к боту Telegram с помощью предоставленного нами уникального токена.",
                         )
+            else:
+                self.send_message(
+                    chat_id, "Неверный токен. Пожалуйста, попробуйте еще раз или свяжитесь с администратором."
+                )
 
             return Response(status=200, data={"status": "ok"})
         except User.DoesNotExist as e:
