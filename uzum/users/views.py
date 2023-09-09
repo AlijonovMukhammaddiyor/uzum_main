@@ -907,6 +907,17 @@ class TelegramBotView(APIView):
                             self.send_message(chat_id, "Ваш аккаунт успешно привязан!")
 
                 except User.DoesNotExist:
+                    # now user requested to connect to the bot
+                    # check if the token is valid
+                    try:
+                        user = User.objects.get(telegram_token=text)
+                        # if the token is valid, set the user's telegram_chat_id
+                        user.telegram_chat_id = chat_id
+                        user.is_telegram_connected = True
+                        user.save()
+                        self.send_message(chat_id, "Ваш аккаунт успешно привязан!")
+                    except User.DoesNotExist:
+                        pass
                     self.send_message(
                         chat_id, "Неверный токен. Пожалуйста, попробуйте еще раз или свяжитесь с администратором."
                     )
