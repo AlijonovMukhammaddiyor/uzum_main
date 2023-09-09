@@ -896,15 +896,18 @@ class TelegramBotView(APIView):
                     user = User.objects.get(telegram_chat_id=chat_id)
                     if user.tariff == Tariffs.FREE:
                         self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию.")
+                        return Response(status=200, data={"status": "ok"})
                     else:
                         # If the user's telegram_chat_id is already set, inform them
                         if user.telegram_chat_id:
                             self.send_message(chat_id, "Ваш аккаунт уже привязан!")
+                            return Response(status=200, data={"status": "ok"})
                         else:
                             user.telegram_chat_id = chat_id
                             user.is_telegram_connected = True
                             user.save()
                             self.send_message(chat_id, "Ваш аккаунт успешно привязан!")
+                            return Response(status=200, data={"status": "ok"})
 
                 except User.DoesNotExist:
                     # now user requested to connect to the bot
@@ -916,16 +919,19 @@ class TelegramBotView(APIView):
                         user.is_telegram_connected = True
                         user.save()
                         self.send_message(chat_id, "Ваш аккаунт успешно привязан!")
+                        return Response(status=200, data={"status": "ok"})
                     except User.DoesNotExist:
                         pass
                     self.send_message(
                         chat_id, "Неверный токен. Пожалуйста, попробуйте еще раз или свяжитесь с администратором."
                     )
+                    return Response(status=200, data={"status": "ok"})
 
             elif text == "/request":
                 user = User.objects.get(telegram_chat_id=chat_id)
                 if user.tariff == Tariffs.FREE:
                     self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию....")
+                    return Response(status=200, data={"status": "ok"})
                 else:
                     favourite_shops = user.favourite_shops.all()
                     favourite_products = user.favourite_products.all()
@@ -942,15 +948,18 @@ class TelegramBotView(APIView):
                         user = User.objects.get(telegram_chat_id=chat_id)
                         self.send_message(chat_id, "Ваш отчет готовится. Пожалуйста, подождите немного.")
                         send_to_single_user(user)
+                        return Response(status=200, data={"status": "ok"})
                     except User.DoesNotExist:
                         self.send_message(
                             chat_id,
                             "Вы не подключились к боту Telegram с помощью предоставленного нами уникального токена.",
                         )
+                        return Response(status=200, data={"status": "ok"})
             else:
                 self.send_message(
                     chat_id, "Неверный токен. Пожалуйста, попробуйте еще раз или свяжитесь с администратором."
                 )
+                return Response(status=200, data={"status": "ok"})
 
             return Response(status=200, data={"status": "ok"})
         except User.DoesNotExist as e:
