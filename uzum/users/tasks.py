@@ -369,6 +369,10 @@ def export_to_excel(shops_data, products_data, user):
             row_num = 1
             for product_id, data in products_data.items():
                 current_data = data["current"]
+
+                if not current_data:
+                    continue
+
                 latest_analytics = data["latest_analytics"]
 
                 current_fill = data_fill_1 if color_toggle else data_fill_2
