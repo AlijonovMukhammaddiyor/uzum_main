@@ -31,7 +31,13 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.review.views import CookieJWTAuthentication
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
-from uzum.utils.general import Tariffs, authorize_Base_tariff, authorize_Seller_tariff, get_today_pretty_fake
+from uzum.utils.general import (
+    Tariffs,
+    authorize_Base_tariff,
+    authorize_Seller_tariff,
+    get_days_based_on_tariff,
+    get_today_pretty_fake,
+)
 
 from .models import Category, CategoryAnalytics
 from .serializers import CategoryAnalyticsSeralizer, CategorySerializer, ProductAnalyticsViewSerializer
@@ -578,10 +584,7 @@ class CategoryDailyAnalyticsView(APIView):
         try:
             authorize_Base_tariff(request)
 
-            user: User = request.user
-
-            days = 60 if user.tariff == Tariffs.SELLER or user.tariff == Tariffs.BUSINESS else 30
-            days = 90 if user.tariff == Tariffs.BUSINESS else days
+            days = get_days_based_on_tariff(request.user)
             start = time.time()
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(

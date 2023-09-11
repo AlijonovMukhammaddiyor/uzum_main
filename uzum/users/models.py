@@ -25,6 +25,10 @@ def get_one_day_later():
     return timezone.now() + timedelta(days=1)
 
 
+def get_week_later():
+    return timezone.now() + timedelta(days=7)
+
+
 class User(AbstractUser):
     """
     Default custom user model for uzum.
@@ -66,7 +70,7 @@ class User(AbstractUser):
     payment_date = models.DateTimeField(
         null=True,
         blank=True,
-        default=get_one_day_later,
+        default=get_week_later,
     )
     shops_updated_at = models.DateTimeField(null=True, blank=True)
     authentication_method = models.CharField(
