@@ -87,7 +87,7 @@ class GoogleView(APIView):
                 if referred_by_code:
                     referred_by = get_referred_by(referred_by_code)
 
-                payment_date = (datetime.datetime.now() + datetime.timedelta(days=1)).astimezone(
+                payment_date = (datetime.datetime.now() + datetime.timedelta(days=7)).astimezone(
                     pytz.timezone("Asia/Tashkent")
                 )
                 if referred_by_code == "invest":
