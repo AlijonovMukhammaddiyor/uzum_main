@@ -134,7 +134,7 @@ class UserSerializer(serializers.ModelSerializer):
                 )
             if referred_by_code and referred_by_code == "681332":
                 # set to 1 week
-                validated_data["payment_date"] = (datetime.now() + timedelta(days=3)).astimezone(
+                validated_data["payment_date"] = (datetime.now() + timedelta(days=7)).astimezone(
                     pytz.timezone("Asia/Tashkent")
                 )
 
