@@ -110,7 +110,7 @@ class Category(models.Model):
         print("Total categories: ", len(categories))
         i = 0
         for category in categories:
-            print(i)
+            # print(i)
             i += 1
             Category.update_descendants_rec(category)
 
