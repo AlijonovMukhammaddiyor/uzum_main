@@ -14,6 +14,7 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["api.shortintroduce.co
 
 ALLOWED_HOSTS += [
     "api.alijonov.com",
+    "jobs.alijonov.com",
     "localhost",
     "127.0.0.1",
     "146.190.84.109",
