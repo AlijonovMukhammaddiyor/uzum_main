@@ -881,7 +881,10 @@ class TelegramBotView(APIView):
 
             # User starts the bot
             if text == "/start":
-                self.send_message(chat_id, "Укажите свой уникальный токен для привязки вашей учетной записи.")
+                self.send_message(
+                    chat_id,
+                    "Укажите свой уникальный токен для привязки вашей учетной записи. Получить токен можно на странице Telegram Bot сайта - www.uzanalitika.uz.",
+                )
                 return Response(status=200, data={"status": "ok"})
 
             # if not request.user.telegram_chat_id:
