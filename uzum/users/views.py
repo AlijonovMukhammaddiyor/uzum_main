@@ -41,7 +41,7 @@ from uzum.users.api.serializers import (
     get_referred_by,
 )
 from uzum.users.tasks import send_to_single_user
-from uzum.utils.general import Tariffs, get_next_day_pretty, get_today_pretty_fake
+from uzum.utils.general import Tariffs, check_user_tariff, get_next_day_pretty, get_today_pretty_fake
 from django.http import FileResponse
 import os
 
@@ -949,6 +949,13 @@ class TelegramBotView(APIView):
                     # if they are registered, send the report
                     try:
                         user = User.objects.get(telegram_chat_id=chat_id)
+                        if user.tariff == Tariffs.FREE or user.payment_date < datetime.datetime.now(
+                            tz=pytz.timezone("Asia/Tashkent")
+                        ):
+                            user.tariff = Tariffs.FREE
+                            user.save()
+                            self.send_message(chat_id, "Ваш тарифный план не позволяет использовать эту функцию.")
+                            return Response(status=200, data={"status": "ok"})
                         self.send_message(chat_id, "Ваш отчет готовится. Пожалуйста, подождите немного.")
                         send_to_single_user(user)
                         return Response(status=200, data={"status": "ok"})
@@ -964,7 +971,6 @@ class TelegramBotView(APIView):
                 )
                 return Response(status=200, data={"status": "ok"})
 
-            return Response(status=200, data={"status": "ok"})
         except User.DoesNotExist as e:
             return Response(
                 status=200,
