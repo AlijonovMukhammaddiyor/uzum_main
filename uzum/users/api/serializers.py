@@ -171,11 +171,9 @@ class UserLoginSerializer(TokenObtainPairSerializer):
         token["user"] = {
             "username": user.username,
             "referral_code": user.referral_code,
-            "tariff": user.tariff,
+            "tariff": user.tariff if user.payment_date > datetime.now(tz=pytz.timezone("Asia/Tashkent")) else "free",
             "referred_by": user.referred_by.referral_code if user.referred_by else None,
         }
-
-        print("token: ", token)
 
         return token
 
@@ -194,7 +192,11 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
         # Add custom claims to the payload
         decoded_payload["username"] = user.username
         decoded_payload["referral_code"] = getattr(user, "referral_code", None)
-        decoded_payload["tariff"] = getattr(user, "tariff", "free")
+        decoded_payload["tariff"] = (
+            getattr(user, "tariff", "free")
+            if user.payment_date > datetime.now(tz=pytz.timezone("Asia/Tashkent"))
+            else "free"
+        )
         decoded_payload["referred_by"] = user.referred_by.referral_code if user.referred_by else None
 
         print("decoded_payload: ", decoded_payload)
@@ -208,14 +210,18 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
         refresh_payload = RefreshToken(data["refresh"]).payload
         refresh_payload["username"] = user.username
         refresh_payload["referral_code"] = getattr(user, "referral_code", None)
-        refresh_payload["tariff"] = getattr(user, "tariff", "free")
+        refresh_payload["tariff"] = (
+            getattr(user, "tariff", "free")
+            if user.payment_date > datetime.now(tz=pytz.timezone("Asia/Tashkent"))
+            else "free"
+        )
         refresh_payload["referred_by"] = user.referred_by.referral_code if user.referred_by else None
         refresh_token = RefreshToken()
         refresh_token.payload = refresh_payload
         refresh_token.payload["user"] = {
             "username": user.username,
             "referral_code": user.referral_code,
-            "tariff": user.tariff,
+            "tariff": user.tariff if user.payment_date > datetime.now(tz=pytz.timezone("Asia/Tashkent")) else "free",
         }
         data["refresh"] = str(refresh_token)
 

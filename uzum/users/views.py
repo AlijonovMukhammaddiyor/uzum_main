@@ -765,7 +765,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
     @extend_schema(tags=["token"], operation_id="login")
     def post(self, request, *args, **kwargs):
-        print("request.data: ", request.data)
         serializer = self.get_serializer(data=request.data)
 
         serializer.is_valid(raise_exception=True)
