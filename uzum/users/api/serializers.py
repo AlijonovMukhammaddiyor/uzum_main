@@ -176,6 +176,7 @@ class UserLoginSerializer(TokenObtainPairSerializer):
             "referral_code": user.referral_code,
             "tariff": user.tariff if user.payment_date > datetime.now(tz=pytz.timezone("Asia/Tashkent")) else "free",
             "referred_by": user.referred_by.referral_code if user.referred_by else None,
+            "is_paid": user.is_paid,
         }
 
         return token
@@ -201,8 +202,8 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             else "free"
         )
         decoded_payload["referred_by"] = user.referred_by.referral_code if user.referred_by else None
+        decoded_payload["is_paid"] = user.is_paid
 
-        print("decoded_payload: ", decoded_payload)
         # Create a new access token with the modified payload
         access_token = AccessToken()
         access_token.payload = decoded_payload
@@ -219,12 +220,16 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
             else "free"
         )
         refresh_payload["referred_by"] = user.referred_by.referral_code if user.referred_by else None
+        refresh_payload["is_paid"] = user.is_paid
         refresh_token = RefreshToken()
         refresh_token.payload = refresh_payload
+
         refresh_token.payload["user"] = {
             "username": user.username,
             "referral_code": user.referral_code,
             "tariff": user.tariff if user.payment_date > datetime.now(tz=pytz.timezone("Asia/Tashkent")) else "free",
+            "referred_by": user.referred_by.referral_code if user.referred_by else None,
+            "is_paid": user.is_paid,
         }
         data["refresh"] = str(refresh_token)
 
