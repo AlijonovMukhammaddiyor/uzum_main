@@ -121,13 +121,14 @@ def start_trial(sender, instance: User, created, **kwargs):
         webhook_url = "https://hooks.slack.com/services/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"
         referral_webhook_url = "https://hooks.slack.com/services/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"
         referrals_umarbek = "https://hooks.slack.com/services/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"
+        referral_soff = "https://hooks.slack.com/services/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"
 
         block = [
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"Username - {instance.username}\n Referred by - {instance.referred_by.username if instance.referred_by else 'No One'}\n Tariff - {instance.tariff}\n Is Google - {instance.authentication_method == 'GOOGLE'}",
+                    "text": f"Username - {instance.username}\n Referred by - {instance.referred_by.username if instance.referred_by else 'No One'}\n Tariff - {instance.tariff}\n",
                 },
             }
         ]
@@ -146,6 +147,15 @@ def start_trial(sender, instance: User, created, **kwargs):
             if instance.referred_by and instance.referred_by.referral_code == "681332":
                 requests.post(
                     referrals_umarbek,
+                    json={
+                        "text": "New user signed up",
+                        "blocks": block,
+                    },
+                )
+
+            if instance.referred_by and instance.referred_by.referral_code == "0746b5":
+                requests.post(
+                    referral_soff,
                     json={
                         "text": "New user signed up",
                         "blocks": block,

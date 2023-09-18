@@ -81,6 +81,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_staff",
             "tariff",
             "shops_updated_at",
+            "payment_date",
         ]
 
         extra_kwargs = {
@@ -95,6 +96,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_staff": {"required": False},
             "shops_updated_at": {"required": False},
             "tariff": {"required": False},
+            "payment_date": {"required": False},
         }
 
     def create(self, validated_data: dict):
