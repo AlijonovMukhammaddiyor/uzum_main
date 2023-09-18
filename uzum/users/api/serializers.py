@@ -118,6 +118,7 @@ class UserSerializer(serializers.ModelSerializer):
 
             # Generate a unique referral code. This will generate a random string of length 6.
             referral_code = get_random_string(6, validated_data["username"], validated_data["username"])
+            logger.warning("user data to create: ", validated_data, self.context["request"].data)
             # replace space with underscore
             validated_data["username"] = validated_data["username"].replace(" ", "_")
             context = self.context["request"].data
