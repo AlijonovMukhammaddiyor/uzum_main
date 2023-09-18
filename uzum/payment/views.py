@@ -176,6 +176,11 @@ class MerchantAPIView(APIView):
         user.payment_date = next_payment_date(datetime.datetime.now(), months)
 
         user.save()
+        try:
+            user.is_paid = True
+            user.save()
+        except Exception as e:
+            logger.error("Error in perform_transaction is paid: ", e)
         logger.info(f"perform_transaction for order_id: {order_id}, response: {action}")
 
     def cancel_transaction(self, order_id, action) -> None:

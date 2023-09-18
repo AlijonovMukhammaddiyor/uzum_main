@@ -111,13 +111,15 @@ class UserViewSet(CreateModelMixin, RetrieveModelMixin, ListModelMixin, UpdateMo
         Returns:
             _type_: _description_
         """
-        # start = time.time()
-        serializer = UserSerializer(request.user, context={"request": request})
-        data = serializer.data
-        # print("before pop: ", data)
-        del data["password"]
-        del data["is_staff"]
-        # print("after pop: ", data)
+        data = {
+            "username": request.user.username,
+            "payment_date": request.user.payment_date,
+            "tariff": request.user.tariff,
+            "shops_updated_at": request.user.shops_updated_at,
+            "referral_code": request.user.referral_code,
+            "referred_by": request.user.referred_by.referral_code if request.user.referred_by else None,
+            "is_paid": request.user.is_paid,
+        }
         return Response(status=status.HTTP_200_OK, data=data)
 
     @action(detail=False)

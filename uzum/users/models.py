@@ -61,7 +61,7 @@ class User(AbstractUser):
     # is_enterprise = models.BooleanField(default=False, null=True, blank=True)
 
     # trial_end = models.DateTimeField(default=get_current_time, null=True, blank=True)
-    # is_paid = models.BooleanField(default=False, null=True, blank=True)
+    is_paid = models.BooleanField(default=False, null=True, blank=True)
     tariff = models.CharField(  # tariff name
         max_length=10,
         choices=Tariffs.choices,
