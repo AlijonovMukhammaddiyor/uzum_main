@@ -218,7 +218,7 @@ class ShopsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
-    PAGE_SIZE = 20
+    PAGE_SIZE = 100
     VALID_COLUMNS = [
         "position",
         "total_products",
@@ -237,8 +237,8 @@ class ShopsView(APIView):
         try:
             # authorize_Base_tariff(request)
             date_pretty = get_today_pretty_fake()
-            page_number = int(request.query_params.get("page", 1))
-            offset = (page_number - 1) * self.PAGE_SIZE
+            offset = request.query_params.get("offset", 0)
+            limit = request.query_params.get("limit", self.PAGE_SIZE)
             column = request.query_params.get("column", "position")
             order = request.query_params.get("order", "asc")
 
@@ -308,7 +308,7 @@ class ShopsView(APIView):
                     ORDER BY {column} {order}
                     LIMIT %s OFFSET %s
                 """,
-                    [date_pretty, self.PAGE_SIZE, offset],
+                    [date_pretty, limit, offset],
                 )
                 columns = [col[0] for col in cursor.description]
                 results = [dict(zip(columns, row)) for row in cursor.fetchall()]
