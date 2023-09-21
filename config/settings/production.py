@@ -14,6 +14,7 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["api.shortintroduce.co
 
 ALLOWED_HOSTS += [
     "api.alijonov.com",
+    "api.uzanalitika.uz",
     "jobs.alijonov.com",
     "localhost",
     "127.0.0.1",
@@ -203,6 +204,7 @@ SPECTACULAR_SETTINGS["SERVERS"] = [  # noqa: F405
 # ------------------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = [
     "https://api.alijonov.com",
+    "https://api.uzanalitika.uz",
     "http://localhost:3000",
     "http://localhost:8000",
     "https://uzanalitika.uz",
@@ -212,6 +214,7 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ORIGIN_WHITELIST = [
     "https://api.alijonov.com",
+    "https://api.uzanalitika.uz",
     "http://localhost:3000",
     "http://localhost:8000",
     "https://uzanalitika.uz",
@@ -227,6 +230,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://uzanalitika.uz",
     "https://api.alijonov.com",
     "https://www.uzanalitika.uz",
+    "https://api.uzanalitika.uz",
     "https://www.uzumanalitika.com"
     # Add other allowed origins if needed
 ]

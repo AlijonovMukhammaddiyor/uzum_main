@@ -249,7 +249,6 @@ class ProductsView(ListAPIView):
             weekly = params.get("weekly", None)  # Get the categories to filter by
             monthly = params.get("monthly", None)  # Get the categories to filter by
 
-            print("weekly", weekly, "monthly", monthly)
             if weekly:
                 return ProductAnalyticsView.objects.all().order_by("-weekly_orders_money")[:100]
 
@@ -363,36 +362,130 @@ class ProductsToExcelView(APIView):
             authorize_Base_tariff(request)
             start = time.time()
             category = Category.objects.get(categoryId=category_id)
-            descendants = category.descendants
-            if not descendants:
-                descendants = [category_id]
+            categories = category.descendants
+            if not categories:
+                categories = [category_id]
             else:
-                descendants = descendants.split(",")
-                descendants.append(category_id)
-            products = (
-                ProductAnalyticsView.objects.filter(category_id__in=descendants)
-                .order_by("-orders_money")
-                .values(
-                    "product_id",
-                    "product_title_ru",
-                    "product_title",
-                    "orders_amount",
-                    "product_available_amount",
-                    "orders_money",
-                    "reviews_amount",
-                    "rating",
-                    "shop_title",
-                    "category_title",
-                    "category_title_ru",
-                    "avg_purchase_price",
-                    "position_in_category",
-                    "diff_orders_amount",
-                    "diff_orders_money",
-                    "diff_reviews_amount",
-                    "weekly_orders_amount",
-                    "weekly_orders_money",
-                    "weekly_reviews_amount",
-                )
+                categories = categories.split(",")
+                categories.append(category_id)
+            params = self.request.GET
+
+            # Dictionary to hold the actual ORM filters
+            orm_filters = {}
+
+            # Extracting sorting parameters
+            column = params.get("column", "orders_money")  # Get the column to sort by
+            order = params.get("order", "desc")  # Get the order (asc/desc)
+
+            weekly = params.get("weekly", None)  # Get the categories to filter by
+            monthly = params.get("monthly", None)  # Get the categories to filter by
+
+            if weekly:
+                return ProductAnalyticsView.objects.all().order_by("-weekly_orders_money")[:100]
+
+            if monthly:
+                return ProductAnalyticsView.objects.all().order_by("-diff_orders_money")[:100]
+
+            if not categories:
+                # return empty queryset
+                return ProductAnalyticsView.objects.none()
+
+            title_include_q_objects = Q()
+            title_exclude_q_objects = Q()
+
+            for key, value in params.items():
+                if key in ["column", "order", "categories"]:
+                    continue  # Skip sorting parameters
+
+                if "__range" in key:
+                    # Splitting the values and converting to numbers
+                    min_val, max_val = map(int, value.strip("[]").split(","))
+                    orm_filters[key] = (min_val, max_val)
+                elif "__gte" in key or "__lte" in key:
+                    orm_filters[key] = int(value)
+                elif "__icontains" in key:
+                    orm_filters[key] = value
+
+                elif "title_include" in key:
+                    # we got list of keywords to include in either title or title_ru
+                    keywords = value.split("---")
+                    for keyword in keywords:
+                        if "ru" in key:
+                            title_include_q_objects |= Q(product_title_ru__icontains=keyword)
+                        else:
+                            title_include_q_objects |= Q(product_title__icontains=keyword)
+
+                elif "title_exclude" in key:
+                    keywords = value.split("---")
+                    # we got list of keywords to exclude in either title or title_ru
+                    for keyword in keywords:
+                        if "ru" in key:
+                            title_exclude_q_objects &= ~Q(product_title_ru__icontains=keyword)
+                        else:
+                            title_exclude_q_objects &= ~Q(product_title__icontains=keyword)
+
+                if key.startswith("orders_money") or key.startswith("diff_orders_money"):
+                    # divide by 1000
+                    values = orm_filters[key]
+                    for keyword in keywords:
+                        if "ru" in key:
+                            title_exclude_q_objects &= ~Q(product_title_ru__iexact=keyword)
+                        else:
+                            title_exclude_q_objects &= ~Q(product_title__iexact=keyword)
+
+                if key.startswith("product_created_at"):
+                    # Convert the timestamp back to a datetime object with the correct timezone
+                    values = orm_filters.get(key)
+                    # check if values is list
+                    print("right")
+                    if values and isinstance(values, list) or isinstance(values, tuple):
+                        orm_filters[key] = [
+                            datetime.fromtimestamp(int(values[0]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
+                                hour=0, minute=0, second=0, microsecond=0
+                            ),
+                            datetime.fromtimestamp(int(values[1]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
+                                hour=23, minute=59, second=59, microsecond=999999
+                            ),
+                        ]
+                    elif values and key.endswith("gte"):
+                        orm_filters[key] = datetime.fromtimestamp(
+                            int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
+                        ).replace(hour=0, minute=0, second=0, microsecond=0)
+                    elif values and key.endswith("lte"):
+                        orm_filters[key] = datetime.fromtimestamp(
+                            int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
+                        ).replace(hour=23, minute=59, second=59, microsecond=999999)
+
+            logger.warning("Product filters %s", orm_filters)
+            # # Now, use the orm_filters to query the database
+            queryset = ProductAnalyticsView.objects.filter(
+                title_include_q_objects, title_exclude_q_objects, **orm_filters, category_id__in=categories
+            )
+
+            if column:
+                order_prefix = "-" if order == "desc" else ""  # Add "-" prefix for descending order
+                queryset = queryset.order_by(order_prefix + column)
+
+            products = queryset.values(
+                "product_id",
+                "product_title_ru",
+                "product_title",
+                "orders_amount",
+                "product_available_amount",
+                "orders_money",
+                "reviews_amount",
+                "rating",
+                "shop_title",
+                "category_title",
+                "category_title_ru",
+                "avg_purchase_price",
+                "position_in_category",
+                "diff_orders_amount",
+                "diff_orders_money",
+                "diff_reviews_amount",
+                "weekly_orders_amount",
+                "weekly_orders_money",
+                "weekly_reviews_amount",
             )
 
             logger.info(f"ProductsToExcelView: {time.time() - start}")

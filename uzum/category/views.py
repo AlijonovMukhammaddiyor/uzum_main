@@ -95,6 +95,56 @@ class AllCategoriesSegmentation(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class AllCategoriesMonthlySegmentation(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = CategoryAnalyticsSeralizer
+
+    def get(self, request: Request):
+        try:
+            # pass
+            # get all category analytics with date_pretty = today which do not have children
+
+            data = {
+                "revenue": cache.get("category_tree_monthly_revenue"),
+                "orders": cache.get("category_tree_monthly_orders"),
+                "products": cache.get("category_tree_monthly_products"),
+                "reviews": cache.get("category_tree_monthly_reviews"),
+                "shops": cache.get("category_tree_monthly_shops"),
+            }
+
+            return Response(status=status.HTTP_200_OK, data=data)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AllCategoriesWeeklySegmentation(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = CategoryAnalyticsSeralizer
+
+    def get(self, request: Request):
+        try:
+            # pass
+            # get all category analytics with date_pretty = today which do not have children
+
+            data = {
+                "revenue": cache.get("category_tree_weekly_revenue"),
+                "orders": cache.get("category_tree_weekly_orders"),
+                "products": cache.get("category_tree_weekly_products"),
+                "reviews": cache.get("category_tree_weekly_reviews"),
+                "shops": cache.get("category_tree_weekly_shops"),
+            }
+
+            return Response(status=status.HTTP_200_OK, data=data)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # Base tariff
 class CategoryTreeView(APIView):
     permission_classes = [IsAuthenticated]
