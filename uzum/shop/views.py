@@ -14,7 +14,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -229,6 +229,8 @@ class ShopsView(APIView):
         "rating",
         "total_revenue",
         "num_categories",
+        "monthly_total_orders",
+        "monthly_total_revenue",
     ]
     VALID_ORDERS = ["asc", "desc"]
     VALID_SEARCHES = ["shop_title"]
@@ -239,8 +241,8 @@ class ShopsView(APIView):
             date_pretty = get_today_pretty_fake()
             offset = request.query_params.get("offset", 0)
             limit = request.query_params.get("limit", self.PAGE_SIZE)
-            column = request.query_params.get("column", "position")
-            order = request.query_params.get("order", "asc")
+            column = request.query_params.get("column", "monthly_total_revenue")
+            order = request.query_params.get("order", "desc")
 
             search_columns = request.query_params.get("searches", "")
             searches_dict = {}
@@ -296,7 +298,7 @@ class ShopsView(APIView):
                     f"""
                     SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
                         sa.average_purchase_price, sa.average_order_price, sa.rating,
-                        sa.date_pretty,
+                        sa.date_pretty, sa.monthly_total_orders, sa.monthly_total_revenue,
                         COUNT(DISTINCT sac.category_id) as num_categories,
                         s.title as shop_title, s.link as seller_link,
                         ROW_NUMBER() OVER (ORDER BY sa.total_revenue DESC) as position
@@ -973,7 +975,8 @@ class ShopProductsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     serializer_class = ProductAnalyticsViewSerializer
-    pagination_class = CategoryProductsPagination
+    pagination_class = LimitOffsetPagination
+
     VALID_FILTER_FIELDS = ["category_title", "product_title"]
 
     def get_queryset(self):

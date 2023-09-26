@@ -380,6 +380,8 @@ class GetFavouriteShopsView(APIView):
                 a.average_purchase_price,
                 a.average_order_price,
                 a.rating,
+                a.monthly_total_orders,
+                a.monthly_total_revenue,
                 a.position
             FROM shop_shop s
             LEFT JOIN (
@@ -392,6 +394,8 @@ class GetFavouriteShopsView(APIView):
                     average_purchase_price,
                     average_order_price,
                     rating,
+                    monthly_total_orders,
+                    monthly_total_revenue,
                     position
                 FROM shop_shopanalytics
                 WHERE created_at = (

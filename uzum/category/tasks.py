@@ -1234,6 +1234,93 @@ def create_product_analytics_monthly_materialized_view(date_pretty):
         )
 
 
+def update_monthly_for_shops(date_pretty):
+    create_shop_analytics_monthly_materialized_view(date_pretty)
+    update_shop_analytics_from_materialized_view(date_pretty)
+
+
+def update_shop_analytics_from_materialized_view(date_pretty):
+    # If date_pretty is a datetime object, convert it to a string
+    if isinstance(date_pretty, datetime):
+        date_pretty = date_pretty.strftime("%Y-%m-%d")
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE shop_shopanalytics sa
+            SET
+                monthly_total_orders = mv.monthly_total_orders,
+                monthly_total_revenue = mv.monthly_total_revenue
+            FROM shop_analytics_monthly mv
+            WHERE
+                sa.shop_id = mv.shop_id
+                AND sa.date_pretty = %s
+            """,
+            [date_pretty],
+        )
+
+
+def create_shop_analytics_monthly_materialized_view(date_pretty):
+    thirty_days_ago = (
+        timezone.make_aware(datetime.now() - timedelta(days=30))
+        .astimezone(pytz.timezone("Asia/Tashkent"))
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+    )
+
+    # If date_pretty is a datetime object, convert it to a string
+    if isinstance(date_pretty, datetime):
+        date_pretty = date_pretty.strftime("%Y-%m-%d")
+
+    with connection.cursor() as cursor:
+        # Drop the materialized view if it exists
+        cursor.execute("DROP MATERIALIZED VIEW IF EXISTS shop_analytics_monthly;")
+
+        cursor.execute(
+            """
+            CREATE MATERIALIZED VIEW shop_analytics_monthly AS
+            WITH LatestEntries AS (
+                SELECT
+                    shop_id,
+                    MAX(created_at) as latest_date
+                FROM
+                    shop_shopanalytics
+                WHERE
+                    created_at <= %s
+                GROUP BY
+                    shop_id
+            )
+
+            , CurrentEntries AS (
+                SELECT
+                    shop_id,
+                    total_orders AS current_total_orders,
+                    total_revenue AS current_total_revenue
+                FROM
+                    shop_shopanalytics
+                WHERE
+                    date_pretty = %s
+            )
+
+            SELECT
+                CE.shop_id,
+                LE.latest_date AS latest_date_30_days_ago,
+                COALESCE(PA.total_orders, 0) AS orders_amount_30_days_ago,
+                COALESCE(PA.total_revenue, 0) AS orders_money_30_days_ago,
+                CE.current_total_orders,
+                CE.current_total_revenue,
+                GREATEST(CE.current_total_orders - COALESCE(PA.total_orders, 0), 0) AS monthly_total_orders,  -- use GREATEST here
+                GREATEST(CE.current_total_revenue - COALESCE(PA.total_revenue, 0), 0) AS monthly_total_revenue  -- and here
+            FROM
+                CurrentEntries CE
+            LEFT JOIN
+                LatestEntries LE ON CE.shop_id = LE.shop_id
+            LEFT JOIN
+                shop_shopanalytics PA ON LE.shop_id = PA.shop_id AND LE.latest_date = PA.created_at;
+            """,
+            [thirty_days_ago, date_pretty],
+        )
+
+
 def create_product_analytics_weekly_materialized_view(date_pretty):
     thirty_days_ago = (
         timezone.make_aware(datetime.now() - timedelta(days=7))

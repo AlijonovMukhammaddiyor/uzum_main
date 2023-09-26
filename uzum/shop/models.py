@@ -59,6 +59,8 @@ class ShopAnalytics(models.Model):
         "category.Category",
     )
     position = models.IntegerField(default=0, null=True, blank=True)
+    monthly_total_orders = models.IntegerField(default=0, null=True, blank=True)
+    monthly_total_revenue = models.FloatField(default=0, null=True, blank=True)
 
     def __str__(self):
         return f"{self.shop.title} - {self.total_products}"
