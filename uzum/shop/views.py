@@ -59,16 +59,72 @@ class SearchEverythingView(APIView):
         try:
             authorize_Base_tariff(request)
             search = request.query_params.get("search", "")
-            isProductsSelected = request.query_params.get("isProductsSelected", False)
-            isShopsSelected = request.query_params.get("isShopsSelected", False)
-            isCategoriesSelected = request.query_params.get("isCategoriesSelected", False)
+            isProductsSelected = request.query_params.get("isProductSelected", False)
+            isShopsSelected = request.query_params.get("isStoreSelected", False)
+            isCategoriesSelected = request.query_params.get("isCategorySelected", False)
             lang = request.query_params.get("lang", "ru")
 
             isRu = lang == "ru"
 
-            if not search:
+            if not search or len(search) < 3:
                 return Response(status=201, data={"products": [], "shops": [], "categories": []})
 
+            products = []
+            products_count = 0
+            shops = []
+            shops_count = 0
+            categories = []
+            categories_count = 0
+
+            # print(search, isProductsSelected, isShopsSelected, isCategoriesSelected, lang)
+
+            if isProductsSelected == "true":
+                if isRu:
+                    products = ProductAnalyticsView.objects.filter(product_title_ru__icontains=search).values(
+                        "product_title_ru", "product_title", "product_id", "photos", "shop_title", "shop_link"
+                    )
+                else:
+                    products = ProductAnalyticsView.objects.filter(product_title__icontains=search).values(
+                        "product_title", "product_title_ru", "product_id", "photos", "shop_title", "shop_link"
+                    )
+
+                products_count = products.count()
+
+                if products_count > 100:
+                    products = products[:100]
+
+            if isShopsSelected == "true":
+                shops = Shop.objects.filter(title__icontains=search).values("title", "link")
+                shops_count = shops.count()
+
+                if shops_count > 100:
+                    shops = shops[:100]
+
+            if isCategoriesSelected == "true":
+                if isRu:
+                    categories = Category.objects.filter(title_ru__icontains=search).values(
+                        "title_ru", "categoryId", "ancestors_ru", "ancestors"
+                    )
+                else:
+                    categories = Category.objects.filter(title__icontains=search).values(
+                        "title", "categoryId", "ancestors", "ancestors_ru"
+                    )
+                categories_count = categories.count()
+
+                if categories_count > 100:
+                    categories = categories[:100]
+
+            return Response(
+                status=200,
+                data={
+                    "products": products,
+                    "products_count": products_count,
+                    "shops": shops,
+                    "shops_count": shops_count,
+                    "categories": categories,
+                    "categories_count": categories_count,
+                },
+            )
             # generate queries
 
         except Exception as e:

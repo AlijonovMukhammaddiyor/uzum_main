@@ -40,7 +40,15 @@ class Category(models.Model):
 
         while current_category.parent:
             if language == "ru":
-                ancestors.append(current_category.parent.title_ru + ":" + str(current_category.parent.categoryId))
+                ancestors.append(
+                    (
+                        current_category.parent.title_ru
+                        if current_category.parent.title_ru
+                        else current_category.parent.title
+                    )
+                    + ":"
+                    + str(current_category.parent.categoryId)
+                )
             else:
                 ancestors.append(current_category.parent.title + ":" + str(current_category.parent.categoryId))
             current_category = current_category.parent
@@ -69,6 +77,23 @@ class Category(models.Model):
             category.ancestors = ancestors
             category.ancestors_ru = ancestors_ru  # update Russian ancestors
             category.save()
+
+    @staticmethod
+    def update_ancestors_bulk():
+        """
+        update ancestors for all categories
+        """
+        try:
+            categories = Category.objects.all()
+            print("Total categories: ", len(categories))
+            for category in categories:
+                ancestors = category.generate_ancestors_string()
+                ancestors_ru = category.generate_ancestors_string("ru")  # generate Russian ancestors
+                category.ancestors = ancestors
+                category.ancestors_ru = ancestors_ru  # update Russian ancestors
+                category.save()
+        except Exception as e:
+            print("Error in update_ancestors_bulk: ", e)
 
     def __str__(self):
         return self.title + " " + str(self.categoryId)

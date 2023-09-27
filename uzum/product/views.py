@@ -44,6 +44,7 @@ from uzum.utils.general import (
     authorize_Base_tariff,
     authorize_Seller_tariff,
     get_day_before_pretty,
+    get_days_based_on_tariff,
     get_today_pretty_fake,
 )
 
@@ -515,12 +516,24 @@ class SingleProductAnalyticsView(APIView):
             authorize_Base_tariff(request)
             print("SingleProductAnalyticsView")
             user: User = request.user
-            days = 101
+            days = get_days_based_on_tariff(user)
             # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
+            last_date = (
+                ProductAnalytics.objects.filter(product__product_id=product_id)
+                .order_by("-created_at")
+                .first()
+                .created_at
+            )
+
             start_date = timezone.make_aware(
-                datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),
+                datetime.combine(last_date - timedelta(days=days), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
             )
+
+            # start_date = timezone.make_aware(
+            #     datetime.combine(date.today() - timedelta(days=days), datetime.min.time()),
+            #     timezone=pytz.timezone("Asia/Tashkent"),
+            # )
 
             if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
                 end_date = timezone.make_aware(

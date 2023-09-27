@@ -9,7 +9,14 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenVerifyView
 
 from uzum.category.utils import seconds_until_next
-from uzum.shop.views import UzumTotalOrders, UzumTotalProducts, UzumTotalRevenue, UzumTotalReviews, UzumTotalShops
+from uzum.shop.views import (
+    SearchEverythingView,
+    UzumTotalOrders,
+    UzumTotalProducts,
+    UzumTotalRevenue,
+    UzumTotalReviews,
+    UzumTotalShops,
+)
 from uzum.users.views import (
     AddfavouriteProductView,
     AddfavouriteShopView,
@@ -85,6 +92,7 @@ urlpatterns += [
     path("api/uzum/sellers/", (UzumTotalShops.as_view()), name="uzum_products"),
     path("api/uzum/revenue/", (UzumTotalRevenue.as_view()), name="uzum_reveue"),
     path("api/uzum/reviews/", (UzumTotalReviews.as_view()), name="uzum_reveue"),
+    path("api/uzum/search/", (SearchEverythingView.as_view()), name="uzum_reveue"),
 ]
 
 if settings.DEBUG:

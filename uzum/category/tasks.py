@@ -87,6 +87,11 @@ def update_uzum_data(args=None, **kwargs):
         for analytics in CategoryAnalytics.objects.filter(date_pretty=date_pretty).prefetch_related("category")
     }
 
+    vacuum_table("category_categoryanalytics")
+    vacuum_table("product_productanalytics")
+    vacuum_table("shop_shopanalytics")
+    vacuum_table("sku_skuanalytics")
+
     for i in range(0, len(product_ids), BATCH_SIZE):
         products_api: list[dict] = []
         print(f"{i}/{len(product_ids)}")
