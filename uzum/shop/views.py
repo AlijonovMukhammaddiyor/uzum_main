@@ -778,6 +778,10 @@ class ShopCompetitorsView(APIView):
                 datetime.now() - timedelta(days=int(days) + 1), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
+            end_date = timezone.make_aware(
+                datetime.strptime(get_today_pretty_fake(), "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+
             competitor_shops_data = self.get_competitor_shops(shop)
 
             competitors_data = []
@@ -805,7 +809,7 @@ class ShopCompetitorsView(APIView):
                 )
 
             shop_analytics = (
-                ShopAnalytics.objects.filter(shop=shop, created_at__gte=start_date)
+                ShopAnalytics.objects.filter(shop=shop, created_at__range=[start_date, end_date])
                 .annotate(category_count=Count("categories"))
                 .values(
                     "id",
