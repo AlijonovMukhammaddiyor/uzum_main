@@ -163,6 +163,9 @@ def update_uzum_data(args=None, **kwargs):
     start = time.time()
     send_reports_to_all()
     print(f"Reports sent in {time.time() - start} seconds")
+    update_monthly_for_shops(date_pretty)
+    update_category_tree_with_monthly_data(date_pretty)
+    update_category_tree_with_weekly_data(date_pretty)
     return True
 
 

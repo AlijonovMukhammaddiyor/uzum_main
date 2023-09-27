@@ -50,6 +50,33 @@ def get_totals(date_pretty):
     return totals
 
 
+class SearchEverythingView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    allowed_methods = ["GET"]
+
+    def get(self, request: Request, *args, **kwargs):
+        try:
+            authorize_Base_tariff(request)
+            search = request.query_params.get("search", "")
+            isProductsSelected = request.query_params.get("isProductsSelected", False)
+            isShopsSelected = request.query_params.get("isShopsSelected", False)
+            isCategoriesSelected = request.query_params.get("isCategoriesSelected", False)
+            lang = request.query_params.get("lang", "ru")
+
+            isRu = lang == "ru"
+
+            if not search:
+                return Response(status=201, data={"products": [], "shops": [], "categories": []})
+
+            # generate queries
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=200, data={"products": [], "shops": [], "categories": []})
+
+
 # Free tariff
 class Top5ShopsView(APIView):
     permission_classes = [AllowAny]
@@ -108,11 +135,6 @@ class CurrentShopView(APIView):
             shops = user.shops.all()
             is_owner = False
 
-            # # check if user has this shop
-            # if not shops.filter(link=link) and user.tariff != Tariffs.BUSINESS:
-            #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "Forbidden"})
-
-            # check if this is user's shop
             if shops.filter(link=link).exists():
                 is_owner = True
 
