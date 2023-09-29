@@ -630,9 +630,14 @@ class SimilarProductsViewByUzum(APIView):
 
             product = Product.objects.get(product_id=product_id)
 
-            product_analytics = ProductAnalytics.objects.filter(
-                product=product, date_pretty=get_today_pretty_fake()
-            ).first()
+            product_analytics = (
+                ProductAnalytics.objects.filter(product=product, created_at__gte=start_date)
+                .order_by("-created_at")
+                .first()
+            )
+
+            if not product_analytics:
+                return Response(status=201, data={"data": []})
 
             similar_products = (
                 ProductAnalytics.objects.filter(
