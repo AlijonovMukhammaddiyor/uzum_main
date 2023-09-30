@@ -650,16 +650,12 @@ class SimilarProductsViewByUzum(APIView):
                         F("average_purchase_price") - product_analytics.average_purchase_price
                     ),
                 )
-                .order_by("diff_orders_money", "diff_avg_purchase_price")[:100]
-                .values_list("product__product_id", flat=True)
+                .order_by("diff_orders_money", "diff_avg_purchase_price")
+                .values_list("product__product_id", flat=True)[:100]
             )
 
-            if len(similar_products) < 10:
-                productIds = SimilarProductsViewByUzum.fetch_similar_products_from_uzum(product_id)
-                productIds.append(product_id)
-            else:
-                productIds = list(similar_products)
-                productIds.append(product_id)
+            productIds = list(similar_products)
+            productIds.append(product_id)
 
             analytics = (
                 ProductAnalytics.objects.select_related("product")
