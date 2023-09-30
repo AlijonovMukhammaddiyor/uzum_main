@@ -1176,7 +1176,7 @@ class StoppedProductsView(APIView):
             #     )
             start = time.time()
             query = f"""
-            SELECT p.title as product_title, p.title_ru, p.photos, pa.*, c.title AS category_title, c.title_ru AS category_title_ru, c."categoryId" as category_id,  AVG(ska.purchase_price) AS avg_purchase_price, AVG(ska.full_price) AS avg_full_price
+            SELECT p.title as product_title, p.title_ru, pa.*, p.photos, c.title AS category_title, c.title_ru AS category_title_ru, c."categoryId" as category_id,  AVG(ska.purchase_price) AS avg_purchase_price, AVG(ska.full_price) AS avg_full_price
             FROM product_product p
             INNER JOIN category_category c ON p.category_id = c."categoryId"
             INNER JOIN (
