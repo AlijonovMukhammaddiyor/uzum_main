@@ -79,7 +79,12 @@ class ProductAnalytics(models.Model):
     position = models.IntegerField(default=0, null=True, blank=True)
     average_purchase_price = models.IntegerField(default=0, null=True, blank=True)
     score = models.FloatField(default=0, null=True, blank=True)
-    # monthly_orders = models.TextField(null=True, blank=True)
+
+    title = models.TextField(default=None, null=True, blank=True)
+    description = models.TextField(default=None, null=True, blank=True)
+    photos = models.TextField(default=None, null=True, blank=True)
+    attributes = models.TextField(default=None, null=True, blank=True)
+    characteristics = models.TextField(default=None, null=True, blank=True)
 
     @staticmethod
     def set_positions(date_pretty=get_today_pretty()):

@@ -227,6 +227,11 @@ def prepareProductData(
             # get average of purchase_price from skuList
             "average_purchase_price": average_purchase_price if average_purchase_price else 0,
             "orders_money": max(new_orders_money, 0),
+            "title": product_api["title"],
+            "description": product_api["description"],
+            "photos": json.dumps(extract_product_photos(product_api["photos"])),
+            "attributes": json.dumps(product_api["attributes"]),
+            "characteristics": json.dumps(product_api["characteristics"]),
         }
 
         for sku_api in product_api["skuList"]:
