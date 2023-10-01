@@ -355,7 +355,7 @@ class ShopsView(APIView):
                     for key, value in searches_dict.items():
                         if search_clause:
                             search_clause += " AND "
-                        search_clause += f"LOWER({key}) LIKE LOWER('%%{value}%%')"
+                        search_clause += f'LOWER({key}) LIKE LOWER("%%{value}%%")'
                     search_clause = " AND " + search_clause
 
                 # First, count total number of rows
