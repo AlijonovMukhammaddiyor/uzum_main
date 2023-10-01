@@ -299,17 +299,16 @@ class ProductsView(ListAPIView):
                 if key.startswith("orders_money") or key.startswith("diff_orders_money"):
                     # divide by 1000
                     values = orm_filters[key]
-                    for keyword in keywords:
-                        if "ru" in key:
-                            title_exclude_q_objects &= ~Q(product_title_ru__iexact=keyword)
-                        else:
-                            title_exclude_q_objects &= ~Q(product_title__iexact=keyword)
+                    # check if values is list
+                    if values and isinstance(values, list) or isinstance(values, tuple):
+                        orm_filters[key] = [int(value) / 1000 for value in values]
+                    else:
+                        orm_filters[key] = int(value) / 1000
 
                 if key.startswith("product_created_at"):
                     # Convert the timestamp back to a datetime object with the correct timezone
                     values = orm_filters.get(key)
                     # check if values is list
-                    print("right")
                     if values and isinstance(values, list) or isinstance(values, tuple):
                         orm_filters[key] = [
                             datetime.fromtimestamp(int(values[0]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
