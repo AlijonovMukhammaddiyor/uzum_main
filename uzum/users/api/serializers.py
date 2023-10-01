@@ -168,6 +168,7 @@ class UserLoginSerializer(TokenObtainPairSerializer):
 
     @classmethod
     def get_token(cls, user: User):
+        logger.warn(user, "TokenObtainPairSerializer")
         token = super(UserLoginSerializer, cls).get_token(user)
 
         # Add custom claims
