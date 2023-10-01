@@ -351,11 +351,13 @@ class ShopsView(APIView):
             with connection.cursor() as cursor:
                 # Construct search clause
                 search_clause = ""
+                params = [date_pretty]
                 if searches_dict:
                     for key, value in searches_dict.items():
                         if search_clause:
                             search_clause += " AND "
-                        search_clause += f'LOWER({key}) LIKE LOWER("%%{value}%%")'
+                        search_clause += f"LOWER({key}) LIKE LOWER(%s)"
+                        params.append(f"%{value}%")
                     search_clause = " AND " + search_clause
 
                 # First, count total number of rows
@@ -369,11 +371,8 @@ class ShopsView(APIView):
                     [date_pretty],
                 )
                 total_count = cursor.fetchone()[0]
-                total_pages = -(-total_count // self.PAGE_SIZE)  # Equivalent to math.ceil(total_count / page_size)
 
-                # Then fetch the data
-                cursor.execute(
-                    f"""
+                sql = f"""
                     SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
                         sa.average_purchase_price, sa.average_order_price, sa.rating,
                         sa.date_pretty, sa.monthly_total_orders, sa.monthly_total_revenue,
@@ -387,9 +386,10 @@ class ShopsView(APIView):
                     GROUP BY sa.id, s.title, s.link
                     ORDER BY {column} {order}
                     LIMIT %s OFFSET %s
-                """,
-                    [date_pretty, limit, offset],
-                )
+                """
+
+                params.extend([limit, offset])  # add limit and offset to params
+                cursor.execute(sql, params)
                 columns = [col[0] for col in cursor.description]
                 results = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
