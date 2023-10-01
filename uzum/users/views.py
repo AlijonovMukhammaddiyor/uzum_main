@@ -769,13 +769,17 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
     @extend_schema(tags=["token"], operation_id="login")
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer = self.get_serializer(data=request.data)
 
-        serializer.is_valid(raise_exception=True)
+            serializer.is_valid(raise_exception=True)
 
-        response = Response(serializer.validated_data, status=200)
+            response = Response(serializer.validated_data, status=200)
 
-        return response
+            return response
+        except Exception as e:
+            print("Error in CustomTokenObtainPairView: ", e)
+            return Response(status=500, data={"message": "Internal server error"})
 
 
 class CustomTokenRefreshView(TokenRefreshView):
