@@ -42,18 +42,23 @@ class CurrentProductSerializer(serializers.ModelSerializer):
         return obj.skus.values("sku", "characteristics")
 
     def get_analytics(self, obj):
-        return obj.analytics.values(
-            "badges",
-            "date_pretty",
-            "rating",
-            "reviews_amount",
-            "orders_amount",
-            "position_in_category",
-            "position_in_shop",
-            "position",
-            "available_amount",
-            "orders_money",
-        )[:1]
+        recent_analytics = obj.analytics.order_by("-created_at").first()
+        if recent_analytics:
+            return [
+                {
+                    "badges": recent_analytics.badges.count(),
+                    "date_pretty": recent_analytics.date_pretty,
+                    "rating": recent_analytics.rating,
+                    "reviews_amount": recent_analytics.reviews_amount,
+                    "orders_amount": recent_analytics.orders_amount,
+                    "position_in_category": recent_analytics.position_in_category,
+                    "position_in_shop": recent_analytics.position_in_shop,
+                    "position": recent_analytics.position,
+                    "available_amount": recent_analytics.available_amount,
+                    "orders_money": recent_analytics.orders_money,
+                }
+            ]
+        return [{}]
 
     def get_sku_analytics(self, obj):
         date_pretty = obj.analytics.order_by("-created_at").first().date_pretty
