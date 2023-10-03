@@ -244,7 +244,14 @@ class CategoryProductsView(ListAPIView):
     authentication_classes = [JWTAuthentication]
     serializer_class = ProductAnalyticsViewSerializer
     pagination_class = LimitOffsetPagination
-    VALID_SEARCHES = ["shop_title", "product_title", "category_title"]
+    VALID_SEARCHES = [
+        "shop_title",
+        "product_title",
+        "category_title",
+        "shop_title_ru",
+        "product_title_ru",
+        "category_title_ru",
+    ]
 
     def get_queryset(self):
         """
@@ -261,6 +268,9 @@ class CategoryProductsView(ListAPIView):
 
         descendant_ids.append(category_id)
         params = self.request.GET
+
+        searches = params.get("searches", None)  # columns to search certain text
+        filters = params.get("filters", None)  # filter texts for certain columns
 
         # Dictionary to hold the actual ORM filters
         orm_filters = {}
@@ -319,7 +329,13 @@ class CategoryProductsView(ListAPIView):
                             int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
                         ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
-        print(orm_filters)
+                # deal with searches and filters: the same index in both lists correspond to each other
+                if searches and filters:
+                    searches = searches.split(",")
+                    filters = filters.split("---")
+                    if key in searches:
+                        orm_filters[key + "__icontains"] = filters[searches.index(key)]
+
         order_prefix = "-" if order == "desc" else ""
         # # Now, use the orm_filters to query the database
         if not instant_filter:
