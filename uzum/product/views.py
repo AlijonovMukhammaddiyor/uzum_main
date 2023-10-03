@@ -802,7 +802,6 @@ class ProductReviews(APIView):
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# Free tariff
 class ProductsWithMostRevenueYesterdayView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
