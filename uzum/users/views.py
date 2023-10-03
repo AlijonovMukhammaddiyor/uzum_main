@@ -778,7 +778,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
             return response
         except Exception as e:
-            print("Error in CustomTokenObtainPairView: ", e)
+            logger.error(traceback.format_exc())
             return Response(status=500, data={"message": "Internal server error"})
 
 

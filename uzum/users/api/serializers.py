@@ -168,18 +168,24 @@ class UserLoginSerializer(TokenObtainPairSerializer):
 
     @classmethod
     def get_token(cls, user: User):
-        token = super(UserLoginSerializer, cls).get_token(user)
+        try:
+            token = super(UserLoginSerializer, cls).get_token(user)
 
-        # Add custom claims
-        token["user"] = {
-            "username": user.username,
-            "referral_code": user.referral_code,
-            "tariff": user.tariff if user.payment_date > datetime.now(tz=pytz.timezone("Asia/Tashkent")) else "free",
-            "referred_by": user.referred_by.referral_code if user.referred_by else None,
-            "is_paid": user.is_paid,
-        }
+            # Add custom claims
+            token["user"] = {
+                "username": user.username,
+                "referral_code": user.referral_code,
+                "tariff": user.tariff
+                if user.payment_date > datetime.now(tz=pytz.timezone("Asia/Tashkent"))
+                else "free",
+                "referred_by": user.referred_by.referral_code if user.referred_by else None,
+                "is_paid": user.is_paid,
+            }
 
-        return token
+            return token
+        except Exception as e:
+            logger.error("Error in get_token serializer: ", e)
+            return e
 
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
