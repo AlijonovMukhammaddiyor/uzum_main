@@ -285,7 +285,8 @@ class CategoryProductsView(ListAPIView):
             # return empty queryset
             return ProductAnalyticsView.objects.none()
 
-        print(searches_filter, filters)
+        title_include_q_objects = Q()
+        title_exclude_q_objects = Q()
 
         if not instant_filter:
             for key, value in params.items():
@@ -298,8 +299,24 @@ class CategoryProductsView(ListAPIView):
                     orm_filters[key] = (min_val, max_val)
                 elif "__gte" in key or "__lte" in key:
                     orm_filters[key] = int(value)
-                elif "__icontains" in key:
-                    orm_filters[key] = value
+
+                if "title_include" in key:
+                    # we got list of keywords to include in either title or title_ru
+                    keywords = value.split("---")
+                    for keyword in keywords:
+                        if "ru" in key:
+                            title_include_q_objects |= Q(product_title_ru__icontains=keyword)
+                        else:
+                            title_include_q_objects |= Q(product_title__icontains=keyword)
+
+                elif "title_exclude" in key:
+                    keywords = value.split("---")
+                    # we got list of keywords to exclude in either title or title_ru
+                    for keyword in keywords:
+                        if "ru" in key:
+                            title_exclude_q_objects &= ~Q(product_title_ru__icontains=keyword)
+                        else:
+                            title_exclude_q_objects &= ~Q(product_title__icontains=keyword)
 
                 if key.startswith("orders_money") or key.startswith("diff_orders_money"):
                     # divide by 1000
@@ -332,19 +349,20 @@ class CategoryProductsView(ListAPIView):
                         ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
                 # deal with searches and filters: the same index in both lists correspond to each other
-            if searches_filter and filters:
-                searches_filter = searches_filter.split(",")
-                filters = filters.split("---")
-                print("searches and filters", searches_filter, filters)
-                for key in searches_filter:
-                    orm_filters[key + "__icontains"] = filters[searches_filter.index(key)]
-            else:
-                print("no searches and filters", searches_filter, filters)
+            # if searches_filter and filters:
+            #     searches_filter = searches_filter.split(",")
+            #     filters = filters.split("---")
+            #     print("searches and filters", searches_filter, filters)
+            #     for key in searches_filter:
+            #         orm_filters[key + "__icontains"] = filters[searches_filter.index(key)]
 
         order_prefix = "-" if order == "desc" else ""
         # # Now, use the orm_filters to query the database
         if not instant_filter:
-            queryset = ProductAnalyticsView.objects.filter(**orm_filters, category_id__in=categories)
+            print(title_exclude_q_objects, title_include_q_objects)
+            queryset = ProductAnalyticsView.objects.filter(
+                title_include_q_objects, title_exclude_q_objects, **orm_filters, category_id__in=categories
+            )
         if instant_filter == "revenue":
             queryset = ProductAnalyticsView.objects.filter(category_id__in=categories).order_by(
                 "-orders_money", order_prefix + column
