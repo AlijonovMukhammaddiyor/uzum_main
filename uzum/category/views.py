@@ -269,7 +269,7 @@ class CategoryProductsView(ListAPIView):
         descendant_ids.append(category_id)
         params = self.request.GET
 
-        searches = params.get("searches", None)  # columns to search certain text
+        searches_filter = params.get("searches", None)  # columns to search certain text
         filters = params.get("filters", None)  # filter texts for certain columns
 
         # Dictionary to hold the actual ORM filters
@@ -284,6 +284,8 @@ class CategoryProductsView(ListAPIView):
         if not categories:
             # return empty queryset
             return ProductAnalyticsView.objects.none()
+
+        print(searches_filter, filters)
 
         if not instant_filter:
             for key, value in params.items():
@@ -330,11 +332,14 @@ class CategoryProductsView(ListAPIView):
                         ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
                 # deal with searches and filters: the same index in both lists correspond to each other
-                if searches and filters:
-                    searches = searches.split(",")
-                    filters = filters.split("---")
-                    if key in searches:
-                        orm_filters[key + "__icontains"] = filters[searches.index(key)]
+            if searches_filter and filters:
+                searches_filter = searches_filter.split(",")
+                filters = filters.split("---")
+                print("searches and filters", searches_filter, filters)
+                for key in searches_filter:
+                    orm_filters[key + "__icontains"] = filters[searches_filter.index(key)]
+            else:
+                print("no searches and filters", searches_filter, filters)
 
         order_prefix = "-" if order == "desc" else ""
         # # Now, use the orm_filters to query the database
@@ -352,6 +357,8 @@ class CategoryProductsView(ListAPIView):
             queryset = ProductAnalyticsView.objects.filter(category_id__in=categories).order_by(
                 "-product_created_at", order_prefix + column
             )[:100]
+
+        print(orm_filters)
 
         if column and not instant_filter:
             order_prefix = "-" if order == "desc" else ""  # Add "-" prefix for descending order
