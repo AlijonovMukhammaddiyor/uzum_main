@@ -955,7 +955,11 @@ class ShopDailySalesView(APIView):
                 item["product__title_ru"] = (
                     item["product__title_ru"] if item["product__title_ru"] else item["product__title"]
                 ) + f'(({item["product__product_id"]}))'
-                item["product__category__title_ru"] += f'(({item["product__category__categoryId"]}))'
+                item["product__category__title_ru"] = (
+                    item["product__category__title_ru"]
+                    if item["product__category__title_ru"]
+                    else item["product__category__title"]
+                ) + f'(({item["product__category__categoryId"]}))'
 
                 item["orders"] = {
                     "target": item["orders_amount"],
