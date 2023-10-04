@@ -122,6 +122,7 @@ def start_trial(sender, instance: User, created, **kwargs):
         referral_webhook_url = "https://hooks.slack.com/services/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"
         referrals_umarbek = "https://hooks.slack.com/services/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"
         referral_soff = "https://hooks.slack.com/services/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"
+        komiljon_webhook = "https://hooks.slack.com/services/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"
 
         block = [
             {
@@ -156,6 +157,15 @@ def start_trial(sender, instance: User, created, **kwargs):
             if instance.referred_by and instance.referred_by.referral_code == "0746b5":
                 requests.post(
                     referral_soff,
+                    json={
+                        "text": "New user signed up",
+                        "blocks": block,
+                    },
+                )
+
+            if instance.referred_by and instance.referred_by.referral_code == "280cf3":
+                requests.post(
+                    komiljon_webhook,
                     json={
                         "text": "New user signed up",
                         "blocks": block,
