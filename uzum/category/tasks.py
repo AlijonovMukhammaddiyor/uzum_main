@@ -25,7 +25,13 @@ from uzum.jobs.category.MultiEntry import (
     get_categories_with_less_than_n_products_for_russian_title,
 )
 from uzum.jobs.category.utils import add_russian_titles, get_categories_tree
-from uzum.jobs.constants import CATEGORIES_HEADER, MAX_ID_COUNT, PAGE_SIZE, POPULAR_SEARCHES_PAYLOAD
+from uzum.jobs.constants import (
+    CATEGORIES_HEADER,
+    CATEGORIES_HEADER_RU,
+    MAX_ID_COUNT,
+    PAGE_SIZE,
+    POPULAR_SEARCHES_PAYLOAD,
+)
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.jobs.product.fetch_details import get_product_details_via_ids
 from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
@@ -486,8 +492,18 @@ def set_banners_for_product_analytics(date_pretty=get_today_pretty()):
         print("Error in setting banner(s): ", e)
 
 
-async def make_request(client=None):
+async def make_request(client=None, isRu=False):
     try:
+        if isRu:
+            return await client.post(
+                "https://graphql.uzum.uz/",
+                json=POPULAR_SEARCHES_PAYLOAD,
+                headers={
+                    **CATEGORIES_HEADER_RU,
+                    "User-Agent": get_random_user_agent(),
+                    "x-iid": generateUUID(),
+                },
+            )
         return await client.post(
             "https://graphql.uzum.uz/",
             json=POPULAR_SEARCHES_PAYLOAD,
@@ -498,15 +514,17 @@ async def make_request(client=None):
             },
         )
     except Exception as e:
-        print("Error in makeRequestProductIds: ", e)
+        traceback.print_exc()
+        print(f"Error in make_request {isRu}:", e)
 
 
-async def fetch_popular_seaches_from_uzum(words: list[str]):
+async def fetch_popular_seaches_from_uzum(words: list[str], isRu=False):
     try:
         async with httpx.AsyncClient() as client:
             tasks = [
                 make_request(
                     client=client,
+                    isRu=isRu,
                 )
                 for _ in range(200)
             ]
@@ -541,6 +559,14 @@ def create_todays_searches():
         if len(word_count) == 0:
             return None
 
+        words_ru = []
+        async_to_sync(fetch_popular_seaches_from_uzum)(words_ru, isRu=True)
+        word_count_ru = Counter(words_ru)
+        if not word_count_ru:
+            return None
+        if len(word_count_ru) == 0:
+            return None
+
         obj = PopularSeaches.objects.filter(date_pretty=get_today_pretty())
 
         if obj.exists():
@@ -548,6 +574,7 @@ def create_todays_searches():
 
         PopularSeaches.objects.create(
             words=json.dumps(word_count),
+            words_ru=json.dumps(word_count_ru),
             requests_count=100,
             date_pretty=get_today_pretty(),
         )
