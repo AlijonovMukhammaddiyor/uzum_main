@@ -437,27 +437,23 @@ class ProductAnalytics(models.Model):
     @staticmethod
     def update_real_orders_amount(date_pretty: str):
         try:
-            # for date_pretty,
-            # 1. get product_latest_analytics for product (if not exists for certain product, it should be 0)
-            # 2. find the difference between orders_amount and latest_orders_amount and available_amount and latest_available_amount
-            # 3. get the greater value of the difference and add it to real_orders_amount
+            # Convert date_pretty to a timezone-aware datetime object
+            date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                        WITH latest_pa AS (
-                            SELECT *
-                            FROM product_latest_analytics
-                        )
-                        UPDATE product_productanalytics pa
-                        SET real_orders_amount = real_orders_amount + GREATEST(
-                            (pa.orders_amount - COALESCE(latest_pa.latest_orders_amount, 0)),
-                            (COALESCE(latest_pa.latest_available_amount, 0) - pa.available_amount)
-                        )
-                        FROM latest_pa
-                        WHERE pa.product_id = latest_pa.product_id
-                        AND pa.date_pretty = %s
-                        """,
+                    UPDATE product_productanalytics pa
+                    SET real_orders_amount = COALESCE(lpa.latest_real_orders_amount, 0) + GREATEST(
+                        (pa.orders_amount - COALESCE(lpa.latest_orders_amount, 0)),
+                        (pa.available_amount - COALESCE(lpa.latest_available_amount, 0))
+                    )
+                    FROM product_latest_analytics lpa
+                    WHERE pa.product_id = lpa.product_id
+                    AND pa.date_pretty = %s
+                    """,
                     [date_pretty],
                 )
         except Exception as e:
@@ -505,6 +501,8 @@ class LatestProductAnalyticsView(models.Model):
     latest_average_purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     latest_orders_amount = models.IntegerField()
     latest_available_amount = models.IntegerField()
+    latest_real_orders_amount = models.IntegerField(default=0, null=True, blank=True)
+    latest_real_orders_money = models.DecimalField(max_digits=10, decimal_places=2, default=0.0, null=True, blank=True)
 
     class Meta:
         managed = False
@@ -531,7 +529,8 @@ def create_product_latestanalytics(date_pretty: str):
                 orders_money as latest_orders_money,
                 average_purchase_price as latest_average_purchase_price,
                 orders_amount as latest_orders_amount,
-                available_amount as latest_available_amount
+                available_amount as latest_available_amount,
+                real_orders_amount as latest_real_orders_amount
             FROM product_productanalytics
             WHERE created_at <= '{date}'
             ORDER BY product_id, created_at DESC
