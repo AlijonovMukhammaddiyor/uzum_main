@@ -145,12 +145,12 @@ def set_orders_amount_sku(date_pretty: str):
                     -- Calculate the difference in available_amount for SKUs between today and the previous day
                     CROSS JOIN LATERAL (
                         SELECT
-                            COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) AS diff_available_amount, -- Corrected subtraction
+                            COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) AS diff_available_amount,
                             -- Calculate the proportional orders amount for each SKU
-                            (COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) * pd.real_orders_amount AS proportional_orders, -- Corrected subtraction
-                            -- Calculate the remainder when dividing the SKU's proportional orders by the total available amount difference
-                            (COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) * pd.real_orders_amount % NULLIF(SUM(COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) OVER (PARTITION BY sku.product_id), 0) AS remainder -- Corrected subtraction
-                    ) AS sd
+                            (COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) / NULLIF(ss.total_diff_available, 0) * pd.real_orders_amount AS proportional_orders,
+                            -- Calculate the remainder when dividing the SKU's proportional orders by the total available amount difference (this might be reconsidered or removed based on the exact requirements)
+                            (COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) / NULLIF(ss.total_diff_available, 0) * pd.real_orders_amount % NULLIF(SUM(COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) OVER (PARTITION BY sku.product_id), 0) AS remainder
+                        ) AS sd
                     -- Calculate the total difference in available_amount for all SKUs under the same product
                     CROSS JOIN LATERAL (
                         SELECT

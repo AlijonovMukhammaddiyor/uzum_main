@@ -68,6 +68,8 @@ class ProductAnalytics(models.Model):
     reviews_amount = models.IntegerField(default=0)
     rating = models.FloatField(default=0)
     orders_amount = models.IntegerField(default=0, db_index=True)
+    real_orders_amount = models.IntegerField(default=0, null=True, blank=True)  # it is actual number of orders so far
+    real_orders_money = models.FloatField(default=0.0, db_index=True)  # it is actual amount of revenue
     orders_money = models.FloatField(default=0.0, db_index=True)
 
     campaigns = models.ManyToManyField(
@@ -431,6 +433,35 @@ class ProductAnalytics(models.Model):
         except Exception as e:
             print(e)
             traceback.print_exc()
+
+    @staticmethod
+    def update_real_orders_amount(date_pretty: str):
+        try:
+            # for date_pretty,
+            # 1. get product_latest_analytics for product (if not exists for certain product, it should be 0)
+            # 2. find the difference between orders_amount and latest_orders_amount and available_amount and latest_available_amount
+            # 3. get the greater value of the difference and add it to real_orders_amount
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                        WITH latest_pa AS (
+                            SELECT *
+                            FROM product_latest_analytics
+                        )
+                        UPDATE product_productanalytics pa
+                        SET real_orders_amount = real_orders_amount + GREATEST(
+                            (pa.orders_amount - COALESCE(latest_pa.latest_orders_amount, 0)),
+                            (COALESCE(latest_pa.latest_available_amount, 0) - pa.available_amount)
+                        )
+                        FROM latest_pa
+                        WHERE pa.product_id = latest_pa.product_id
+                        AND pa.date_pretty = %s
+                        """,
+                    [date_pretty],
+                )
+        except Exception as e:
+            print(e)
 
 
 class ProductAnalyticsView(models.Model):
