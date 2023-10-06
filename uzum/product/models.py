@@ -46,13 +46,17 @@ class Product(models.Model):
 
 
 class ProductAnalytics(models.Model):
+    class Meta:
+        db_table = "product_productanalytics"
+
     id = models.UUIDField(
         default=uuid.uuid4,
         editable=False,
         unique=True,
         primary_key=True,
     )
-    product = models.ForeignKey(Product, on_delete=models.DO_NOTHING, related_name="analytics", db_index=True)
+
+    product = models.ForeignKey(Product, on_delete=models.DO_NOTHING, related_name="analytics")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     banners = models.ManyToManyField(
         "banner.Banner",
@@ -64,18 +68,20 @@ class ProductAnalytics(models.Model):
         related_name="products",
     )
 
-    available_amount = models.IntegerField(default=0)
+    available_amount = models.IntegerField(default=0, db_index=True)
     reviews_amount = models.IntegerField(default=0)
     rating = models.FloatField(default=0)
     orders_amount = models.IntegerField(default=0, db_index=True)
-    real_orders_amount = models.IntegerField(default=0, null=True, blank=True)  # it is actual number of orders so far
-    real_orders_money = models.FloatField(default=0.0, db_index=True)  # it is actual amount of revenue
+    real_orders_amount = models.IntegerField(
+        default=0, null=True, blank=True, db_index=True
+    )  # it is actual number of orders so far
+    real_orders_money = models.FloatField(default=0.0)  # it is actual amount of revenue
     orders_money = models.FloatField(default=0.0, db_index=True)
 
     campaigns = models.ManyToManyField(
         "campaign.Campaign",
     )
-    date_pretty = models.CharField(max_length=255, null=True, blank=True, db_index=True, default=get_today_pretty)
+    date_pretty = models.CharField(max_length=255, null=True, blank=True, default=get_today_pretty, db_index=True)
     position_in_shop = models.IntegerField(default=0, null=True, blank=True)
     position_in_category = models.IntegerField(default=0, null=True, blank=True)
     position = models.IntegerField(default=0, null=True, blank=True)
@@ -437,19 +443,16 @@ class ProductAnalytics(models.Model):
     @staticmethod
     def update_real_orders_amount(date_pretty: str):
         try:
-            # Convert date_pretty to a timezone-aware datetime object
-            date = timezone.make_aware(
-                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=0, minute=0, second=0, microsecond=0)
-
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     UPDATE product_productanalytics pa
-                    SET real_orders_amount = COALESCE(lpa.latest_real_orders_amount, 0) + GREATEST(
-                        (pa.orders_amount - COALESCE(lpa.latest_orders_amount, 0)),
-                        (pa.available_amount - COALESCE(lpa.latest_available_amount, 0))
-                    )
+                    SET real_orders_amount =
+                        CASE
+                            WHEN (COALESCE(lpa.latest_available_amount, 0) - pa.available_amount) >= 0
+                            THEN (COALESCE(lpa.latest_available_amount, 0) - pa.available_amount)
+                            ELSE (pa.orders_amount - COALESCE(lpa.latest_orders_amount, 0))
+                        END
                     FROM product_latest_analytics lpa
                     WHERE pa.product_id = lpa.product_id
                     AND pa.date_pretty = %s

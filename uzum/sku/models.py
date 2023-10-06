@@ -34,7 +34,7 @@ class SkuAnalytics(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sku = models.ForeignKey(Sku, on_delete=models.DO_NOTHING, related_name="analytics")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    available_amount = models.IntegerField(default=0)
+    available_amount = models.IntegerField(default=0, db_index=True)
     orders_amount = models.IntegerField(default=0)
     purchase_price = models.FloatField(default=0, db_index=True)
     full_price = models.FloatField(default=None, null=True, blank=True)
@@ -45,9 +45,27 @@ class SkuAnalytics(models.Model):
         db_index=True,
         default=get_today_pretty,
     )
+    delta_available_amount = models.IntegerField(default=0, blank=True, null=True)
 
     def __str__(self) -> str:
         return f"{self.sku} - {self.sku.product.title}"
+
+    @staticmethod
+    def update_delta_available_amount(date_pretty: str):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE sku_skuanalytics sa
+                    SET delta_available_amount = (COALESCE(lsa.latest_available_amount, 0) - sa.available_amount)
+                    FROM sku_latest_analytics lsa
+                    WHERE sa.sku_id = lsa.sku_id
+                    AND sa.date_pretty = %s
+                    """,
+                    [date_pretty],
+                )
+        except Exception as e:
+            print(e)
 
 
 class LatestSkuAnalyticsView(models.Model):
@@ -89,8 +107,88 @@ def create_sku_latestanalytics(date_pretty: str):
         )
 
 
+# def set_orders_amount_sku(date_pretty: str):
+#     try:
+#         with connection.cursor() as cursor:
+#             cursor.execute(
+#                 f"""
+#                 UPDATE sku_skuanalytics sa
+#                 SET orders_amount = sub.sku_real_orders_amount
+#                 FROM (
+#                     SELECT
+#                         sa.id AS analytics_id,
+#                         -- Determine the real_orders_amount for each SKU
+#                         CASE
+#                             -- If real_orders_amount is 0, set all SKU's orders_amount to 0
+#                             -- WHEN pd.real_orders_amount = 0 THEN 0
+#                             -- If SKU's difference in available_amount is 0, set its orders_amount to 0
+#                             WHEN sd.diff_available_amount = 0 THEN 0
+#                             -- When the total SKU available amount difference equals product's real orders amount, use the SKU's available amount difference
+#                             WHEN ss.total_diff_available = pd.real_orders_amount THEN sd.diff_available_amount
+#                             -- Otherwise, calculate the proportional orders amount for each SKU
+#                             ELSE
+#                                 (sd.diff_available_amount / NULLIF(ss.total_diff_available, 0)) * pd.real_orders_amount
+#                                 + CASE
+#                                     -- Adjust the orders_amount for SKUs based on the remainder when dividing their proportional orders by the total available amount difference
+#                                     WHEN ROW_NUMBER() OVER (PARTITION BY sku.product_id ORDER BY remainder DESC, sku.sku) <= pd.real_orders_amount - SUM(proportional_orders) OVER (PARTITION BY sku.product_id)
+#                                     THEN 1
+#                                     ELSE 0
+#                                 END
+#                         END AS sku_real_orders_amount
+#                     FROM
+#                         -- Join SKU table with SKU analytics for the given date
+#                         sku_sku sku
+#                     JOIN
+#                         sku_skuanalytics sa ON sa.sku_id = sku.sku AND sa.date_pretty = '{date_pretty}'
+#                     -- Get the previous day's SKU analytics using the materialized view
+#                     LEFT JOIN
+#                         sku_latest_analytics prev_sa ON prev_sa.sku_id = sa.sku_id
+#                     -- Join with product analytics for the given date
+#                     LEFT JOIN
+#                         product_productanalytics pa ON pa.product_id = sku.product_id AND pa.date_pretty = '{date_pretty}'
+#                     -- Get the previous day's product analytics using the materialized view
+#                     LEFT JOIN
+#                         product_latest_analytics prev_pa ON prev_pa.product_id = pa.product_id
+#                     -- Calculate the difference in available_amount and orders_amount for products between today and the previous day
+#                     CROSS JOIN LATERAL (
+#                         SELECT
+#                             -- Determine the real orders amount for the product
+#                             GREATEST(
+#                                 COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0),  -- Original subtraction
+#                                 COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)  -- Corrected subtraction
+#                             ) AS real_orders_amount
+#                     ) AS pd
+#                     -- Calculate the total difference in available_amount for all SKUs under the same product
+#                     CROSS JOIN LATERAL (
+#                         SELECT
+#                             SUM(GREATEST(0, COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0))) OVER (PARTITION BY sku.product_id) AS total_diff_available -- Corrected subtraction
+#                     ) AS ss
+#                     -- Calculate the difference in available_amount for SKUs between today and the previous day
+#                     CROSS JOIN LATERAL (
+#                         SELECT
+#                             GREATEST(0, COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) AS diff_available_amount,
+#                             -- Calculate the proportional orders amount for each SKU
+#                             GREATEST(0, COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) / NULLIF(ss.total_diff_available, 0) * pd.real_orders_amount AS proportional_orders,
+#                             -- Calculate the remainder when dividing the SKU's proportional orders by the total available amount difference (this might be reconsidered or removed based on the exact requirements)
+#                             GREATEST(0, COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) / NULLIF(ss.total_diff_available, 0) * pd.real_orders_amount % NULLIF(SUM(GREATEST(0, COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0))) OVER (PARTITION BY sku.product_id), 0) AS remainder
+#                         ) AS sd
+#                 ) AS sub
+#                 WHERE sa.id = sub.analytics_id;
+#                 """
+#             )
+#     except Exception as e:
+#         print(e)
+#         traceback.print_exc()
+#         return False
+
+
 def set_orders_amount_sku(date_pretty: str):
     try:
+        tz = pytz.timezone("Asia/Tashkent")
+        local_dt = tz.localize(datetime.datetime.strptime(date_pretty, "%Y-%m-%d"))
+        utc_dt = local_dt.astimezone(pytz.UTC)
+        utc_date_pretty = utc_dt.strftime("%Y-%m-%d")
+
         with connection.cursor() as cursor:
             cursor.execute(
                 f"""
@@ -99,63 +197,44 @@ def set_orders_amount_sku(date_pretty: str):
                 FROM (
                     SELECT
                         sa.id AS analytics_id,
-                        -- Determine the real_orders_amount for each SKU
                         CASE
-                            -- If real_orders_amount is 0, set all SKU's orders_amount to 0
-                            WHEN pd.real_orders_amount = 0 THEN 0
-                            -- If SKU's difference in available_amount is 0, set its orders_amount to 0
-                            WHEN sd.diff_available_amount = 0 THEN 0
-                            -- When the total SKU available amount difference equals product's real orders amount, use the SKU's available amount difference
-                            WHEN ss.total_diff_available = pd.real_orders_amount THEN sd.diff_available_amount
-                            -- Otherwise, calculate the proportional orders amount for each SKU
+                            -- Case 1: Sum of reductions equals real_orders_amount
+                            WHEN pa.real_orders_amount = SUM(COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) OVER (PARTITION BY sku.product_id) THEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)
+
+                            -- Combined Case 2 & 3
                             ELSE
-                                (sd.diff_available_amount / NULLIF(ss.total_diff_available, 0)) * pd.real_orders_amount
-                                + CASE
-                                    -- Adjust the orders_amount for SKUs based on the remainder when dividing their proportional orders by the total available amount difference
-                                    WHEN ROW_NUMBER() OVER (PARTITION BY sku.product_id ORDER BY remainder DESC, sku.sku) <= pd.real_orders_amount - SUM(proportional_orders) OVER (PARTITION BY sku.product_id)
-                                    THEN 1
-                                    ELSE 0
+                                CASE
+                                    WHEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) = 0 THEN
+                                    (
+                                        CASE
+                                            WHEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0) >= COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
+                                            THEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0)
+                                            ELSE COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
+                                        END -
+                                        SUM(CASE WHEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) <
+                                            CASE
+                                                WHEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0) >= COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
+                                                THEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0)
+                                                ELSE COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
+                                            END
+                                        AND COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) > 0 THEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) ELSE 0 END) OVER (PARTITION BY sku.product_id)
+                                    ) / NULLIF(COUNT(CASE WHEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) = 0 THEN 1 END) OVER (PARTITION BY sku.product_id), 0)
+                                    + CASE WHEN ROW_NUMBER() OVER (PARTITION BY sku.product_id ORDER BY sa.id) = 1 THEN
+                                        CASE
+                                            WHEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0) >= COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
+                                            THEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0)
+                                            ELSE COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
+                                        END % NULLIF(COUNT(CASE WHEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) = 0 THEN 1 END) OVER (PARTITION BY sku.product_id), 0)
+                                      ELSE 0 END
+                                    ELSE COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)
                                 END
                         END AS sku_real_orders_amount
                     FROM
-                        -- Join SKU table with SKU analytics for the given date
                         sku_sku sku
-                    JOIN
-                        sku_skuanalytics sa ON sa.sku_id = sku.sku AND sa.date_pretty = '{date_pretty}'
-                    -- Get the previous day's SKU analytics using the materialized view
-                    LEFT JOIN
-                        sku_latest_analytics prev_sa ON prev_sa.sku_id = sa.sku_id
-                    -- Join with product analytics for the given date
-                    LEFT JOIN
-                        product_productanalytics pa ON pa.product_id = sku.product_id AND pa.date_pretty = '{date_pretty}'
-                    -- Get the previous day's product analytics using the materialized view
-                    LEFT JOIN
-                        product_latest_analytics prev_pa ON prev_pa.product_id = pa.product_id
-                    -- Calculate the difference in available_amount and orders_amount for products between today and the previous day
-                    CROSS JOIN LATERAL (
-                        SELECT
-                            COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) AS diff_available_amount, -- Corrected subtraction
-                            COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0) AS diff_orders_amount,  -- Original subtraction
-                            -- Determine the real orders amount for the product
-                            GREATEST(
-                                COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0),  -- Original subtraction
-                                COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)  -- Corrected subtraction
-                            ) AS real_orders_amount
-                    ) AS pd
-                    -- Calculate the difference in available_amount for SKUs between today and the previous day
-                    CROSS JOIN LATERAL (
-                        SELECT
-                            COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) AS diff_available_amount,
-                            -- Calculate the proportional orders amount for each SKU
-                            (COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) / NULLIF(ss.total_diff_available, 0) * pd.real_orders_amount AS proportional_orders,
-                            -- Calculate the remainder when dividing the SKU's proportional orders by the total available amount difference (this might be reconsidered or removed based on the exact requirements)
-                            (COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) / NULLIF(ss.total_diff_available, 0) * pd.real_orders_amount % NULLIF(SUM(COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) OVER (PARTITION BY sku.product_id), 0) AS remainder
-                        ) AS sd
-                    -- Calculate the total difference in available_amount for all SKUs under the same product
-                    CROSS JOIN LATERAL (
-                        SELECT
-                            SUM(COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) OVER (PARTITION BY sku.product_id) AS total_diff_available -- Corrected subtraction
-                    ) AS ss
+                    LEFT JOIN product_productanalytics pa ON pa.product_id = sku.product_id AND pa.created_at::DATE = '{utc_date_pretty}'::DATE
+                    LEFT JOIN product_latest_analytics prev_pa ON prev_pa.product_id = sku.product_id
+                    LEFT JOIN sku_skuanalytics sa ON sa.sku_id = sku.sku AND sa.created_at::DATE = '{utc_date_pretty}'::DATE
+                    LEFT JOIN sku_latest_analytics prev_sa ON prev_sa.sku_id = sa.sku_id
                 ) AS sub
                 WHERE sa.id = sub.analytics_id;
                 """
