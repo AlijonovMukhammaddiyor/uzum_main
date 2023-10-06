@@ -140,15 +140,15 @@ def create_products_from_api(
         #                 temp.campaigns.set(campaigns)
         #                 temp.save()
         #     print(f"Time taken to set campaigns: {time.time() - campaign_start:.2f} secs")
-        if badges_to_set:
-            print("Setting badges...")
-            badge_start = time.time()
-            for product_id, badges in badges_to_set.items():
-                temp = result.get(product_id, None)
-                if temp:
-                    temp.badges.set(badges)
-                    temp.save()
-            print(f"Time taken to set badges: {time.time() - badge_start:.2f} secs")
+        # if badges_to_set:
+        #     print("Setting badges...")
+        #     badge_start = time.time()
+        #     for product_id, badges in badges_to_set.items():
+        #         temp = result.get(product_id, None)
+        #         if temp:
+        #             temp.badges.set(badges)
+        #             temp.save()
+        #     print(f"Time taken to set badges: {time.time() - badge_start:.2f} secs")
         end = time.time()
         print(f"Time taken to create product analytics: {end - start:.2f} secs")
 

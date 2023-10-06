@@ -115,38 +115,38 @@ def update_uzum_data(args=None, **kwargs):
     print(product_associations, shop_association)
     bulk_remove_duplicate_product_analytics(date_pretty)
 
-    for product_id, banners in product_associations.items():
-        try:
-            product = Product.objects.get(product_id=product_id)
-            product_analytics = ProductAnalytics.objects.filter(product=product, date_pretty=get_today_pretty())
+    # for product_id, banners in product_associations.items():
+    #     try:
+    #         product = Product.objects.get(product_id=product_id)
+    #         product_analytics = ProductAnalytics.objects.filter(product=product, date_pretty=get_today_pretty())
 
-            if len(product_analytics) > 0:
-                # get the most recently created analytics
-                product_analytics = product_analytics.order_by("-created_at").first()
+    #         if len(product_analytics) > 0:
+    #             # get the most recently created analytics
+    #             product_analytics = product_analytics.order_by("-created_at").first()
 
-            product_analytics.banners.set(banners)
-            product_analytics.save()
+    #         product_analytics.banners.set(banners)
+    #         product_analytics.save()
 
-            print(f"Product {product.title} banners set")
-        except Exception as e:
-            print("Error in setting banner(s): ", e)
+    #         print(f"Product {product.title} banners set")
+    #     except Exception as e:
+    #         print("Error in setting banner(s): ", e)
 
-    for link, banners in shop_association.items():
-        try:
-            shop_an = ShopAnalytics.objects.filter(shop=Shop.objects.get(link=link), date_pretty=get_today_pretty())
+    # for link, banners in shop_association.items():
+    #     try:
+    #         shop_an = ShopAnalytics.objects.filter(shop=Shop.objects.get(link=link), date_pretty=get_today_pretty())
 
-            if len(shop_an) > 0:
-                shop_an = shop_an.order_by("-created_at").first()
+    #         if len(shop_an) > 0:
+    #             shop_an = shop_an.order_by("-created_at").first()
 
-            if len(shop_an) == 0:
-                continue
-            target = shop_an.order_by("-created_at").first()  # get most recently created analytics
-            target.banners.set(banners)
-            target.save()
+    #         if len(shop_an) == 0:
+    #             continue
+    #         target = shop_an.order_by("-created_at").first()  # get most recently created analytics
+    #         target.banners.set(banners)
+    #         target.save()
 
-            print(f"Shop {link} banner(s) set")
-        except Exception as e:
-            print("Error in setting shop banner(s): ", e)
+    #         print(f"Shop {link} banner(s) set")
+    #     except Exception as e:
+    #         print("Error in setting shop banner(s): ", e)
 
     create_todays_searches()
 
