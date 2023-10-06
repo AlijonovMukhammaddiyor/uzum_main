@@ -130,16 +130,16 @@ def create_products_from_api(
         print(f"Creating product analytics... - {len(products_analytics)}")
         start = time.time()
         result = create_product_analytics_bulk(products_analytics)
-        if product_campaigns:
-            print("Setting campaigns...")
-            campaign_start = time.time()
-            for product_id, campaigns in product_campaigns.items():
-                if product_id in product_campaigns and len(campaigns) > 0:
-                    temp = result.get(product_id)
-                    if temp:
-                        temp.campaigns.set(campaigns)
-                        temp.save()
-            print(f"Time taken to set campaigns: {time.time() - campaign_start:.2f} secs")
+        # if product_campaigns:
+        #     print("Setting campaigns...")
+        #     campaign_start = time.time()
+        #     for product_id, campaigns in product_campaigns.items():
+        #         if product_id in product_campaigns and len(campaigns) > 0:
+        #             temp = result.get(product_id)
+        #             if temp:
+        #                 temp.campaigns.set(campaigns)
+        #                 temp.save()
+        #     print(f"Time taken to set campaigns: {time.time() - campaign_start:.2f} secs")
         if badges_to_set:
             print("Setting badges...")
             badge_start = time.time()

@@ -76,7 +76,7 @@ class ProductAnalytics(models.Model):
         default=0, null=True, blank=True, db_index=True
     )  # it is actual number of orders so far
     real_orders_money = models.FloatField(default=0.0)  # it is actual amount of revenue
-    orders_money = models.FloatField(default=0.0, db_index=True)
+    orders_money = models.FloatField(default=0.0)
 
     campaigns = models.ManyToManyField(
         "campaign.Campaign",
