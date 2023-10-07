@@ -434,6 +434,14 @@ def fetch_product_ids(date_pretty: str = get_today_pretty()):
 
     BATCH_SIZE = 10_000
 
+    category_sales_map = {
+        analytics.category.categoryId: {
+            "products_with_sales": set(),
+            "shops_with_sales": set(),
+        }
+        for analytics in CategoryAnalytics.objects.filter(date_pretty=date_pretty).prefetch_related("category")
+    }
+
     for i in range(0, len(unfetched_product_ids), BATCH_SIZE):
         products_api: list[dict] = []
         print(
@@ -443,7 +451,7 @@ def fetch_product_ids(date_pretty: str = get_today_pretty()):
 
         # Wrap database interaction in a transaction
         with transaction.atomic():
-            create_products_from_api(products_api, {}, shop_analytics_done)
+            create_products_from_api(products_api, {}, shop_analytics_done, category_sales_map)
 
         time.sleep(30)
         del products_api
