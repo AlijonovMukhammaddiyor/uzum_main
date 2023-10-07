@@ -184,61 +184,62 @@ def create_sku_latestanalytics(date_pretty: str):
 
 def set_orders_amount_sku(date_pretty: str):
     try:
-        tz = pytz.timezone("Asia/Tashkent")
-        local_dt = tz.localize(datetime.datetime.strptime(date_pretty, "%Y-%m-%d"))
-        utc_dt = local_dt.astimezone(pytz.UTC)
-        utc_date_pretty = utc_dt.strftime("%Y-%m-%d")
-
         with connection.cursor() as cursor:
+            # Step 1: Create a temporary table for calculations
             cursor.execute(
                 f"""
-                UPDATE sku_skuanalytics sa
-                SET orders_amount = sub.sku_real_orders_amount
-                FROM (
-                    SELECT
-                        sa.id AS analytics_id,
-                        CASE
-                            -- Case 1: Sum of reductions equals real_orders_amount
-                            WHEN pa.real_orders_amount = SUM(COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)) OVER (PARTITION BY sku.product_id) THEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)
+            DROP TABLE IF EXISTS tmp_orders_distribution;
 
-                            -- Combined Case 2 & 3
-                            ELSE
-                                CASE
-                                    WHEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) = 0 THEN
-                                    (
-                                        CASE
-                                            WHEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0) >= COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
-                                            THEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0)
-                                            ELSE COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
-                                        END -
-                                        SUM(CASE WHEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) <
-                                            CASE
-                                                WHEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0) >= COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
-                                                THEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0)
-                                                ELSE COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
-                                            END
-                                        AND COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) > 0 THEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) ELSE 0 END) OVER (PARTITION BY sku.product_id)
-                                    ) / NULLIF(COUNT(CASE WHEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) = 0 THEN 1 END) OVER (PARTITION BY sku.product_id), 0)
-                                    + CASE WHEN ROW_NUMBER() OVER (PARTITION BY sku.product_id ORDER BY sa.id) = 1 THEN
-                                        CASE
-                                            WHEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0) >= COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
-                                            THEN COALESCE(pa.orders_amount, 0) - COALESCE(prev_pa.latest_orders_amount, 0)
-                                            ELSE COALESCE(prev_pa.latest_available_amount, 0) - COALESCE(pa.available_amount, 0)
-                                        END % NULLIF(COUNT(CASE WHEN COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0) = 0 THEN 1 END) OVER (PARTITION BY sku.product_id), 0)
-                                      ELSE 0 END
-                                    ELSE COALESCE(prev_sa.latest_available_amount, 0) - COALESCE(sa.available_amount, 0)
-                                END
-                        END AS sku_real_orders_amount
-                    FROM
-                        sku_sku sku
-                    LEFT JOIN product_productanalytics pa ON pa.product_id = sku.product_id AND pa.created_at::DATE = '{utc_date_pretty}'::DATE
-                    LEFT JOIN product_latest_analytics prev_pa ON prev_pa.product_id = sku.product_id
-                    LEFT JOIN sku_skuanalytics sa ON sa.sku_id = sku.sku AND sa.created_at::DATE = '{utc_date_pretty}'::DATE
-                    LEFT JOIN sku_latest_analytics prev_sa ON prev_sa.sku_id = sa.sku_id
-                ) AS sub
-                WHERE sa.id = sub.analytics_id;
-                """
+            CREATE TEMP TABLE tmp_orders_distribution AS
+            SELECT
+                sku.product_id,
+                sa.sku_id,
+                sa.delta_available_amount,
+                pa.real_orders_amount
+            FROM
+                sku_sku sku
+            JOIN
+                sku_skuanalytics sa ON sa.sku_id = sku.sku AND sa.date_pretty = '{date_pretty}'
+            JOIN
+                product_productanalytics pa ON pa.product_id = sku.product_id AND pa.date_pretty = '{date_pretty}';
+            """
             )
+
+            # Step 2 & 3: Compute necessary values and Update the orders_amount
+            cursor.execute(
+                f"""
+            WITH ProductTotals AS (
+                SELECT
+                    product_id,
+                    SUM(delta_available_amount) AS total_sku_delta,
+                    real_orders_amount - SUM(delta_available_amount) AS remaining_amount,
+                    COUNT(*) FILTER (WHERE delta_available_amount = 0) AS skus_with_no_delta
+                FROM
+                    tmp_orders_distribution
+                GROUP BY product_id, real_orders_amount
+            )
+
+            UPDATE sku_skuanalytics sa
+            SET
+                orders_amount = CASE
+                    -- Rule 1: If total_sku_delta matches real_orders_amount
+                    WHEN t.total_sku_delta = t.real_orders_amount THEN tmp.delta_available_amount
+
+                    -- Rule 2: If delta_available_amount is between 0 and real_orders_amount
+                    WHEN tmp.delta_available_amount BETWEEN 1 AND t.real_orders_amount THEN tmp.delta_available_amount
+
+                    -- Rule 3: Distribute remaining amount equally for skus with delta_available_amount = 0
+                    ELSE t.remaining_amount / NULLIF(t.skus_with_no_delta, 0)
+                END
+            FROM
+                tmp_orders_distribution tmp
+            JOIN
+                ProductTotals t ON t.product_id = tmp.product_id
+            WHERE
+                sa.sku_id = tmp.sku_id AND sa.date_pretty = '{date_pretty}';
+            """
+            )
+
     except Exception as e:
         print(e)
         traceback.print_exc()

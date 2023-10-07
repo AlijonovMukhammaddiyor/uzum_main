@@ -506,7 +506,7 @@ class CategoryAnalytics(models.Model):
                     growth_rates[category] = slope
 
             # Sort categories by growth rate to get the top growing categories
-            top_growing_categories = sorted(growth_rates.keys(), key=lambda x: growth_rates[x], reverse=True)[:20]
+            top_growing_categories = sorted(growth_rates.keys(), key=lambda x: growth_rates[x], reverse=True)[:40]
             return top_growing_categories
 
         # Calculate top growing categories for each metric
