@@ -35,7 +35,7 @@ class SkuAnalytics(models.Model):
     sku = models.ForeignKey(Sku, on_delete=models.DO_NOTHING, related_name="analytics")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     available_amount = models.IntegerField(default=0, db_index=True)
-    orders_amount = models.IntegerField(default=0)
+    orders_amount = models.IntegerField(default=0, null=False)
     purchase_price = models.FloatField(default=0, db_index=True)
     full_price = models.FloatField(default=None, null=True, blank=True)
     date_pretty = models.CharField(
@@ -212,11 +212,13 @@ def set_orders_amount_sku(date_pretty: str):
                 SELECT
                     product_id,
                     SUM(delta_available_amount) AS total_sku_delta,
-                    real_orders_amount - SUM(delta_available_amount) AS remaining_amount,
-                    COUNT(*) FILTER (WHERE delta_available_amount = 0) AS skus_with_no_delta
+                    AVG(real_orders_amount) -
+                    SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END) AS remaining_amount,
+                    COUNT(*) FILTER (WHERE delta_available_amount <= 0) AS skus_with_no_delta,
+                    AVG(real_orders_amount) AS real_orders_amount
                 FROM
                     tmp_orders_distribution
-                GROUP BY product_id, real_orders_amount
+                GROUP BY product_id
             )
 
             UPDATE sku_skuanalytics sa
@@ -225,11 +227,14 @@ def set_orders_amount_sku(date_pretty: str):
                     -- Rule 1: If total_sku_delta matches real_orders_amount
                     WHEN t.total_sku_delta = t.real_orders_amount THEN tmp.delta_available_amount
 
+                    -- if real_orders_amount is negative or 0, set all SKU's orders_amount to 0
+                    WHEN t.real_orders_amount <= 0 THEN 0
+
                     -- Rule 2: If delta_available_amount is between 0 and real_orders_amount
                     WHEN tmp.delta_available_amount BETWEEN 1 AND t.real_orders_amount THEN tmp.delta_available_amount
 
                     -- Rule 3: Distribute remaining amount equally for skus with delta_available_amount = 0
-                    ELSE t.remaining_amount / NULLIF(t.skus_with_no_delta, 0)
+                    ELSE COALESCE(t.remaining_amount / NULLIF(t.skus_with_no_delta, 0), 0)
                 END
             FROM
                 tmp_orders_distribution tmp
