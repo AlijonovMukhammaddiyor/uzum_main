@@ -357,7 +357,70 @@ def add_product_russian_titles():
                     SET title_ru = product_id_title_mapping.new_title
                     FROM product_id_title_mapping
                     WHERE product_product.product_id = product_id_title_mapping.product_id
-                    AND product_product.title_ru IS NULL
+                    """
+                )
+
+    except Exception as e:
+        print("Error in add_russian_titles: ", e)
+        traceback.print_exc()
+        return None
+
+
+def add_product_russian_characteristics():
+    try:
+        tree = get_categories_tree()
+        cat_totals = {}  # mapping from id to total products given in api response
+
+        for i, category in enumerate(tree):
+            cat_totals[category["category"]["id"]] = category["total"]
+
+        print("MAX_ID_COUNT: ", MAX_ID_COUNT)
+        categories_filtered = get_categories_with_less_than_n_products_for_russian_title(MAX_ID_COUNT, cat_totals)
+        product_ids: list[dict] = []  # it is [{productId: int, title: str}]
+
+        async_to_sync(get_all_product_ids_from_uzum)(
+            categories_filtered,
+            product_ids,
+            page_size=PAGE_SIZE,
+            is_ru=True,
+        )
+
+        # find which products has no russian title
+        ids = Product.objects.filter(title_ru__isnull=True).values_list("product_id", flat=True)
+
+        # remove duplicate product ids
+        product_ids_dict = {d["productId"]: d["characteristicValues"] for d in product_ids if d["productId"] in ids}
+        product_ids = [{"productId": k, "characteristics": v} for k, v in product_ids_dict.items()]
+        print(f"Total product ids: {len(product_ids)}")
+
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                # Create mapping table
+                cursor.execute(
+                    """
+                    DROP TABLE IF EXISTS product_id_charcateristics_mapping;
+                    CREATE TABLE product_id_charcateristics_mapping (
+                        product_id INT PRIMARY KEY,
+                        characteristics TEXT
+                    );
+                """
+                )
+
+                # Insert product id and new title mapping into the table using batch insert
+                values = ", ".join(["(%s, %s)"] * len(product_ids))
+                query = f"""
+                    INSERT INTO product_id_charcateristics_mapping (product_id, characteristics)
+                    VALUES {values}
+                """
+                cursor.execute(query, sum([list(item.values()) for item in product_ids], []))
+
+                # Update product titles based on the mapping table only if title_ru is null
+                cursor.execute(
+                    """
+                    UPDATE product_product
+                    SET characteristics_ru = product_id_charcateristics_mapping.characteristics
+                    FROM product_id_charcateristics_mapping
+                    WHERE product_product.product_id = product_id_charcateristics_mapping.product_id
                     """
                 )
 
@@ -743,7 +806,7 @@ def update_category_tree_with_weekly_data(date_pretty=get_today_pretty()):
                 "categoryId": category_id,
                 "title": category["title"],
                 "title_ru": category["title_ru"],
-                "analytics": analytics.get(type, 0) if analytics.get(type, 0) > 0 else 0,
+                "analytics": analytics.get(type, 0),
                 "children": [build_tree(child["categoryId"], type) for child in children],
             }
 
@@ -889,7 +952,7 @@ def update_category_tree_with_monthly_data(date_pretty=None):
                 "categoryId": category_id,
                 "title": category["title"],
                 "title_ru": category["title_ru"],
-                "analytics": analytics.get(type, 0) if analytics.get(type, 0) > 0 else 0,
+                "analytics": analytics.get(type, 0),
                 "children": [build_tree(child["categoryId"], type) for child in children],
             }
 

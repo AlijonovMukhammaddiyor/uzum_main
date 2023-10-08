@@ -185,63 +185,81 @@ def create_sku_latestanalytics(date_pretty: str):
 def set_orders_amount_sku(date_pretty: str):
     try:
         with connection.cursor() as cursor:
-            # Step 1: Create a temporary table for calculations
+            # Create a temporary table for calculations
             cursor.execute(
                 f"""
-            DROP TABLE IF EXISTS tmp_orders_distribution;
+                DROP TABLE IF EXISTS tmp_orders_distribution;
 
-            CREATE TEMP TABLE tmp_orders_distribution AS
-            SELECT
-                sku.product_id,
-                sa.sku_id,
-                sa.delta_available_amount,
-                pa.real_orders_amount
-            FROM
-                sku_sku sku
-            JOIN
-                sku_skuanalytics sa ON sa.sku_id = sku.sku AND sa.date_pretty = '{date_pretty}'
-            JOIN
-                product_productanalytics pa ON pa.product_id = sku.product_id AND pa.date_pretty = '{date_pretty}';
+                CREATE TEMP TABLE tmp_orders_distribution AS
+                SELECT
+                    sku.product_id,
+                    sa.sku_id,
+                    sa.delta_available_amount,
+                    pa.real_orders_amount
+                FROM
+                    sku_sku sku
+                JOIN
+                    sku_skuanalytics sa ON sa.sku_id = sku.sku AND sa.date_pretty = '{date_pretty}'
+                JOIN
+                    product_productanalytics pa ON pa.product_id = sku.product_id AND pa.date_pretty = '{date_pretty}';
             """
             )
 
-            # Step 2 & 3: Compute necessary values and Update the orders_amount
+            # Compute necessary values and Update the orders_amount
             cursor.execute(
                 f"""
-            WITH ProductTotals AS (
-                SELECT
-                    product_id,
-                    SUM(delta_available_amount) AS total_sku_delta,
-                    AVG(real_orders_amount) -
-                    SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END) AS remaining_amount,
-                    COUNT(*) FILTER (WHERE delta_available_amount <= 0) AS skus_with_no_delta,
-                    AVG(real_orders_amount) AS real_orders_amount
+                WITH ProductTotals AS (
+                    SELECT
+                        product_id,
+                        SUM(delta_available_amount) AS total_sku_delta,
+                        AVG(real_orders_amount) -
+                        SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END) AS remaining_amount,
+                        COUNT(*) FILTER (WHERE delta_available_amount <= 0) AS skus_with_no_delta,
+                        AVG(real_orders_amount) AS real_orders_amount,
+                        MAX(delta_available_amount) AS max_delta
+                    FROM
+                        tmp_orders_distribution
+                    GROUP BY product_id
+                )
+
+                UPDATE sku_skuanalytics sa
+                SET
+                    orders_amount = CASE
+                        -- Rule 1: If total_sku_delta matches real_orders_amount
+                        WHEN t.total_sku_delta = t.real_orders_amount THEN tmp.delta_available_amount
+
+                        -- if real_orders_amount is negative or 0, set all SKU's orders_amount to 0
+                        WHEN t.real_orders_amount <= 0 THEN 0
+
+                        -- Rule 2: If delta_available_amount is between 0 and real_orders_amount
+                        WHEN tmp.delta_available_amount BETWEEN 1 AND t.real_orders_amount THEN tmp.delta_available_amount
+
+                        -- Rule 3: If delta_available_amount exceeds real_orders_amount, is the max_delta for the product, and is the first when ordered by sku_id
+                        WHEN tmp.delta_available_amount > t.real_orders_amount AND tmp.delta_available_amount = t.max_delta AND tmp.sku_id = (
+                            SELECT sku_id FROM tmp_orders_distribution
+                            WHERE product_id = tmp.product_id AND delta_available_amount = t.max_delta
+                            ORDER BY sku_id
+                            LIMIT 1
+                        ) THEN t.remaining_amount
+
+                        -- Rule 4: If the delta_available_amount is not the one that took all the remaining_amount, but it's more than real_orders_amount
+                        WHEN tmp.delta_available_amount > t.real_orders_amount THEN 0
+
+                        -- Rule 5: If any SKU of the product had a delta_available_amount greater than or equal to real_orders_amount, then set to 0
+                        WHEN EXISTS (
+                            SELECT 1 FROM tmp_orders_distribution
+                            WHERE product_id = tmp.product_id AND delta_available_amount >= real_orders_amount
+                        ) THEN 0
+
+                        -- Rule 6: Distribute remaining amount equally for skus with delta_available_amount = 0
+                        ELSE COALESCE(t.remaining_amount / NULLIF(t.skus_with_no_delta, 0), 0)
+                    END
                 FROM
-                    tmp_orders_distribution
-                GROUP BY product_id
-            )
-
-            UPDATE sku_skuanalytics sa
-            SET
-                orders_amount = CASE
-                    -- Rule 1: If total_sku_delta matches real_orders_amount
-                    WHEN t.total_sku_delta = t.real_orders_amount THEN tmp.delta_available_amount
-
-                    -- if real_orders_amount is negative or 0, set all SKU's orders_amount to 0
-                    WHEN t.real_orders_amount <= 0 THEN 0
-
-                    -- Rule 2: If delta_available_amount is between 0 and real_orders_amount
-                    WHEN tmp.delta_available_amount BETWEEN 1 AND t.real_orders_amount THEN tmp.delta_available_amount
-
-                    -- Rule 3: Distribute remaining amount equally for skus with delta_available_amount = 0
-                    ELSE COALESCE(t.remaining_amount / NULLIF(t.skus_with_no_delta, 0), 0)
-                END
-            FROM
-                tmp_orders_distribution tmp
-            JOIN
-                ProductTotals t ON t.product_id = tmp.product_id
-            WHERE
-                sa.sku_id = tmp.sku_id AND sa.date_pretty = '{date_pretty}';
+                    tmp_orders_distribution tmp
+                JOIN
+                    ProductTotals t ON t.product_id = tmp.product_id
+                WHERE
+                    sa.sku_id = tmp.sku_id AND sa.date_pretty = '{date_pretty}';
             """
             )
 

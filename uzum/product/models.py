@@ -40,6 +40,7 @@ class Product(models.Model):
     comments = models.TextField(null=True, blank=True)  # json.dumps(comments)
     photos = models.TextField(null=True, blank=True)  # json.dumps(photos)
     characteristics = models.TextField(null=True, blank=True)  # json.dumps(characteristics)
+    characteristics_ru = models.TextField(null=True, blank=True)  # json.dumps(characteristics_ru)
 
     def __str__(self) -> str:
         return f"{self.product_id} - {self.title}"

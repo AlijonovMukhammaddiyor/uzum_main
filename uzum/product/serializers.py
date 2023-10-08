@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from uzum.sku.models import SkuAnalytics
-from uzum.sku.serializers import ExtendedSkuSerializer
+from uzum.sku.serializers import ExtendedSkuSerializer, SkuAnalyticsSerializer
 
 from .models import Product, ProductAnalytics
 
@@ -126,6 +126,7 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
     skus = ExtendedSkuSerializer(many=True, read_only=True)
     recent_analytics = ProductAnalyticsSerializer(many=True, read_only=True)
     skus_count = serializers.IntegerField(read_only=True)
+    skus_analytics = SkuAnalyticsSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -143,4 +144,5 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
             "skus_count",
             "skus",
             "recent_analytics",
+            "skus_analytics",
         ]
