@@ -48,7 +48,7 @@ def products_payload(
         "operationName": "getMakeSearch",
         "query": "query getMakeSearch( $queryInput: MakeSearchQueryInput!) {makeSearch(query: $queryInput) {items { catalogCard { productId } } } }"
         if not is_ru
-        else "query getMakeSearch($queryInput: MakeSearchQueryInput!) { makeSearch(query: $queryInput) { items { catalogCard { productId, title, characteristicValues { id, value, title, characteristic { values { id, title, value }, title, id } } } } } }",
+        else "query getMakeSearch($queryInput: MakeSearchQueryInput!) { makeSearch(query: $queryInput) { items { catalogCard { ...SkuGroupCardFragment } } } } fragment SkuGroupCardFragment on SkuGroupCard { productId title characteristicValues { id value title characteristic { values { id title value } title id } } }",
         "variables": {
             "queryInput": {
                 "categoryId": categoryId,
