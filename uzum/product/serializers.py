@@ -133,6 +133,7 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
             "product_id",
             "created_at",
             "title",
+            "characteristics",
             "title_ru",
             "description",
             "adult",
