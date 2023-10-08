@@ -252,14 +252,23 @@ def update_all_category_parents():
 
         # Build dictionary for quick access
         for category in chain(categories_qs, parent_qs):
-            all_categories[category.categoryId] = category
+            try:
+                if category.categoryId not in all_categories:
+                    all_categories[category.categoryId] = category
+            except Exception as e:
+                print("Keyerror:", e)
+                traceback.print_exc()
 
         # Update parent of each category
         for cat_id, parent_id in cat_parents.items():
-            cat = all_categories[cat_id]
-            parent = all_categories[parent_id]
-            cat.parent = parent
-            cat.save()
+            try:
+                cat = all_categories[cat_id]
+                parent = all_categories[parent_id]
+                cat.parent = parent
+                cat.save()
+            except Exception as e:
+                print("Error in update_all_category_parents:", e)
+                traceback.print_exc()
             # print(f"Category {cat.title} parent set to {parent.title}")
     except Exception as e:
         print("Error in update_all_category_parents:", e)

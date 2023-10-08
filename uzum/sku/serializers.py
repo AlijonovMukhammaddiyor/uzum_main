@@ -54,4 +54,5 @@ class ExtendedSkuSerializer(serializers.ModelSerializer):
             "vat_price",
             "vat_rate",
             "recent_analytics",
+            "characteristics",
         ]
