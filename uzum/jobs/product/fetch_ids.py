@@ -144,6 +144,7 @@ async def concurrent_requests_for_ids(
                                         {
                                             "productId": product["catalogCard"]["productId"],
                                             "title": product["catalogCard"]["title"],
+                                            "characteristicValues": product["catalogCard"]["characteristicValues"],
                                         }
                                     )
                             else:
