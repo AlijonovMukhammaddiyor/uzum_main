@@ -68,6 +68,21 @@ class SkuAnalytics(models.Model):
         except Exception as e:
             print(e)
 
+    @staticmethod
+    def update_orders_money(date_pretty: str):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE sku_skuanalytics sa
+                    SET orders_money = sa.orders_amount * sa.purchase_price
+                    WHERE sa.date_pretty = %s
+                    """,
+                    [date_pretty],
+                )
+        except Exception as e:
+            print(e)
+
 
 class LatestSkuAnalyticsView(models.Model):
     sku_id = models.IntegerField(primary_key=True)

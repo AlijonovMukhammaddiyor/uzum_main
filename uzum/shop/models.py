@@ -61,6 +61,8 @@ class ShopAnalytics(models.Model):
     position = models.IntegerField(default=0, null=True, blank=True)
     monthly_total_orders = models.IntegerField(default=0, null=True, blank=True)
     monthly_total_revenue = models.FloatField(default=0, null=True, blank=True)
+    real_orders_amount = models.IntegerField(default=0)
+    real_revenue = models.FloatField(default=0)
 
     def __str__(self):
         return f"{self.shop.title} - {self.total_products}"
@@ -194,6 +196,45 @@ class ShopAnalytics(models.Model):
                     )
                     UPDATE shop_shopanalytics
                     SET total_revenue = shop_revenue.total_revenue
+                    FROM shop_revenue
+                    WHERE shop_shopanalytics.shop_id = shop_revenue.shop_id
+                    AND shop_shopanalytics.date_pretty = %s
+                    """,
+                    [date, date_pretty],
+                )
+        except Exception as e:
+            print(e, "Error in set_total_revenue")
+
+    @staticmethod
+    def set_real_total_revenue(date_pretty: str = get_today_pretty()):
+        try:
+            # Convert date_pretty to a timezone-aware datetime object
+            date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=23, minute=59, second=59, microsecond=0)
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH latest_sa AS (
+                        SELECT DISTINCT ON (sku_id) *
+                        FROM sku_skuanalytics
+                        WHERE created_at < %s
+                        ORDER BY sku_id, created_at DESC
+                    ),
+                    shop_revenue AS (
+                        SELECT
+                            product_product.shop_id,
+                            SUM(latest_sa.orders_money) AS real_total_revenue
+                        FROM
+                            latest_sa
+                            JOIN sku_sku ON latest_sa.sku_id = sku_sku.sku
+                            JOIN product_product ON sku_sku.product_id = product_product.product_id
+                        GROUP BY
+                            product_product.shop_id
+                    )
+                    UPDATE shop_shopanalytics
+                    SET real_total_revenue = shop_revenue.real_total_revenue
                     FROM shop_revenue
                     WHERE shop_shopanalytics.shop_id = shop_revenue.shop_id
                     AND shop_shopanalytics.date_pretty = %s
