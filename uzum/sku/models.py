@@ -36,6 +36,7 @@ class SkuAnalytics(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     available_amount = models.IntegerField(default=0, db_index=True)
     orders_amount = models.IntegerField(default=0, null=False)
+    orders_money = models.FloatField(default=0, null=False)
     purchase_price = models.FloatField(default=0, db_index=True)
     full_price = models.FloatField(default=None, null=True, blank=True)
     date_pretty = models.CharField(

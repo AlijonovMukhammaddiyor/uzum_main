@@ -450,7 +450,7 @@ class ProductAnalytics(models.Model):
                     UPDATE product_productanalytics pa
                     SET real_orders_amount =
                         CASE
-                            WHEN (COALESCE(lpa.latest_available_amount, 0) - pa.available_amount) >= 0
+                            WHEN (COALESCE(lpa.latest_available_amount, 0) - pa.available_amount) >= (pa.orders_amount - COALESCE(lpa.latest_orders_amount, 0))
                             THEN (COALESCE(lpa.latest_available_amount, 0) - pa.available_amount)
                             ELSE (pa.orders_amount - COALESCE(lpa.latest_orders_amount, 0))
                         END
