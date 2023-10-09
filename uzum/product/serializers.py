@@ -126,6 +126,7 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
     skus = ExtendedSkuSerializer(many=True, read_only=True)
     recent_analytics = ProductAnalyticsSerializer(many=True, read_only=True)
     skus_count = serializers.IntegerField(read_only=True)
+    sku_analytics = SkuAnalyticsSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -144,4 +145,5 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
             "skus_count",
             "skus",
             "recent_analytics",
+            "sku_analytics",
         ]
