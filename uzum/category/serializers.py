@@ -39,6 +39,8 @@ class CategoryAnalyticsSeralizer(ModelSerializer):
             "total_products_with_sales",
             "average_purchase_price",
             "date_pretty",
+            "daily_revenue",
+            "daily_orders",
         ]
         depth = 1
 

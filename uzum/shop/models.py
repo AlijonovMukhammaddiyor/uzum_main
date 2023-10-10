@@ -61,8 +61,8 @@ class ShopAnalytics(models.Model):
     position = models.IntegerField(default=0, null=True, blank=True)
     monthly_total_orders = models.IntegerField(default=0, null=True, blank=True)
     monthly_total_revenue = models.FloatField(default=0, null=True, blank=True)
-    real_orders_amount = models.IntegerField(default=0)
-    real_revenue = models.FloatField(default=0)
+    daily_orders = models.IntegerField(default=0)
+    daily_revenue = models.FloatField(default=0)
 
     def __str__(self):
         return f"{self.shop.title} - {self.total_products}"
@@ -206,43 +206,48 @@ class ShopAnalytics(models.Model):
             print(e, "Error in set_total_revenue")
 
     @staticmethod
-    def set_real_total_revenue(date_pretty: str = get_today_pretty()):
+    def set_shop_daily_sales(date_pretty=get_today_pretty()):
         try:
-            # Convert date_pretty to a timezone-aware datetime object
-            date = timezone.make_aware(
-                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=0)
+            # get all skus of products in each shop
+            # get the sum of the orders_amount and orders_money of these skus
 
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    WITH latest_sa AS (
-                        SELECT DISTINCT ON (sku_id) *
-                        FROM sku_skuanalytics
-                        WHERE created_at < %s
-                        ORDER BY sku_id, created_at DESC
-                    ),
-                    shop_revenue AS (
+                    WITH sku_shop_totals AS (
+                        -- Aggregate totals from sku_skuanalytics for skus related to products in each shop
                         SELECT
-                            product_product.shop_id,
-                            SUM(latest_sa.orders_money) AS real_total_revenue
+                            p.shop_id,
+                            SUM(sa.orders_amount) as total_orders_amount,
+                            SUM(sa.orders_money) as total_orders_money
                         FROM
-                            latest_sa
-                            JOIN sku_sku ON latest_sa.sku_id = sku_sku.sku
-                            JOIN product_product ON sku_sku.product_id = product_product.product_id
+                            sku_skuanalytics sa
+                        JOIN
+                            sku_sku sku ON sa.sku_id = sku.sku
+                        JOIN
+                            product_product p ON sku.product_id = p.product_id
+                        WHERE
+                            sa.date_pretty = %s
                         GROUP BY
-                            product_product.shop_id
+                            p.shop_id
                     )
-                    UPDATE shop_shopanalytics
-                    SET real_total_revenue = shop_revenue.real_total_revenue
-                    FROM shop_revenue
-                    WHERE shop_shopanalytics.shop_id = shop_revenue.shop_id
-                    AND shop_shopanalytics.date_pretty = %s
+
+                    UPDATE
+                        shop_shopanalytics ssa
+                    SET
+                        daily_revenue = sst.total_orders_money,
+                        daily_orders = sst.total_orders_amount
+                    FROM
+                        sku_shop_totals sst
+                    WHERE
+                        ssa.shop_id = sst.shop_id
+                        AND ssa.date_pretty = %s;
                     """,
-                    [date, date_pretty],
+                    [date_pretty, date_pretty],
                 )
+
         except Exception as e:
-            print(e, "Error in set_total_revenue")
+            print(e, "Error in set_shop_daily_sales")
 
 
 class ShopAnalyticsTable(models.Model):

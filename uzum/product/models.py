@@ -76,7 +76,9 @@ class ProductAnalytics(models.Model):
     real_orders_amount = models.IntegerField(
         default=0, null=True, blank=True, db_index=True
     )  # it is actual number of orders so far
-    real_orders_money = models.FloatField(default=0.0)  # it is actual amount of revenue
+
+    daily_revenue = models.FloatField(default=0.0, null=True, blank=True)
+
     orders_money = models.FloatField(default=0.0)
 
     campaigns = models.ManyToManyField(
@@ -463,6 +465,45 @@ class ProductAnalytics(models.Model):
         except Exception as e:
             print(e)
 
+    @staticmethod
+    def set_daily_revenue(date_pretty: str):
+        try:
+            # get all sku analytics for the given date_pretty of the products
+            # then sum up the orders_money of the sku analytics and set it to the daily_revenue of the product analytics
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH sku_product_totals AS (
+                        -- Aggregate totals from sku_skuanalytics for each product
+                        SELECT
+                            sku.product_id,
+                            SUM(sa.orders_money) as total_orders_money
+                        FROM
+                            sku_skuanalytics sa
+                        JOIN
+                            sku_sku sku ON sa.sku_id = sku.sku
+                        WHERE
+                            sa.date_pretty = %s
+                        GROUP BY
+                            sku.product_id
+                    )
+
+                    UPDATE
+                        product_productanalytics ppa
+                    SET
+                        daily_revenue = spt.total_orders_money
+                    FROM
+                        sku_product_totals spt
+                    WHERE
+                        ppa.product_id = spt.product_id
+                        AND ppa.date_pretty = %s;
+                    """,
+                    [date_pretty, date_pretty],
+                )
+
+        except Exception as e:
+            print(e)
+
 
 class ProductAnalyticsView(models.Model):
     product_id = models.IntegerField(primary_key=True)
@@ -506,7 +547,6 @@ class LatestProductAnalyticsView(models.Model):
     latest_orders_amount = models.IntegerField()
     latest_available_amount = models.IntegerField()
     latest_real_orders_amount = models.IntegerField(default=0, null=True, blank=True)
-    latest_real_orders_money = models.DecimalField(max_digits=10, decimal_places=2, default=0.0, null=True, blank=True)
 
     class Meta:
         managed = False

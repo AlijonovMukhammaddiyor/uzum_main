@@ -220,6 +220,12 @@ class CategoryAnalytics(models.Model):
     average_order_price = models.FloatField(
         null=True, blank=True, default=0
     )  # average price of all orders in category between yesterday and today
+    daily_revenue = models.FloatField(
+        null=True, blank=True, default=0, db_index=True
+    )  # revenue of category between yesterday and today
+    daily_orders = models.IntegerField(
+        null=True, blank=True, default=0, db_index=True
+    )  # orders amount of category between yesterday and today
 
     def __str__(self):
         return f"{self.category.categoryId}: {self.total_products}"
@@ -291,6 +297,56 @@ class CategoryAnalytics(models.Model):
             print(e, "Error in set_average_purchase_price")
 
     @staticmethod
+    def set_daily_sales(date_pretty=get_today_pretty()):
+        try:
+            # get all skus of products in category
+            # get the sum of the orders_amount and orders_money of these skus
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH sku_totals AS (
+                        -- Aggregate totals from sku_skuanalytics for skus related to products in each category and its descendants
+                        SELECT
+                            c."categoryId" as category_id,
+                            SUM(sa.orders_amount) as total_orders_amount,
+                            SUM(sa.orders_money) as total_orders_money
+                        FROM
+                            sku_skuanalytics sa
+                        JOIN
+                            sku_sku sku ON sa.sku_id = sku.sku
+                        JOIN
+                            product_product p ON sku.product_id = p.product_id
+                        JOIN
+                            category_category c ON p.category_id = ANY(
+                                ARRAY[c."categoryId"] ||
+                                CASE WHEN c.descendants IS NOT NULL THEN string_to_array(c.descendants, ',')::integer[] ELSE ARRAY[]::integer[] END
+                            )
+                        WHERE
+                            sa.date_pretty = %s
+                        GROUP BY
+                            c."categoryId"
+                    )
+
+                    UPDATE
+                        category_categoryanalytics cca
+                    SET
+                        daily_revenue = st.total_orders_money,
+                        daily_orders = st.total_orders_amount
+                    FROM
+                        sku_totals st
+                    WHERE
+                        cca.category_id = st.category_id
+                        AND cca.date_pretty = %s;
+
+                    """,
+                    [date_pretty, date_pretty],
+                )
+
+        except Exception as e:
+            print(e, "Error in set_daily_sales")
+
+    @staticmethod
     def update_totals_for_date(date_pretty):
         try:
             # Convert date_pretty to datetime
@@ -302,7 +358,7 @@ class CategoryAnalytics(models.Model):
                 cursor.execute(
                     """
                     WITH latest_pa AS (
-                    SELECT DISTINCT ON (pa.product_id) pa.product_id, pa.orders_amount, pa.reviews_amount, pa.rating, pa.orders_money
+                    SELECT DISTINCT ON (pa.product_id) pa.product_id, pa.real_orders_amount, pa.reviews_amount, pa.rating
                     FROM product_productanalytics pa
                     WHERE pa.created_at <= %s
                     ORDER BY pa.product_id, pa.created_at DESC
@@ -310,10 +366,9 @@ class CategoryAnalytics(models.Model):
                 aggs AS (
                     SELECT
                         c."categoryId" AS categoryid,
-                        COALESCE(SUM(lpa.orders_amount), 0) as total_orders,
                         COALESCE(SUM(lpa.reviews_amount), 0) as total_reviews,
                         COALESCE(AVG(NULLIF(lpa.rating, 0)), 0) as average_rating,
-                        COALESCE(SUM(lpa.orders_money), 0) as total_orders_amount
+                        COALESCE(SUM(lpa.real_orders_amount), 0) as total_orders
                     FROM
                         category_category c
                         LEFT JOIN product_product p ON p.category_id = ANY(
@@ -326,10 +381,9 @@ class CategoryAnalytics(models.Model):
                 UPDATE
                     category_categoryanalytics cca
                 SET
-                    total_orders = aggs.total_orders,
+                    orders_amount = aggs.total_orders,
                     total_reviews = aggs.total_reviews,
-                    average_product_rating = aggs.average_rating,
-                    total_orders_amount = aggs.total_orders_amount
+                    average_product_rating = aggs.average_rating
                 FROM
                     aggs
                 WHERE

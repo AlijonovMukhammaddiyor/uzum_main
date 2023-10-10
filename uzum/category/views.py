@@ -629,7 +629,7 @@ class CategoryDailyAnalyticsView(APIView):
     pagination_class = PageNumberPagination
 
     @staticmethod
-    def analytics(category: Category, start_date: datetime):
+    def analytics(category: Category, start_date: datetime, request: Request):
         try:
             end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
                 hour=23, minute=59, second=59, microsecond=0
@@ -675,7 +675,14 @@ class CategoryDailyAnalyticsView(APIView):
         try:
             authorize_Base_tariff(request)
 
-            days = get_days_based_on_tariff(request.user)
+            days = 3
+            if request.user.tariff == Tariffs.BASE:
+                days = 60
+            if request.user.tariff == Tariffs.SELLER:
+                days = 90
+            if request.user.tariff == Tariffs.BUSINESS:
+                days = 120
+
             start = time.time()
             # get start_date 00:00 in Asia/Tashkent timezone which is range days ago
             start_date = timezone.make_aware(
@@ -683,7 +690,7 @@ class CategoryDailyAnalyticsView(APIView):
             ).replace(hour=0, minute=0, second=0, microsecond=0)
 
             category = Category.objects.get(categoryId=category_id)
-            category_analytics = self.analytics(category, start_date)
+            category_analytics = self.analytics(category, start_date, request)
             print(f"Category analytics: {time.time() - start} seconds")
             return Response(
                 status=status.HTTP_200_OK,
@@ -722,7 +729,7 @@ class SubcategoriesView(APIView):
     def get(self, request: Request, category_id):
         try:
             start = time.time()
-            authorize_Base_tariff(request)
+            # authorize_Base_tariff(request)
             category = Category.objects.get(categoryId=category_id)
             children = category.child_categories.all()
 
@@ -745,16 +752,212 @@ class SubcategoriesView(APIView):
                 main_analytics = dictfetchall(cursor)
 
             # Get children_analytics using raw SQL
-            ids = [child.categoryId for child in children]
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT ca.*, c.title AS category_title, c.title_ru AS category_title_ru
+
+            query = f"""
+                WITH LatestAnalytics AS (
+                        SELECT
+                            category_id,
+                            total_products,
+                            total_shops,
+                            average_purchase_price
+                        FROM (
+                            SELECT
+                                category_id,
+                                total_products,
+                                total_shops,
+                                average_purchase_price,
+                                ROW_NUMBER() OVER(PARTITION BY category_id ORDER BY created_at DESC) as rn
+                            FROM category_categoryanalytics
+                        ) as sub
+                        WHERE rn = 1
+                    )
+
+                    SELECT
+                        ca.category_id,
+                        c.title AS category_title,
+                        c.title_ru AS category_title_ru,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '3 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_3_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '3 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_3_days,
+
+                        -- Getting total_products and total_shops for each category
+                        la.total_products,
+                        la.total_shops,
+                        la.average_purchase_price
+
                     FROM category_categoryanalytics AS ca
                     JOIN category_category AS c ON ca.category_id = c."categoryId"
-                    WHERE ca.category_id IN %s AND ca.date_pretty = %s
-                """,
-                    [tuple(ids), date_pretty],
+                    JOIN LatestAnalytics AS la ON la.category_id = ca.category_id  -- Joining with the CTE
+                    WHERE ca.category_id IN (
+                        SELECT "categoryId" FROM category_category WHERE parent_id = {category.categoryId}
+                    ) AND ca.created_at BETWEEN current_date - INTERVAL '120 days' AND current_date
+                    GROUP BY ca.category_id, c.title, c.title_ru, la.total_products, la.total_shops, la.average_purchase_price
+            """
+            if request.user.tariff == Tariffs.BASE:
+                query = f"""
+                WITH LatestAnalytics AS (
+                        SELECT
+                            category_id,
+                            total_products,
+                            total_shops,
+                            average_purchase_price
+                        FROM (
+                            SELECT
+                                category_id,
+                                total_products,
+                                total_shops,
+                                average_purchase_price,
+                                ROW_NUMBER() OVER(PARTITION BY category_id ORDER BY created_at DESC) as rn
+                            FROM category_categoryanalytics
+                        ) as sub
+                        WHERE rn = 1
+                    )
+
+                    SELECT
+                        ca.category_id,
+                        c.title AS category_title,
+                        c.title_ru AS category_title_ru,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '3 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_3_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '3 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_3_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '7 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_7_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '7 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_7_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '30 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_30_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '30 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_30_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '60 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_60_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '60 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_60_days,
+
+                        -- Getting total_products and total_shops for each category
+                        la.total_products,
+                        la.total_shops,
+                        la.average_purchase_price
+
+                    FROM category_categoryanalytics AS ca
+                    JOIN category_category AS c ON ca.category_id = c."categoryId"
+                    JOIN LatestAnalytics AS la ON la.category_id = ca.category_id  -- Joining with the CTE
+                    WHERE ca.category_id IN (
+                        SELECT "categoryId" FROM category_category WHERE parent_id = {category.categoryId}
+                    ) AND ca.created_at BETWEEN current_date - INTERVAL '120 days' AND current_date
+                    GROUP BY ca.category_id, c.title, c.title_ru, la.total_products, la.total_shops, la.average_purchase_price
+            """
+            if request.user.tariff == Tariffs.SELLER:
+                query = f"""
+                    WITH LatestAnalytics AS (
+                        SELECT
+                            category_id,
+                            total_products,
+                            total_shops,
+                            average_purchase_price
+                        FROM (
+                            SELECT
+                                category_id,
+                                total_products,
+                                total_shops,
+                                average_purchase_price,
+                                ROW_NUMBER() OVER(PARTITION BY category_id ORDER BY created_at DESC) as rn
+                            FROM category_categoryanalytics
+                        ) as sub
+                        WHERE rn = 1
+                    )
+
+                    SELECT
+                        ca.category_id,
+                        c.title AS category_title,
+                        c.title_ru AS category_title_ru,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '3 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_3_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '3 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_3_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '7 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_7_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '7 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_7_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '30 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_30_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '30 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_30_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '60 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_60_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '60 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_60_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '90 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_90_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '90 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_90_days,
+
+                        -- Getting total_products and total_shops for each category
+                        la.total_products,
+                        la.total_shops,
+                        la.average_purchase_price
+
+                    FROM category_categoryanalytics AS ca
+                    JOIN category_category AS c ON ca.category_id = c."categoryId"
+                    JOIN LatestAnalytics AS la ON la.category_id = ca.category_id  -- Joining with the CTE
+                    WHERE ca.category_id IN (
+                        SELECT "categoryId" FROM category_category WHERE parent_id = {category.categoryId}
+                    ) AND ca.created_at BETWEEN current_date - INTERVAL '120 days' AND current_date
+                    GROUP BY ca.category_id, c.title, c.title_ru, la.total_products, la.total_shops, la.average_purchase_price
+                """
+
+            if request.user.tariff == Tariffs.BUSINESS:
+                query = f"""
+                    WITH LatestAnalytics AS (
+                        SELECT
+                            category_id,
+                            total_products,
+                            total_shops,
+                            average_purchase_price
+                        FROM (
+                            SELECT
+                                category_id,
+                                total_products,
+                                total_shops,
+                                average_purchase_price,
+                                ROW_NUMBER() OVER(PARTITION BY category_id ORDER BY created_at DESC) as rn
+                            FROM category_categoryanalytics
+                        ) as sub
+                        WHERE rn = 1
+                    )
+
+                    SELECT
+                        ca.category_id,
+                        c.title AS category_title,
+                        c.title_ru AS category_title_ru,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '3 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_3_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '3 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_3_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '7 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_7_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '7 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_7_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '30 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_30_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '30 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_30_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '60 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_60_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '60 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_60_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '90 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_90_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '90 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_90_days,
+
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '120 days' AND current_date THEN ca.daily_orders ELSE 0 END) AS orders_120_days,
+                        SUM(CASE WHEN ca.created_at BETWEEN current_date - INTERVAL '120 days' AND current_date THEN ca.daily_revenue ELSE 0 END) AS revenue_120_days,
+
+                        -- Getting total_products and total_shops for each category
+                        la.total_products,
+                        la.total_shops,
+                        la.average_purchase_price
+
+                    FROM category_categoryanalytics AS ca
+                    JOIN category_category AS c ON ca.category_id = c."categoryId"
+                    JOIN LatestAnalytics AS la ON la.category_id = ca.category_id  -- Joining with the CTE
+                    WHERE ca.category_id IN (
+                        SELECT "categoryId" FROM category_category WHERE parent_id = {category.categoryId}
+                    ) AND ca.created_at BETWEEN current_date - INTERVAL '120 days' AND current_date
+                    GROUP BY ca.category_id, c.title, c.title_ru, la.total_products, la.total_shops, la.average_purchase_price
+                """
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    [],
                 )
                 children_analytics = dictfetchall(cursor)
 
@@ -950,37 +1153,48 @@ class CategoryShopsView(APIView):
 
             # Add the parent category ID to the list
             descendant_ids.append(category_id)
-            shops = (
-                ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
-                .values("shop_link", "shop_title")  # group by shop_link and shop_title
-                .annotate(
-                    total_orders=Sum("orders_amount"),
-                    total_products=Count("product_id", distinct=True),
-                    total_reviews=Sum("reviews_amount"),
-                    total_revenue=Sum("orders_money"),
-                    average_product_rating=Avg(
-                        Case(
-                            When(rating__gt=0, then=F("rating")),  # only consider rating when it's greater than 0
-                            default=None,
-                            output_field=FloatField(),
-                        )
-                    ),
-                    avg_purchase_price=Avg("avg_purchase_price"),
-                )
-            )
 
-            data = list(shops)
+            date_pretty = get_today_pretty_fake()
+
             # convert title to title + ((shop_link))
-            for item in data:
-                item["title"] = f"{item['shop_title']} (({item['shop_link']}))"
-                del item["shop_title"]
-                del item["shop_link"]
+            # for item in data:
+            #     item["title"] = f"{item['shop_title']} (({item['shop_link']}))"
+            #     del item["shop_title"]
+            #     del item["shop_link"]
+
+            query = """
+            SELECT
+                s.seller_id,
+                s.title,
+
+                COUNT(DISTINCT pa.product_id) AS total_products,  -- Assuming there's a product_id in ProductAnalytics
+                AVG(pa.average_purchase_price) AS avg_purchase_price,
+
+                SUM(CASE WHEN pa.created_at::DATE BETWEEN current_date - interval '31 days' AND current_date THEN pa.daily_revenue ELSE 0 END) AS revenue_30_days,
+                SUM(CASE WHEN pa.created_at::DATE BETWEEN current_date - interval '31 days' AND current_date THEN pa.real_orders_amount ELSE 0 END) AS orders_30_days
+
+            FROM shop_shop as s
+            JOIN product_product pp ON pp.shop_id = s.seller_id
+            JOIN product_productanalytics pa ON pa.product_id = pp.product_id
+            JOIN shop_shopanalytics as sa ON sa.shop_id = s.seller_id AND sa.date_pretty = %s
+
+            WHERE pp.category_id IN %s AND pa.created_at::DATE BETWEEN current_date - interval '30 days' AND current_date
+
+            GROUP BY s.seller_id, s.title
+            """
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    [date_pretty, tuple(descendant_ids)],
+                )
+                shops_analytics = dictfetchall(cursor)
 
             print(f"Category Shops took {time.time() - start_time} seconds")
             return Response(
                 status=status.HTTP_200_OK,
                 data={
-                    "data": data,
+                    "data": shops_analytics,
                 },
             )
 

@@ -277,6 +277,7 @@ def update_all_category_parents():
 
 def update_analytics(date_pretty: str):
     try:
+        vacuum_table("sku_skuanalytics")
         yesterday_pretty = get_day_before_pretty(date_pretty)
         create_product_latestanalytics(yesterday_pretty)
         start = time.time()
