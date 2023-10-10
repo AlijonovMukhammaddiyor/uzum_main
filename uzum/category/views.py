@@ -1153,48 +1153,37 @@ class CategoryShopsView(APIView):
 
             # Add the parent category ID to the list
             descendant_ids.append(category_id)
-
-            date_pretty = get_today_pretty_fake()
-
-            # convert title to title + ((shop_link))
-            # for item in data:
-            #     item["title"] = f"{item['shop_title']} (({item['shop_link']}))"
-            #     del item["shop_title"]
-            #     del item["shop_link"]
-
-            query = """
-            SELECT
-                s.seller_id,
-                s.title,
-
-                COUNT(DISTINCT pa.product_id) AS total_products,  -- Assuming there's a product_id in ProductAnalytics
-                AVG(pa.average_purchase_price) AS avg_purchase_price,
-
-                SUM(CASE WHEN pa.created_at::DATE BETWEEN current_date - interval '31 days' AND current_date THEN pa.daily_revenue ELSE 0 END) AS revenue_30_days,
-                SUM(CASE WHEN pa.created_at::DATE BETWEEN current_date - interval '31 days' AND current_date THEN pa.real_orders_amount ELSE 0 END) AS orders_30_days
-
-            FROM shop_shop as s
-            JOIN product_product pp ON pp.shop_id = s.seller_id
-            JOIN product_productanalytics pa ON pa.product_id = pp.product_id
-            JOIN shop_shopanalytics as sa ON sa.shop_id = s.seller_id AND sa.date_pretty = %s
-
-            WHERE pp.category_id IN %s AND pa.created_at::DATE BETWEEN current_date - interval '30 days' AND current_date
-
-            GROUP BY s.seller_id, s.title
-            """
-
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    query,
-                    [date_pretty, tuple(descendant_ids)],
+            shops = (
+                ProductAnalyticsView.objects.filter(category_id__in=descendant_ids)
+                .values("shop_link", "shop_title")  # group by shop_link and shop_title
+                .annotate(
+                    total_orders=Sum("orders_amount"),
+                    total_products=Count("product_id", distinct=True),
+                    total_reviews=Sum("reviews_amount"),
+                    total_revenue=Sum("orders_money"),
+                    average_product_rating=Avg(
+                        Case(
+                            When(rating__gt=0, then=F("rating")),  # only consider rating when it's greater than 0
+                            default=None,
+                            output_field=FloatField(),
+                        )
+                    ),
+                    avg_purchase_price=Avg("avg_purchase_price"),
                 )
-                shops_analytics = dictfetchall(cursor)
+            )
+
+            data = list(shops)
+            # convert title to title + ((shop_link))
+            for item in data:
+                item["title"] = f"{item['shop_title']} (({item['shop_link']}))"
+                del item["shop_title"]
+                del item["shop_link"]
 
             print(f"Category Shops took {time.time() - start_time} seconds")
             return Response(
                 status=status.HTTP_200_OK,
                 data={
-                    "data": shops_analytics,
+                    "data": data,
                 },
             )
 
