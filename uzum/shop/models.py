@@ -81,7 +81,7 @@ class ShopAnalytics(models.Model):
         ShopAnalytics.set_total_products(date_pretty)
         ShopAnalytics.set_total_revenue(date_pretty)
         # ShopAnalytics.set_shop_positions(date_pretty)
-
+        ShopAnalytics.set_shop_daily_sales(date_pretty)
         ShopAnalytics.set_average_price(date_pretty)
         ShopAnalytics.set_categories(date_pretty)
 

@@ -498,8 +498,6 @@ class SingleProductAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
     allowed_methods = ["GET"]
-    # pagination_class = ExamplePagination
-    # serializer_class = ExtendedProductSerializer
 
     @extend_schema(tags=["Product"])
     def get(self, request: Request, product_id: str):
@@ -582,8 +580,6 @@ class SingleProductAnalyticsView(APIView):
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-# Base tariff with Some Seller tariff
 class SimilarProductsViewByUzum(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -728,7 +724,6 @@ class SimilarProductsViewByUzum(APIView):
             print(e)
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class ProductReviews(APIView):
     permission_classes = [IsAuthenticated]
