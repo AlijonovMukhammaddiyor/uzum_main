@@ -368,7 +368,8 @@ class CategoryAnalytics(models.Model):
                         c."categoryId" AS categoryid,
                         COALESCE(SUM(lpa.reviews_amount), 0) as total_reviews,
                         COALESCE(AVG(NULLIF(lpa.rating, 0)), 0) as average_rating,
-                        COALESCE(SUM(lpa.real_orders_amount), 0) as total_orders
+                        COALESCE(SUM(lpa.orders_amount), 0) as total_orders,
+                        COALESCE(SUM(lpa.orders_money), 0) as total_revenue,
                     FROM
                         category_category c
                         LEFT JOIN product_product p ON p.category_id = ANY(
@@ -381,9 +382,10 @@ class CategoryAnalytics(models.Model):
                 UPDATE
                     category_categoryanalytics cca
                 SET
-                    orders_amount = aggs.total_orders,
+                    total_orders = aggs.total_orders,
                     total_reviews = aggs.total_reviews,
-                    average_product_rating = aggs.average_rating
+                    average_product_rating = aggs.average_rating,
+                    total_orders_amount = aggs.total_revenue
                 FROM
                     aggs
                 WHERE

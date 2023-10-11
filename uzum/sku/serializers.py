@@ -33,6 +33,7 @@ class SkuAnalyticsSerializer(serializers.ModelSerializer):
             "created_at",
             "available_amount",
             "orders_amount",
+            "orders_money",
             "purchase_price",
             "full_price",
             "date_pretty",
