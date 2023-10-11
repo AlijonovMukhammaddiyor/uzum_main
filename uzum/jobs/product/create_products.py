@@ -7,7 +7,9 @@ import pytz
 from uzum.badge.models import Badge
 from uzum.category.models import Category
 from uzum.jobs.badge.singleEntry import create_badge
-from uzum.jobs.category.singleEntry import create_category, create_category_analytics, find_category
+from uzum.jobs.category.singleEntry import (create_category,
+                                            create_category_analytics,
+                                            find_category)
 from uzum.jobs.product.singleEntry import find_product
 from uzum.jobs.sku.singleEntry import find_sku
 from uzum.product.models import Product, ProductAnalytics

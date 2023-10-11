@@ -1,5 +1,6 @@
 from uzum.banner.models import Banner
-from uzum.jobs.campaign.utils import associate_with_shop_or_product, prepare_banners_data
+from uzum.jobs.campaign.utils import (associate_with_shop_or_product,
+                                      prepare_banners_data)
 
 
 def create_banners(banners, product_associations: dict, shop_associations: dict):

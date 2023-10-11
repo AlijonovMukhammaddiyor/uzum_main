@@ -1,8 +1,8 @@
 #!/home/developer/uzum/uzum_env/bin/python3
 
-import sys
-import json
 import argparse
+import json
+import sys
 from pprint import pformat
 
 import jmespath

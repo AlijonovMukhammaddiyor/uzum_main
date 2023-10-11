@@ -9,7 +9,8 @@ import pandas as pd
 import pytz
 from django.core.cache import cache
 from django.db import connection, transaction
-from django.db.models import Avg, Case, Count, F, FloatField, OuterRef, Q, Subquery, Sum, When
+from django.db.models import (Avg, Case, Count, F, FloatField, OuterRef, Q,
+                              Subquery, Sum, When)
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -18,7 +19,8 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
-from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
+from rest_framework.pagination import (LimitOffsetPagination,
+                                       PageNumberPagination)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -31,16 +33,14 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.review.views import CookieJWTAuthentication
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
-from uzum.utils.general import (
-    Tariffs,
-    authorize_Base_tariff,
-    authorize_Seller_tariff,
-    get_days_based_on_tariff,
-    get_today_pretty_fake,
-)
+from uzum.utils.general import (Tariffs, authorize_Base_tariff,
+                                authorize_Seller_tariff,
+                                get_days_based_on_tariff,
+                                get_today_pretty_fake)
 
 from .models import Category, CategoryAnalytics
-from .serializers import CategoryAnalyticsSeralizer, CategorySerializer, ProductAnalyticsViewSerializer
+from .serializers import (CategoryAnalyticsSeralizer, CategorySerializer,
+                          ProductAnalyticsViewSerializer)
 
 
 # Base tariff
@@ -1151,6 +1151,7 @@ class CategoryShopsView(APIView):
             else:
                 descendant_ids = []
 
+            # TODO: use sku based revenu for product total revenue
             # Add the parent category ID to the list
             descendant_ids.append(category_id)
             shops = (

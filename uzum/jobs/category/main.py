@@ -1,7 +1,9 @@
 import time
 
-from uzum.jobs.category.MultiEntry import create_categories, create_category_analytics_bulk
-from uzum.jobs.category.utils import assign_parents, get_categories_tree, prepare_categories_for_bulk_create
+from uzum.jobs.category.MultiEntry import (create_categories,
+                                           create_category_analytics_bulk)
+from uzum.jobs.category.utils import (assign_parents, get_categories_tree,
+                                      prepare_categories_for_bulk_create)
 
 
 def create_and_update_categories():

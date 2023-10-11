@@ -1,20 +1,10 @@
 from django.urls import path
 
 from uzum.users.views import (  # CodeVerificationView,; VerificationSendView,
-    GoogleView,
-    PasswordRenewView,
-    SetShopsView,
-    user_detail_view,
-    user_redirect_view,
-    user_update_view,
-    AddfavouriteProductView,
-    AddfavouriteShopView,
-    RemovefavouriteProductView,
-    RemovefavouriteShopView,
-    GetFavouriteProductsView,
-    GetFavouriteShopsView,
-    TelegramBotView,
-)
+    AddfavouriteProductView, AddfavouriteShopView, GetFavouriteProductsView,
+    GetFavouriteShopsView, GoogleView, PasswordRenewView,
+    RemovefavouriteProductView, RemovefavouriteShopView, SetShopsView,
+    TelegramBotView, user_detail_view, user_redirect_view, user_update_view)
 
 app_name = "users"
 urlpatterns = [

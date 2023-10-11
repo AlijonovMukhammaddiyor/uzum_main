@@ -6,15 +6,11 @@ import traceback
 
 import httpx
 
-from uzum.jobs.constants import (
-    CATEGORIES_HEADER,
-    CATEGORIES_HEADER_RU,
-    MAX_OFFSET,
-    MAX_PAGE_SIZE,
-    PRODUCTIDS_CONCURRENT_REQUESTS,
-    PRODUCTS_URL,
-)
-from uzum.jobs.helpers import generateUUID, get_random_user_agent, products_payload
+from uzum.jobs.constants import (CATEGORIES_HEADER, CATEGORIES_HEADER_RU,
+                                 MAX_OFFSET, MAX_PAGE_SIZE,
+                                 PRODUCTIDS_CONCURRENT_REQUESTS, PRODUCTS_URL)
+from uzum.jobs.helpers import (generateUUID, get_random_user_agent,
+                               products_payload)
 
 # Set up a basic configuration for logging
 logging.basicConfig(level=logging.INFO)

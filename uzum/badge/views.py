@@ -11,7 +11,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt import authentication
 
 from uzum.product.models import Product, ProductAnalytics
-from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
+from uzum.product.serializers import (ProductAnalyticsSerializer,
+                                      ProductSerializer)
 from uzum.review.models import PopularSeaches
 from uzum.review.serializers import PopularSearchesSerializer
 from uzum.utils.general import get_today_pretty_fake

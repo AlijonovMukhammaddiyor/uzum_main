@@ -1,50 +1,49 @@
 import datetime
+import json
 import logging
+import os
 import time
 import traceback
 from datetime import timedelta
+
+import pandas as pd
 import pytz
 import requests
-import json
+from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
+from django.db.models import OuterRef, Subquery
+from django.http import FileResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import DetailView, RedirectView, UpdateView
 from drf_spectacular.utils import extend_schema
-from django.db.models import OuterRef, Subquery
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt import authentication
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import (TokenObtainPairView,
+                                            TokenRefreshView)
 from twilio.base.exceptions import TwilioRestException
 from twilio.rest import Client
-import pandas as pd
+
 from config.settings.base import env
 from uzum.product.models import Product, ProductAnalytics
 from uzum.shop.models import Shop, ShopAnalytics
-from uzum.users.api.serializers import (
-    CheckUserNameAndPhoneSerializer,
-    CustomTokenRefreshSerializer,
-    LogOutSerializer,
-    PasswordRenewSerializer,
-    UserLoginSerializer,
-    create_referral,
-    get_random_string,
-    get_referred_by,
-)
+from uzum.users.api.serializers import (CheckUserNameAndPhoneSerializer,
+                                        CustomTokenRefreshSerializer,
+                                        LogOutSerializer,
+                                        PasswordRenewSerializer,
+                                        UserLoginSerializer, create_referral,
+                                        get_random_string, get_referred_by)
 from uzum.users.tasks import send_to_single_user
-from uzum.utils.general import Tariffs, check_user_tariff, get_next_day_pretty, get_today_pretty_fake
-from django.http import FileResponse
-import os
-
+from uzum.utils.general import (Tariffs, check_user_tariff,
+                                get_next_day_pretty, get_today_pretty_fake)
 
 logger = logging.getLogger(__name__)
 # disable twilio info logs

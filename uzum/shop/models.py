@@ -34,6 +34,11 @@ class Shop(models.Model):
 
 
 class ShopAnalytics(models.Model):
+    """
+    Analytics models for shops
+    New analytics are created every day for each shop
+    """
+
     id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="analytics")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -58,9 +63,13 @@ class ShopAnalytics(models.Model):
     categories = models.ManyToManyField(
         "category.Category",
     )
-    position = models.IntegerField(default=0, null=True, blank=True)
+    position = models.IntegerField(default=0, null=True, blank=True)  # NONEED
+
+    positions = models.TextField(null=True, blank=True)  # store the positions of shops in each category
+
     monthly_total_orders = models.IntegerField(default=0, null=True, blank=True)
     monthly_total_revenue = models.FloatField(default=0, null=True, blank=True)
+
     daily_orders = models.IntegerField(default=0)
     daily_revenue = models.FloatField(default=0)
 
@@ -71,9 +80,17 @@ class ShopAnalytics(models.Model):
     def update_analytics(date_pretty: str = get_today_pretty()):
         ShopAnalytics.set_total_products(date_pretty)
         ShopAnalytics.set_total_revenue(date_pretty)
-        ShopAnalytics.set_shop_positions(date_pretty)
+        # ShopAnalytics.set_shop_positions(date_pretty)
+
         ShopAnalytics.set_average_price(date_pretty)
         ShopAnalytics.set_categories(date_pretty)
+
+    @staticmethod
+    def update_shops_positions_in_categories(date_pretty: str = get_today_pretty()):
+        try:
+            pass
+        except Exception as e:
+            print("Error in update_shops_positions_in_categories: ", e)
 
     @staticmethod
     def set_shop_positions(date_pretty: str = get_today_pretty()):

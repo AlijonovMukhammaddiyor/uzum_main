@@ -1,9 +1,10 @@
 import json
+import logging
 import time
 import traceback
 from datetime import date, datetime, timedelta
 from itertools import groupby
-import logging
+
 import numpy as np
 import pandas as pd
 import pytz
@@ -11,43 +12,37 @@ import requests
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import connection
-from django.db.models import Avg, Count, Prefetch, Q, Sum, F
+from django.db.models import Avg, Count, F, Prefetch, Q, Sum
 from django.db.models.functions import Abs
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
-from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
+from rest_framework.pagination import (LimitOffsetPagination,
+                                       PageNumberPagination)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from uzum.category.models import Category, CategoryAnalytics
 
+from uzum.category.models import Category, CategoryAnalytics
 from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.jobs.constants import PRODUCT_HEADER
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.pagination import ExamplePagination
-from uzum.product.serializers import (
-    CurrentProductSerializer,
-    ExtendedProductAnalyticsSerializer,
-    ExtendedProductSerializer,
-    ProductSerializer,
-)
+from uzum.product.serializers import (CurrentProductSerializer,
+                                      ExtendedProductAnalyticsSerializer,
+                                      ExtendedProductSerializer,
+                                      ProductSerializer)
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
-from uzum.utils.general import (
-    Tariffs,
-    authorize_Base_tariff,
-    authorize_Seller_tariff,
-    get_day_before_pretty,
-    get_days_based_on_tariff,
-    get_today_pretty_fake,
-)
-
+from uzum.utils.general import (Tariffs, authorize_Base_tariff,
+                                authorize_Seller_tariff, get_day_before_pretty,
+                                get_days_based_on_tariff,
+                                get_today_pretty_fake)
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +224,14 @@ class ProductsView(ListAPIView):
         "position_in_category",
         "avg_purchase_price",
         "orders_money",
+        "revenue_3_days",
+        "orders_3_days",
+        "weekly_revenue",
+        "weekly_orders",
+        "monthly_revenue",
+        "monthly_orders",
+        "revenue_90_days",
+        "orders_90_days"
     ]
     VALID_FILTER_FIELDS = ["product_title", "product_title_ru", "shop_title", "category_title", "category_title_ru"]
 
@@ -251,10 +254,10 @@ class ProductsView(ListAPIView):
             monthly = params.get("monthly", None)  # Get the categories to filter by
 
             if weekly:
-                return ProductAnalyticsView.objects.all().order_by("-weekly_orders_amount")[:100]
+                return ProductAnalyticsView.objects.all().order_by("-weekly_revenue")[:100]
 
             if monthly:
-                return ProductAnalyticsView.objects.all().order_by("-diff_orders_amount")[:100]
+                return ProductAnalyticsView.objects.all().order_by("-monthly_revenue")[:100]
 
             if not categories:
                 # return empty queryset
@@ -295,15 +298,6 @@ class ProductsView(ListAPIView):
                             title_exclude_q_objects &= ~Q(product_title_ru__icontains=keyword)
                         else:
                             title_exclude_q_objects &= ~Q(product_title__icontains=keyword)
-
-                if key.startswith("orders_money") or key.startswith("diff_orders_money"):
-                    # divide by 1000
-                    values = orm_filters[key]
-                    # check if values is list
-                    if values and isinstance(values, list) or isinstance(values, tuple):
-                        orm_filters[key] = [int(value) / 1000 for value in values]
-                    else:
-                        orm_filters[key] = int(value) / 1000
 
                 if key.startswith("product_created_at"):
                     # Convert the timestamp back to a datetime object with the correct timezone

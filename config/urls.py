@@ -9,31 +9,17 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenVerifyView
 
 from uzum.category.utils import seconds_until_next
-from uzum.shop.views import (
-    SearchEverythingView,
-    UzumTotalOrders,
-    UzumTotalProducts,
-    UzumTotalRevenue,
-    UzumTotalReviews,
-    UzumTotalShops,
-)
-from uzum.users.views import (
-    AddfavouriteProductView,
-    AddfavouriteShopView,
-    CheckUserNameAndPhone,
-    CodeVerificationView,
-    CustomTokenObtainPairView,
-    CustomTokenRefreshView,
-    GetFavouriteProductsView,
-    GetFavouriteShopsView,
-    GoogleView,
-    LogoutView,
-    PasswordRenewView,
-    RemovefavouriteProductView,
-    RemovefavouriteShopView,
-    TelegramBotView,
-    VerificationSendView,
-)
+from uzum.shop.views import (SearchEverythingView, UzumTotalOrders,
+                             UzumTotalProducts, UzumTotalRevenue,
+                             UzumTotalReviews, UzumTotalShops)
+from uzum.users.views import (AddfavouriteProductView, AddfavouriteShopView,
+                              CheckUserNameAndPhone, CodeVerificationView,
+                              CustomTokenObtainPairView,
+                              CustomTokenRefreshView, GetFavouriteProductsView,
+                              GetFavouriteShopsView, GoogleView, LogoutView,
+                              PasswordRenewView, RemovefavouriteProductView,
+                              RemovefavouriteShopView, TelegramBotView,
+                              VerificationSendView)
 
 urlpatterns = [
     path("", TemplateView.as_view(template_name="pages/home.html"), name="home"),

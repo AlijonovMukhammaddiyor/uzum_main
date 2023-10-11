@@ -2,14 +2,16 @@ import asyncio
 import json
 import time
 import traceback
+from datetime import datetime
+
 import httpx
 import requests
-from datetime import datetime
+from asgiref.sync import async_to_sync
 from django.db.models import Q
+
 from uzum.jobs.constants import SELLER_HEADERS, SELLER_URL
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.shop.models import Shop
-from asgiref.sync import async_to_sync
 
 
 async def fetch_shop_api(link: str, retries=3, backoff_factor=0.3, client=None):

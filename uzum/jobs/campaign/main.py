@@ -2,7 +2,8 @@ from collections import defaultdict
 
 from uzum.jobs.campaign.multiEntry import create_banners
 from uzum.jobs.campaign.singleEntry import create_campaign
-from uzum.jobs.campaign.utils import get_campaign_products_ids, get_main_page_data, prepare_banners_data
+from uzum.jobs.campaign.utils import (get_campaign_products_ids,
+                                      get_main_page_data, prepare_banners_data)
 
 
 def update_or_create_campaigns():

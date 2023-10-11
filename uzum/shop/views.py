@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 
 import pytz
 from django.db import connection
-from django.db.models import CharField, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
+from django.db.models import (CharField, Count, F, IntegerField, Max, Min,
+                              OuterRef, Q, Subquery, Sum)
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -14,7 +15,8 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
-from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
+from rest_framework.pagination import (LimitOffsetPagination,
+                                       PageNumberPagination)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -25,20 +27,18 @@ from uzum.category.models import Category
 from uzum.category.pagination import CategoryProductsPagination
 from uzum.category.serializers import ProductAnalyticsViewSerializer
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
-from uzum.product.serializers import ProductAnalyticsSerializer, ProductSerializer
+from uzum.product.serializers import (ProductAnalyticsSerializer,
+                                      ProductSerializer)
 from uzum.review.views import CookieJWTAuthentication
 from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsTable
 from uzum.users.models import User
-from uzum.utils.general import (
-    Tariffs,
-    authorize_Base_tariff,
-    get_day_before_pretty,
-    get_days_based_on_tariff,
-    get_next_day_pretty,
-    get_today_pretty_fake,
-)
+from uzum.utils.general import (Tariffs, authorize_Base_tariff,
+                                get_day_before_pretty,
+                                get_days_based_on_tariff, get_next_day_pretty,
+                                get_today_pretty_fake)
 
-from .serializers import ExtendedShopSerializer, ShopAnalyticsSerializer, ShopCompetitorsSerializer, ShopSerializer
+from .serializers import (ExtendedShopSerializer, ShopAnalyticsSerializer,
+                          ShopCompetitorsSerializer, ShopSerializer)
 
 
 def get_totals(date_pretty):
@@ -270,14 +270,12 @@ class ShopsExportExcelView(APIView):
                         sa.average_purchase_price, sa.average_order_price, sa.rating,
                         sa.date_pretty,
                         COUNT(DISTINCT sac.category_id) as num_categories,
-                        s.title as shop_title, s.link as seller_link,
-                        ROW_NUMBER() OVER (ORDER BY sa.total_revenue DESC) as position
+                        s.title as shop_title, s.link as seller_link
                     FROM shop_shopanalytics sa
                     JOIN shop_shop s ON sa.shop_id = s.seller_id
                     LEFT JOIN shop_shopanalytics_categories sac ON sa.id = sac.shopanalytics_id
                     WHERE sa.date_pretty = %s
                     GROUP BY sa.id, s.title, s.link
-                    ORDER BY position ASC
                 """,
                     [date_pretty],
                 )
@@ -298,7 +296,6 @@ class ShopsView(APIView):
     allowed_methods = ["GET"]
     PAGE_SIZE = 100
     VALID_COLUMNS = [
-        "position",
         "total_products",
         "total_orders",
         "total_reviews",
@@ -377,8 +374,7 @@ class ShopsView(APIView):
                         sa.average_purchase_price, sa.average_order_price, sa.rating,
                         sa.date_pretty, sa.monthly_total_orders, sa.monthly_total_revenue,
                         COUNT(DISTINCT sac.category_id) as num_categories,
-                        s.title as shop_title, s.link as seller_link,
-                        ROW_NUMBER() OVER (ORDER BY sa.total_revenue DESC) as position
+                        s.title as shop_title, s.link as seller_link
                     FROM shop_shopanalytics sa
                     JOIN shop_shop s ON sa.shop_id = s.seller_id
                     LEFT JOIN shop_shopanalytics_categories sac ON sa.id = sac.shopanalytics_id
@@ -668,7 +664,7 @@ class ShopAnalyticsView(APIView):
                 cursor.execute(
                     """
                     SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
-                        sa.average_purchase_price, sa.average_order_price, sa.rating, sa.position,
+                        sa.average_purchase_price, sa.average_order_price, sa.rating,
                         sa.date_pretty, COUNT(sa_categories.category_id) as category_count
                     FROM shop_shopanalytics sa
                     LEFT JOIN shop_shopanalytics_categories sa_categories ON sa.id = sa_categories.shopanalytics_id
@@ -819,7 +815,6 @@ class ShopCompetitorsView(APIView):
                     "average_purchase_price",
                     "average_order_price",
                     "rating",
-                    "position",
                     "date_pretty",
                     "category_count",
                     "total_revenue",
@@ -827,7 +822,6 @@ class ShopCompetitorsView(APIView):
             )
             shop_analytics_data = list(shop_analytics)
 
-            print(f"Time taken Competitors: {time.time() - start}")
             return Response(data={"data": competitors_data, "shop": shop_analytics_data}, status=status.HTTP_200_OK)
         except Shop.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND, data={"message": "Shop not found"})
@@ -1195,7 +1189,7 @@ class StoppedProductsView(APIView):
             LEFT JOIN sku_sku s ON p.product_id = s.product_id
             LEFT JOIN sku_skuanalytics ska ON s.sku = ska.sku_id AND pa.date_pretty = ska.date_pretty
             WHERE p.shop_id = {seller_id}
-            GROUP BY p.title, p.title_ru, pa.id, pa.score, c.title, c."categoryId", p.photos, pa.created_at, pa.date_pretty, pa.product_id, pa.reviews_amount, pa.orders_amount, pa.rating, pa.available_amount, pa.orders_money, pa.position, pa.position_in_category, pa.position_in_shop, pa.average_purchase_price, pa.real_orders_amount, pa.daily_revenue
+            GROUP BY p.title, p.title_ru, pa.id, pa.score, c.title, c."categoryId", p.photos, pa.created_at, pa.date_pretty, pa.product_id, pa.reviews_amount, pa.orders_amount, pa.rating, pa.available_amount, pa.orders_money, pa.position, pa.position_in_category, pa.position_in_shop, pa.average_purchase_price, pa.real_orders_amount, pa.daily_revenue, pa.positions
             """
 
             with connection.cursor() as cursor:

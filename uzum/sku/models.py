@@ -1,9 +1,9 @@
-from datetime import datetime
 import traceback
 import uuid
+from datetime import datetime
 
-from django.db import connection, models
 import pytz
+from django.db import connection, models
 
 from uzum.badge.models import Badge
 from uzum.utils.general import get_today_pretty

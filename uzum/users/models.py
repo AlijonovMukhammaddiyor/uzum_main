@@ -1,6 +1,7 @@
-from datetime import timedelta
 import uuid
+from datetime import timedelta
 
+import requests
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save
@@ -8,7 +9,6 @@ from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-import requests
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 

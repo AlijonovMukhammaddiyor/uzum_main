@@ -1,25 +1,25 @@
 import datetime
+import io
 import time
 import traceback
+
 import pandas as pd
 import pytz
-from django.utils import timezone
-from django.db.models import OuterRef, Subquery
 import requests
+from django.db.models import OuterRef, Subquery
+from django.utils import timezone
+from openpyxl.chart import LineChart, Reference
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
 from uzum.product.models import ProductAnalytics, ProductAnalyticsView
-from uzum.shop.models import ShopAnalytics
+from uzum.shop.models import Shop, ShopAnalytics
 from uzum.users.models import User
 from uzum.utils.general import get_today_pretty, get_today_pretty_fake
-import io
-from openpyxl.styles import Font, Border, Side, PatternFill, Alignment
-from openpyxl.chart import LineChart, Reference
 
 
-def prepare_shop_statistics(user, shop):
+def prepare_shop_statistics(user, shop: Shop):
     try:
-        print("Shop Daily Sales Report for shop: ", shop.title, " and user: ", user.username)
-        start = time.time()
-
+        print(f"Shop Daily Sales Report for shop: {shop.title} and user: {user.username}")
         today_pretty = get_today_pretty()
         date = today_pretty
 
@@ -151,8 +151,6 @@ def prepare_shop_statistics(user, shop):
                     item[key] = (round(item[key]) / 100) * 100
 
         final_res = target_analytics
-
-        print("Shop Daily Sales View Time taken: ", time.time() - start)
 
         return final_res
     except Exception as e:
@@ -567,7 +565,6 @@ def send_reports_to_all():
                     "total_reviews": latest_analytics.total_reviews,
                     "average_purchase_price": latest_analytics.average_purchase_price,
                     "rating": latest_analytics.rating,
-                    "position": latest_analytics.position,
                     "categories": latest_analytics.categories.all().count(),
                 }
 
@@ -682,7 +679,6 @@ def send_to_single_user(user):
                 "total_reviews": latest_analytics.total_reviews,
                 "average_purchase_price": latest_analytics.average_purchase_price,
                 "rating": latest_analytics.rating,
-                "position": latest_analytics.position,
                 "categories": latest_analytics.categories.all().count(),
             }
 

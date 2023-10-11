@@ -10,7 +10,7 @@ from django.core.cache import cache
 from django.db import connection, models
 from django.utils import timezone
 
-from uzum.utils.general import get_day_before_pretty, get_today_pretty, get_today_pretty_fake
+from uzum.utils.general import get_day_before_pretty, get_today_pretty
 
 
 class Product(models.Model):
@@ -50,52 +50,48 @@ class ProductAnalytics(models.Model):
     class Meta:
         db_table = "product_productanalytics"
 
+    # Identifiers
     id = models.UUIDField(
         default=uuid.uuid4,
         editable=False,
         unique=True,
         primary_key=True,
     )
-
     product = models.ForeignKey(Product, on_delete=models.DO_NOTHING, related_name="analytics")
+
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    date_pretty = models.CharField(max_length=255, null=True, blank=True, default=get_today_pretty, db_index=True)
+
+    # Relational Fields
     banners = models.ManyToManyField(
         "banner.Banner",
-        # on_delete=models.DO_NOTHING, null=True, blank=True, related_name="products"
     )
+    badges = models.ManyToManyField("badge.Badge", related_name="products")
+    campaigns = models.ManyToManyField("campaign.Campaign")
 
-    badges = models.ManyToManyField(
-        "badge.Badge",
-        related_name="products",
-    )
-
+    # Counts and Metrics
     available_amount = models.IntegerField(default=0, db_index=True)
     reviews_amount = models.IntegerField(default=0)
     rating = models.FloatField(default=0)
-    orders_amount = models.IntegerField(default=0, db_index=True)
+    orders_amount = models.IntegerField(default=0, db_index=True)  # number of orders so far
     real_orders_amount = models.IntegerField(
         default=0, null=True, blank=True, db_index=True
-    )  # it is actual number of orders so far
+    )  # how many products actully deducted from the stock daily - one order can have multiple products
+    daily_revenue = models.FloatField(
+        default=0.0, null=True, blank=True
+    )  # daily revenue amount from real_orders_amount
+    orders_money = models.FloatField(default=0.0)  # total revenue amount from real_orders_amount
 
-    daily_revenue = models.FloatField(default=0.0, null=True, blank=True)
-
-    orders_money = models.FloatField(default=0.0)
-
-    campaigns = models.ManyToManyField(
-        "campaign.Campaign",
-    )
-    date_pretty = models.CharField(max_length=255, null=True, blank=True, default=get_today_pretty, db_index=True)
+    # Positional and Pricing Data
     position_in_shop = models.IntegerField(default=0, null=True, blank=True)
     position_in_category = models.IntegerField(default=0, null=True, blank=True)
     position = models.IntegerField(default=0, null=True, blank=True)
+    positions = models.TextField(null=True, blank=True)
     average_purchase_price = models.IntegerField(default=0, null=True, blank=True)
-    score = models.FloatField(default=0, null=True, blank=True)
 
-    # title = models.TextField(default=None, null=True, blank=True)
-    # description = models.TextField(default=None, null=True, blank=True)
-    # photos = models.TextField(default=None, null=True, blank=True)
-    # attributes = models.TextField(default=None, null=True, blank=True)
-    # characteristics = models.TextField(default=None, null=True, blank=True)
+    # Miscellaneous
+    score = models.FloatField(default=0, null=True, blank=True)
 
     @staticmethod
     def set_positions(date_pretty=get_today_pretty()):
@@ -354,89 +350,9 @@ class ProductAnalytics(models.Model):
         gc.collect()
 
     @staticmethod
-    def set_orders_money(date_pretty: str):
-        try:
-            # Convert date_pretty to a timezone-aware datetime object
-            date = timezone.make_aware(
-                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=0, minute=0, second=0, microsecond=0)
-
-            with connection.cursor() as cursor:
-                if date_pretty == "2023-05-20":
-                    # Handle the entries for date_pretty="2023-05-20" separately
-                    cursor.execute(
-                        """
-                        WITH today_pa AS (
-                            SELECT *
-                            FROM product_productanalytics
-                            WHERE date_pretty = %s AND average_purchase_price IS NOT NULL
-                        )
-                        UPDATE product_productanalytics
-                        SET orders_money = (today_pa.orders_amount * today_pa.average_purchase_price) / 1000.0
-                        FROM today_pa
-                        WHERE product_productanalytics.product_id = today_pa.product_id
-                        AND product_productanalytics.date_pretty = %s
-                        """,
-                        [date_pretty, date_pretty],
-                    )
-                else:
-                    # Handle the entries for other dates
-                    cursor.execute(
-                        """
-                        WITH today_pa AS (
-                            SELECT *
-                            FROM product_productanalytics
-                            WHERE date_pretty = %s
-                        ),
-                        order_difference AS (
-                            SELECT
-                                today_pa.product_id,
-                                (today_pa.orders_amount - COALESCE(latest_pa.latest_orders_amount, 0)) AS delta_orders,
-                                COALESCE(latest_pa.latest_orders_money, 0) AS latest_orders_money
-                            FROM
-                                today_pa
-                        LEFT JOIN product_latest_analytics latest_pa ON today_pa.product_id = latest_pa.product_id
-                        ),
-                        delta_orders_money AS (
-                           SELECT
-                                order_difference.product_id,
-                                GREATEST(
-                                    (order_difference.latest_orders_money + ((order_difference.delta_orders * today_pa.average_purchase_price) / 1000.0)),
-                                    0
-                                ) AS new_orders_money
-                            FROM
-                                order_difference
-                                JOIN today_pa ON order_difference.product_id = today_pa.product_id
-                            WHERE today_pa.average_purchase_price IS NOT NULL
-                        )
-                        UPDATE product_productanalytics
-                        SET orders_money = delta_orders_money.new_orders_money
-                        FROM delta_orders_money
-                        WHERE product_productanalytics.product_id = delta_orders_money.product_id
-                        AND product_productanalytics.date_pretty = %s
-                        """,
-                        [date_pretty, date_pretty],
-                    )
-        except Exception as e:
-            print(e)
-
-    @staticmethod
     def update_analytics(date_pretty: str):
         try:
-            # yesterday_pretty = get_day_before_pretty(date_pretty)
-            # create_product_latestanalytics(yesterday_pretty)
-            # ProductAnalytics.update_average_purchase_price(date_pretty)
-
-            # first, to make it faster, execute set_orders_money for past date
-            # try:
-            #     create_product_latestanalytics("2023-06-04")
-            #     ProductAnalytics.set_orders_money("2023-06-05")
-            # except Exception as e:
-            #     print(e)
-            #     traceback.print_exc()
-
-            # create_product_latestanalytics(get_day_before_pretty(date_pretty))
-            # ProductAnalytics.set_orders_money(date_pretty)
+            ProductAnalytics.set_daily_revenue(date_pretty)
             ProductAnalytics.set_positions(date_pretty)
             ProductAnalytics.set_top_growing_products()
         except Exception as e:
@@ -465,6 +381,7 @@ class ProductAnalytics(models.Model):
         except Exception as e:
             print(e)
 
+    # should be executed after sku analytics is done
     @staticmethod
     def set_daily_revenue(date_pretty: str):
         try:
@@ -533,6 +450,14 @@ class ProductAnalyticsView(models.Model):
     weekly_orders_money = models.FloatField(blank=True, null=True)
     weekly_orders_amount = models.IntegerField(blank=True, null=True)
     weekly_reviews_amount = models.IntegerField(blank=True, null=True)
+    revenue_3_days = models.FloatField(blank=True, null=True)
+    orders_3_days = models.IntegerField(blank=True, null=True)
+    weekly_revenue = models.FloatField(blank=True, null=True)
+    weekly_orders = models.IntegerField(blank=True, null=True)
+    monthly_revenue = models.FloatField(blank=True, null=True)
+    monthly_orders = models.IntegerField(blank=True, null=True)
+    revenue_90_days = models.FloatField(blank=True, null=True)
+    orders_90_days = models.IntegerField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -546,7 +471,6 @@ class LatestProductAnalyticsView(models.Model):
     latest_average_purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     latest_orders_amount = models.IntegerField()
     latest_available_amount = models.IntegerField()
-    latest_real_orders_amount = models.IntegerField(default=0, null=True, blank=True)
 
     class Meta:
         managed = False
@@ -573,8 +497,7 @@ def create_product_latestanalytics(date_pretty: str):
                 orders_money as latest_orders_money,
                 average_purchase_price as latest_average_purchase_price,
                 orders_amount as latest_orders_amount,
-                available_amount as latest_available_amount,
-                real_orders_amount as latest_real_orders_amount
+                available_amount as latest_available_amount
             FROM product_productanalytics
             WHERE created_at <= '{date}'
             ORDER BY product_id, created_at DESC

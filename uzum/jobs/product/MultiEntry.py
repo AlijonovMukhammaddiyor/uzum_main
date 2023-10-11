@@ -4,8 +4,10 @@ import traceback
 from uzum.badge.models import Badge
 from uzum.jobs.product.create_products import prepareProductData
 from uzum.jobs.seller.MultiEntry import create_shop_analytics_bulk
-from uzum.jobs.sku.MultiEntry import create_sku_analytics_bulk, create_skus_bulk
-from uzum.product.models import LatestProductAnalyticsView, Product, ProductAnalytics
+from uzum.jobs.sku.MultiEntry import (create_sku_analytics_bulk,
+                                      create_skus_bulk)
+from uzum.product.models import (LatestProductAnalyticsView, Product,
+                                 ProductAnalytics)
 from uzum.shop.models import Shop
 
 

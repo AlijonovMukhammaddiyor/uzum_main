@@ -10,15 +10,9 @@ import requests
 from requests.adapters import HTTPAdapter
 
 from uzum.banner.models import Banner
-from uzum.jobs.constants import (
-    CATEGORIES_HEADER,
-    MAIN_PAGE_PAYLOAD,
-    MAIN_PAGE_URL,
-    MAX_ID_COUNT,
-    PAGE_SIZE,
-    PRODUCTIDS_CONCURRENT_REQUESTS,
-    PRODUCTS_URL,
-)
+from uzum.jobs.constants import (CATEGORIES_HEADER, MAIN_PAGE_PAYLOAD,
+                                 MAIN_PAGE_URL, MAX_ID_COUNT, PAGE_SIZE,
+                                 PRODUCTIDS_CONCURRENT_REQUESTS, PRODUCTS_URL)
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 
 # Set up a basic configuration for logging
