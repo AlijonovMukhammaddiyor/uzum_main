@@ -30,14 +30,14 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.serializers import (ProductAnalyticsSerializer,
                                       ProductSerializer)
 from uzum.review.views import CookieJWTAuthentication
-from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsTable
+from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsRecent, ShopAnalyticsTable
 from uzum.users.models import User
 from uzum.utils.general import (Tariffs, authorize_Base_tariff,
                                 get_day_before_pretty,
                                 get_days_based_on_tariff, get_next_day_pretty,
                                 get_today_pretty_fake)
 
-from .serializers import (ExtendedShopSerializer, ShopAnalyticsSerializer,
+from .serializers import (ExtendedShopSerializer, ShopAnalyticsRecentSerializer, ShopAnalyticsSerializer,
                           ShopCompetitorsSerializer, ShopSerializer)
 
 
@@ -265,7 +265,7 @@ class ShopsExportExcelView(APIView):
                 )
 
                 cursor.execute(
-                    f"""
+                    """
                     SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
                         sa.average_purchase_price, sa.average_order_price, sa.rating,
                         sa.date_pretty,
@@ -290,121 +290,65 @@ class ShopsExportExcelView(APIView):
 
 
 # Base tariff
-class ShopsView(APIView):
+class ShopsView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    allowed_methods = ["GET"]
+    serializer_class = ShopAnalyticsRecentSerializer
+    pagination_class = LimitOffsetPagination
     PAGE_SIZE = 100
     VALID_COLUMNS = [
         "total_products",
         "total_orders",
         "total_reviews",
         "average_purchase_price",
-        "average_order_price",
         "rating",
-        "total_revenue",
-        "num_categories",
-        "monthly_total_orders",
-        "monthly_total_revenue",
+        "monthly_revenue",
+        "monthly_orders"
+        "quarterly_revenue",
+        "quarterly_orders",
     ]
     VALID_ORDERS = ["asc", "desc"]
-    VALID_SEARCHES = ["shop_title"]
+    VALID_SEARCHES = ["title"]
 
-    def get(self, request: Request, *args, **kwargs):
-        try:
-            # authorize_Base_tariff(request)
-            date_pretty = get_today_pretty_fake()
-            offset = request.query_params.get("offset", 0)
-            limit = request.query_params.get("limit", self.PAGE_SIZE)
-            column = request.query_params.get("column", "monthly_total_revenue")
-            order = request.query_params.get("order", "desc")
+    def get_queryset(self):
+        date_pretty = get_today_pretty_fake()
+        column = self.request.query_params.get("column", "monthly_revenue")
+        order = self.request.query_params.get("order", "desc")
+        search_columns = self.request.query_params.get("searches", "")
+        searches_dict = {}
+        filters = self.request.query_params.get("filters", "")
 
-            search_columns = request.query_params.get("searches", "")
-            searches_dict = {}
+        if search_columns:
 
-            if search_columns:
-                filters = request.query_params.get("filters", "")
+            searchs = search_columns.split(",")
 
-                searchs = search_columns.split(",")
+            for col in searchs:
+                if col not in self.VALID_SEARCHES:
+                    raise ValidationError({"error": f"Invalid search column: {col}"})
+                searchs[0] = "title"
+            filters = filters.split(",")
+            for i in range(len(searchs)):
+                searches_dict[searchs[i]] = filters[i]
 
-                for col in searchs:
-                    if col not in self.VALID_SEARCHES:
-                        return Response({"error": f"Invalid search column: {col}"}, status=status.HTTP_400_BAD_REQUEST)
+        if column not in self.VALID_COLUMNS:
+            raise ValidationError({"error": f"Invalid column: {column}"})
+        if order not in self.VALID_ORDERS:
+            raise ValidationError({"error": f"Invalid order: {order}"})
 
-                if len(searchs) == 0 or len(searchs) > 1:
-                    return Response({"error": "Invalid search columns"}, status=status.HTTP_400_BAD_REQUEST)
-                searchs[0] = "s.title"
+        column = f"-{column}" if order == "desc" else column
+        queryset = ShopAnalyticsRecent.objects.all().order_by(column)
 
-                filters = filters.split(",")
+        # either title or link contains search search_dict['title']
+        if searches_dict:
+            queryset = queryset.filter(
+                Q(title__icontains=searches_dict["title"]) | Q(link__icontains=searches_dict["title"])
+            )
 
-                for i in range(len(searchs)):
-                    searches_dict[searchs[i]] = filters[i]
+        return queryset
 
-            if column not in self.VALID_COLUMNS:
-                return Response({"error": f"Invalid column: {column}"}, status=status.HTTP_400_BAD_REQUEST)
-            if order not in self.VALID_ORDERS:
-                return Response({"error": f"Invalid order: {order}"}, status=status.HTTP_400_BAD_REQUEST)
-
-            with connection.cursor() as cursor:
-                # Construct search clause
-                search_clause = ""
-                params = [date_pretty]
-                if searches_dict:
-                    for key, value in searches_dict.items():
-                        if search_clause:
-                            search_clause += " AND "
-                        search_clause += f"LOWER({key}) LIKE LOWER(%s)"
-                        params.append(f"%{value}%")
-                    search_clause = " AND " + search_clause
-
-                # First, count total number of rows
-                cursor.execute(
-                    """
-                    SELECT COUNT(*)
-                    FROM shop_shopanalytics sa
-                    JOIN shop_shop s ON sa.shop_id = s.seller_id
-                    WHERE sa.date_pretty = %s
-                """,
-                    [date_pretty],
-                )
-                total_count = cursor.fetchone()[0]
-
-                sql = f"""
-                    SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
-                        sa.average_purchase_price, sa.average_order_price, sa.rating,
-                        sa.date_pretty, sa.monthly_total_orders, sa.monthly_total_revenue,
-                        COUNT(DISTINCT sac.category_id) as num_categories,
-                        s.title as shop_title, s.link as seller_link
-                    FROM shop_shopanalytics sa
-                    JOIN shop_shop s ON sa.shop_id = s.seller_id
-                    LEFT JOIN shop_shopanalytics_categories sac ON sa.id = sac.shopanalytics_id
-                    WHERE sa.date_pretty = %s {search_clause}
-                    GROUP BY sa.id, s.title, s.link
-                    ORDER BY {column} {order}
-                    LIMIT %s OFFSET %s
-                """
-
-                params.extend([limit, offset])  # add limit and offset to params
-                cursor.execute(sql, params)
-                columns = [col[0] for col in cursor.description]
-                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-                # attach shop link to title as title(link)
-                for result in results:
-                    result["shop_title"] = f'{result["shop_title"]}(({result["seller_link"]}))'
-
-            # Create the response data
-            data = {
-                "results": results,
-                "count": total_count,
-            }
-
-            return Response(data, status=status.HTTP_200_OK)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return response
 
 # Base tariff
 class UserShopsView(APIView):
@@ -424,33 +368,13 @@ class UserShopsView(APIView):
                 return Response({"data": []}, status=201)
 
             # Execute raw SQL
-            shop_ids = ",".join([str(shop.seller_id) for shop in shops])
+            shop_ids = [shop.seller_id for shop in shops]
 
-            raw_sql = f"""
-            WITH LatestDate AS (
-                SELECT shop_id, MAX(created_at) as max_created
-                FROM shop_shopanalytics
-                WHERE shop_id IN ({shop_ids})
-                GROUP BY shop_id
-            )
+            shops = ShopAnalyticsRecent.objects.filter(seller_id__in=shop_ids).order_by("-monthly_revenue")
 
-            SELECT a.*, s.title, s.link, COUNT(DISTINCT sac.category_id) as num_categories
-            FROM shop_shopanalytics a
-            INNER JOIN LatestDate ld ON a.shop_id = ld.shop_id AND a.created_at = ld.max_created
-            INNER JOIN shop_shop s ON a.shop_id = s.seller_id
-            LEFT JOIN shop_shopanalytics_categories sac ON a.id = sac.shopanalytics_id
-            GROUP BY a.id, s.title, s.link;
-            """
+            serializer = ShopAnalyticsRecentSerializer(shops, many=True)
 
-            with connection.cursor() as cursor:
-                cursor.execute(raw_sql)
-                columns = [col[0] for col in cursor.description]
-                latest_analytics = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-            for shop in latest_analytics:
-                shop["shop_title"] = f'{shop["title"]}(({shop["link"]}))'
-
-            return Response({"data": latest_analytics}, status=status.HTTP_200_OK)
+            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
 
         except Exception as e:
             print(e)

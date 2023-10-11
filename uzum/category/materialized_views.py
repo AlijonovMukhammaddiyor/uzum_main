@@ -340,6 +340,89 @@ def update_shop_analytics_from_materialized_view(date_pretty):
             [date_pretty],
         )
 
+def create_combined_shop_analytics_materialized_view(date_pretty):
+    # Create interval materialized views for monthly and 3 months
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            DROP MATERIALIZED VIEW IF EXISTS combined_shop_analytics;
+            """
+        )
+
+    create_shop_analytics_interval_materialized_view(date_pretty, 30)
+    create_shop_analytics_interval_materialized_view(date_pretty, 90)
+
+    with connection.cursor() as cursor:
+        # Create the consolidated materialized view
+        cursor.execute(
+            """
+
+            CREATE MATERIALIZED VIEW combined_shop_analytics AS
+            SELECT
+                s.seller_id,
+                s.title,
+                s.link,
+                s.registration_date,
+                s.avatar,
+                sa.total_products,
+                sa.total_orders,
+                sa.total_reviews,
+                sa.average_purchase_price,
+                sa.rating,
+                monthly.total_orders_30days AS monthly_orders,
+                monthly.total_revenue_30days AS monthly_revenue,
+                quarterly.total_orders_90days AS quarterly_orders,
+                quarterly.total_revenue_90days AS quarterly_revenue
+            FROM
+                shop_shop s
+            JOIN
+                shop_shopanalytics sa ON s.seller_id = sa.shop_id AND sa.date_pretty = %s
+            LEFT JOIN
+                shop_analytics_30days monthly ON s.seller_id = monthly.shop_id
+            LEFT JOIN
+                shop_analytics_90days quarterly ON s.seller_id = quarterly.shop_id;
+            """,
+            [date_pretty],
+        )
+
+
+def create_shop_analytics_interval_materialized_view(date_pretty, interval_days):
+    end_date = (
+        timezone.make_aware(datetime.strptime(date_pretty, "%Y-%m-%d"))
+        .astimezone(pytz.timezone("Asia/Tashkent"))
+        .replace(hour=23, minute=59, second=0, microsecond=0)
+    )
+
+    start_date = end_date - timedelta(days=interval_days)
+
+    # If date_pretty is a datetime object, convert it to a string
+    if isinstance(date_pretty, datetime):
+        date_pretty = date_pretty.strftime("%Y-%m-%d")
+
+    with connection.cursor() as cursor:
+        # Create a name for the materialized view based on the interval
+        view_name = f"shop_analytics_{interval_days}days"
+
+        # Drop the materialized view if it exists
+        cursor.execute(f"DROP MATERIALIZED VIEW IF EXISTS {view_name};")
+
+        cursor.execute(
+            f"""
+            CREATE MATERIALIZED VIEW {view_name} AS
+            SELECT
+                shop_id,
+                SUM(daily_orders) AS total_orders_{interval_days}days,
+                SUM(daily_revenue) AS total_revenue_{interval_days}days
+            FROM
+                shop_shopanalytics
+            WHERE
+                date_pretty::DATE BETWEEN %s AND %s
+            GROUP BY
+                shop_id;
+            """,
+            [start_date, end_date],
+        )
 
 def create_shop_analytics_monthly_materialized_view(date_pretty):
     thirty_days_ago = (

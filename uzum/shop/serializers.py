@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from .models import Shop, ShopAnalytics
+from .models import Shop, ShopAnalytics, ShopAnalyticsRecent
 
 
 class ShopSerializer(ModelSerializer):
@@ -22,6 +22,33 @@ class ShopSerializer(ModelSerializer):
             "updated_at",
         ]
 
+class ShopAnalyticsRecentSerializer(ModelSerializer):
+    class Meta:
+        model = ShopAnalyticsRecent
+        fields = [
+            "total_products",
+            "total_orders",
+            "total_reviews",
+            "rating",
+            "average_purchase_price",
+            "monthly_revenue",
+            "monthly_orders",
+            "quarterly_revenue",
+            "quarterly_orders",
+            "title",
+            "avatar",
+            "link",
+            "seller_id",
+        ]
+
+    def to_representation(self, instance):
+        # Use the original to_representation to get the original serialized data
+        representation = super().to_representation(instance)
+
+        # Adjust the title
+        representation["title"] = f'{representation["title"]}(({representation["link"]}))'
+
+        return representation
 
 class ShopAnalyticsSerializer(ModelSerializer):
     class Meta:

@@ -299,3 +299,27 @@ def create_shop_analytics_table():
             )
             """
         )
+
+
+class ShopAnalyticsRecent(models.Model):
+    seller_id = models.IntegerField(primary_key=True)
+    title = models.TextField(null=True, blank=True)
+    avatar = models.TextField(null=True, blank=True)
+    link = models.TextField(null=True, blank=True)
+    registration_date = models.DateTimeField(null=True, blank=True)
+    total_products = models.IntegerField(default=0)
+    total_orders = models.IntegerField(default=0)
+    total_reviews = models.IntegerField(default=0)
+    average_purchase_price = models.FloatField(default=0, null=True, blank=True)
+    rating = models.FloatField(default=0)
+    monthly_orders = models.IntegerField(default=0, null=True, blank=True)
+    monthly_revenue = models.FloatField(default=0, null=True, blank=True)
+    quarterly_orders = models.IntegerField(default=0, null=True, blank=True)
+    quarterly_revenue = models.FloatField(default=0, null=True, blank=True)
+
+    class Meta:
+        managed = False  # This ensures that Django won't create a table for this model
+        db_table = 'combined_shop_analytics'  # The name of the materialized view in your database.
+
+    def __str__(self):
+        return f"Shop {self.shop_id} - 30 days analytics"
