@@ -232,7 +232,7 @@ def set_orders_amount_sku(date_pretty: str):
                         AVG(real_orders_amount) -
                         SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END) AS remaining_amount,
                         COUNT(*) FILTER (WHERE delta_available_amount <= 0 AND NOT (delta_available_amount = 0 AND available_amount = 0)) AS skus_with_no_delta,
-                        (AVG(real_orders_amount) - SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END)) / NULLIF(COUNT(*) FILTER (WHERE delta_available_amount <= 0 AND NOT (delta_available_amount = 0 AND available_amount = 0)), 0) AS base_amount,
+                        FLOOR((AVG(real_orders_amount) - SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END)) / NULLIF(COUNT(*) FILTER (WHERE delta_available_amount <= 0 AND NOT (delta_available_amount = 0 AND available_amount = 0)), 0)) AS base_amount,
                         (AVG(real_orders_amount) - SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END)) % NULLIF(COUNT(*) FILTER (WHERE delta_available_amount <= 0 AND NOT (delta_available_amount = 0 AND available_amount = 0)), 0) AS extra_skus,
                         AVG(real_orders_amount) AS real_orders_amount,
                         MAX(delta_available_amount) AS max_delta

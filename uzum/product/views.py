@@ -509,7 +509,14 @@ class SingleProductAnalyticsView(APIView):
             authorize_Base_tariff(request)
             print("SingleProductAnalyticsView")
             user: User = request.user
-            days = get_days_based_on_tariff(user)
+            days = 3
+            if user.tariff == Tariffs.BASE:
+                days = 60
+            elif user.tariff == Tariffs.SELLER:
+                days = 90
+            elif user.tariff == Tariffs.BUSINESS:
+                days = 120
+
             # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
             last_date = (
                 ProductAnalytics.objects.filter(product__product_id=product_id)

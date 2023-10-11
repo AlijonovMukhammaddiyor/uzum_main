@@ -49,9 +49,9 @@ class ShopAnalytics(models.Model):
     average_purchase_price = models.FloatField(default=0, null=True, blank=True)
     average_order_price = models.FloatField(default=0, null=True, blank=True)
     rating = models.FloatField(default=0)
-    banners = models.ManyToManyField(
-        "banner.Banner",
-    )
+    # banners = models.ManyToManyField(
+    #     "banner.Banner",
+    # )
     date_pretty = models.CharField(
         max_length=255,
         null=True,
