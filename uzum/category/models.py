@@ -358,7 +358,7 @@ class CategoryAnalytics(models.Model):
                 cursor.execute(
                     """
                     WITH latest_pa AS (
-                    SELECT DISTINCT ON (pa.product_id) pa.product_id, pa.real_orders_amount, pa.reviews_amount, pa.rating
+                    SELECT DISTINCT ON (pa.product_id) pa.product_id, pa.orders_amount, pa.reviews_amount, pa.rating, pa.orders_money
                     FROM product_productanalytics pa
                     WHERE pa.created_at <= %s
                     ORDER BY pa.product_id, pa.created_at DESC
@@ -369,7 +369,7 @@ class CategoryAnalytics(models.Model):
                         COALESCE(SUM(lpa.reviews_amount), 0) as total_reviews,
                         COALESCE(AVG(NULLIF(lpa.rating, 0)), 0) as average_rating,
                         COALESCE(SUM(lpa.orders_amount), 0) as total_orders,
-                        COALESCE(SUM(lpa.orders_money), 0) as total_revenue,
+                        COALESCE(SUM(lpa.orders_money), 0) as total_revenue
                     FROM
                         category_category c
                         LEFT JOIN product_product p ON p.category_id = ANY(
@@ -502,6 +502,7 @@ class CategoryAnalytics(models.Model):
             CategoryAnalytics.update_totals_for_date(date_pretty)
             # CategoryAnalytics.update_totals_with_sale(date_pretty)
             CategoryAnalytics.set_top_growing_categories()
+            CategoryAnalytics.set_daily_sales(date_pretty)
         except Exception as e:
             print(e, "Error in update_analytics")
 
