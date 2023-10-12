@@ -352,6 +352,7 @@ def create_combined_shop_analytics_materialized_view(date_pretty):
 
     create_shop_analytics_interval_materialized_view(date_pretty, 30)
     create_shop_analytics_interval_materialized_view(date_pretty, 90)
+    create_shop_analytics_monthly_materialized_view(date_pretty)
 
     with connection.cursor() as cursor:
         # Create the consolidated materialized view
@@ -373,7 +374,8 @@ def create_combined_shop_analytics_materialized_view(date_pretty):
                 monthly.total_orders_30days AS monthly_orders,
                 monthly.total_revenue_30days AS monthly_revenue,
                 quarterly.total_orders_90days AS quarterly_orders,
-                quarterly.total_revenue_90days AS quarterly_revenue
+                quarterly.total_revenue_90days AS quarterly_revenue,
+                mon.monthly_total_orders as monthly_transactions
             FROM
                 shop_shop s
             JOIN
@@ -381,7 +383,9 @@ def create_combined_shop_analytics_materialized_view(date_pretty):
             LEFT JOIN
                 shop_analytics_30days monthly ON s.seller_id = monthly.shop_id
             LEFT JOIN
-                shop_analytics_90days quarterly ON s.seller_id = quarterly.shop_id;
+                shop_analytics_90days quarterly ON s.seller_id = quarterly.shop_id
+            LEFT JOIN
+                shop_analytics_monthly mon ON s.seller_id = mon.shop_id;
             """,
             [date_pretty],
         )
@@ -394,7 +398,7 @@ def create_shop_analytics_interval_materialized_view(date_pretty, interval_days)
         .replace(hour=23, minute=59, second=0, microsecond=0)
     )
 
-    start_date = end_date - timedelta(days=interval_days)
+    start_date = end_date - timedelta(days=(interval_days - 1))
 
     # If date_pretty is a datetime object, convert it to a string
     if isinstance(date_pretty, datetime):
@@ -457,8 +461,7 @@ def create_shop_analytics_monthly_materialized_view(date_pretty):
             , CurrentEntries AS (
                 SELECT
                     shop_id,
-                    total_orders AS current_total_orders,
-                    total_revenue AS current_total_revenue
+                    total_orders AS current_total_orders
                 FROM
                     shop_shopanalytics
                 WHERE
@@ -471,9 +474,7 @@ def create_shop_analytics_monthly_materialized_view(date_pretty):
                 COALESCE(PA.total_orders, 0) AS orders_amount_30_days_ago,
                 COALESCE(PA.total_revenue, 0) AS orders_money_30_days_ago,
                 CE.current_total_orders,
-                CE.current_total_revenue,
-                GREATEST(CE.current_total_orders - COALESCE(PA.total_orders, 0), 0) AS monthly_total_orders,
-                GREATEST(CE.current_total_revenue - COALESCE(PA.total_revenue, 0), 0) AS monthly_total_revenue
+                GREATEST(CE.current_total_orders - COALESCE(PA.total_orders, 0), 0) AS monthly_total_orders
             FROM
                 CurrentEntries CE
             LEFT JOIN

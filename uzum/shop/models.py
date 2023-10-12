@@ -316,6 +316,7 @@ class ShopAnalyticsRecent(models.Model):
     monthly_revenue = models.FloatField(default=0, null=True, blank=True)
     quarterly_orders = models.IntegerField(default=0, null=True, blank=True)
     quarterly_revenue = models.FloatField(default=0, null=True, blank=True)
+    monthly_transactions = models.IntegerField(default=0, null=True, blank=True)
 
     class Meta:
         managed = False  # This ensures that Django won't create a table for this model

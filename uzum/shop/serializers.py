@@ -39,6 +39,7 @@ class ShopAnalyticsRecentSerializer(ModelSerializer):
             "avatar",
             "link",
             "seller_id",
+            "monthly_transactions"
         ]
 
     def to_representation(self, instance):
@@ -49,6 +50,27 @@ class ShopAnalyticsRecentSerializer(ModelSerializer):
         representation["title"] = f'{representation["title"]}(({representation["link"]}))'
 
         return representation
+
+class ShopAnalyticsRecentExcelSerializer(ModelSerializer):
+    class Meta:
+        model = ShopAnalyticsRecent
+        fields = [
+            "total_products",
+            "total_orders",
+            "total_reviews",
+            "rating",
+            "average_purchase_price",
+            "monthly_revenue",
+            "monthly_orders",
+            "quarterly_revenue",
+            "quarterly_orders",
+            "title",
+            "avatar",
+            "link",
+            "seller_id",
+            "monthly_transactions"
+        ]
+
 
 class ShopAnalyticsSerializer(ModelSerializer):
     class Meta:

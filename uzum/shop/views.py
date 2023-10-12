@@ -37,7 +37,7 @@ from uzum.utils.general import (Tariffs, authorize_Base_tariff,
                                 get_days_based_on_tariff, get_next_day_pretty,
                                 get_today_pretty_fake)
 
-from .serializers import (ExtendedShopSerializer, ShopAnalyticsRecentSerializer, ShopAnalyticsSerializer,
+from .serializers import (ExtendedShopSerializer, ShopAnalyticsRecentExcelSerializer, ShopAnalyticsRecentSerializer, ShopAnalyticsSerializer,
                           ShopCompetitorsSerializer, ShopSerializer)
 
 
@@ -242,52 +242,33 @@ class TreemapShopsView(APIView):
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ShopsExportExcelView(APIView):
+class ShopsExportExcelView(ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    allowed_methods = ["GET"]
+    serializer_class = ShopAnalyticsRecentSerializer
+    VALID_COLUMNS = [
+        "total_products",
+        "total_orders",
+        "total_reviews",
+        "average_purchase_price",
+        "rating",
+        "monthly_revenue",
+        "monthly_orders"
+        "quarterly_revenue",
+        "quarterly_orders",
+        "monthly_transactions"
+    ]
+    VALID_ORDERS = ["asc", "desc"]
+    VALID_SEARCHES = ["title"]
 
     def get(self, request: Request, *args, **kwargs):
-        try:
-            authorize_Base_tariff(request)
-            date_pretty = get_today_pretty_fake()
+        if request.user.tariff == Tariffs.FREE or request.user.tariff == Tariffs.TRIAL:
+            return Response(status=200, data={"data": []})
+        queryset = ShopAnalyticsRecent.objects.all().order_by("-monthly_revenue")
 
-            with connection.cursor() as cursor:
-                # First, count total number of rows
-                cursor.execute(
-                    """
-                    SELECT COUNT(*)
-                    FROM shop_shopanalytics sa
-                    JOIN shop_shop s ON sa.shop_id = s.seller_id
-                    WHERE sa.date_pretty = %s
-                """,
-                    [date_pretty],
-                )
+        serializer = ShopAnalyticsRecentExcelSerializer(queryset, many=True)
 
-                cursor.execute(
-                    """
-                    SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
-                        sa.average_purchase_price, sa.average_order_price, sa.rating,
-                        sa.date_pretty,
-                        COUNT(DISTINCT sac.category_id) as num_categories,
-                        s.title as shop_title, s.link as seller_link
-                    FROM shop_shopanalytics sa
-                    JOIN shop_shop s ON sa.shop_id = s.seller_id
-                    LEFT JOIN shop_shopanalytics_categories sac ON sa.id = sac.shopanalytics_id
-                    WHERE sa.date_pretty = %s
-                    GROUP BY sa.id, s.title, s.link
-                """,
-                    [date_pretty],
-                )
-                columns = [col[0] for col in cursor.description]
-                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-                return Response(data=results, status=status.HTTP_200_OK)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 # Base tariff
 class ShopsView(ListAPIView):
@@ -306,6 +287,7 @@ class ShopsView(ListAPIView):
         "monthly_orders"
         "quarterly_revenue",
         "quarterly_orders",
+        "monthly_transactions"
     ]
     VALID_ORDERS = ["asc", "desc"]
     VALID_SEARCHES = ["title"]
