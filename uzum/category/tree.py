@@ -102,8 +102,8 @@ def update_category_tree_with_weekly_data(date_pretty=get_today_pretty()):
 
         for data in analytics_dict.values():
             monthly_data = monthly_analytics_data.get(data["category_id"], {})
-            if not monthly_data:
-                print("No monthly data for category: ", data["category_id"])
+            # if not monthly_data:
+                # print("No monthly data for category: ", data["category_id"])
             for key in ["total_orders_amount", "total_orders", "total_products", "total_reviews", "total_shops"]:
                 data[key] = data.get(key, 0) - monthly_data.get(key, 0)
 
@@ -122,8 +122,8 @@ def update_category_tree_with_weekly_data(date_pretty=get_today_pretty()):
 
         for data in min_max_dict.values():
             monthly_data = monthly_analytics_data.get(data["category_id"], {})
-            if not monthly_data:
-                print("No monthly data for category: ", data["category_id"])
+            # if not monthly_data:
+            #     print("No monthly data for category: ", data["category_id"])
             for key in ["total_orders_amount", "total_orders", "total_products", "total_reviews", "total_shops"]:
                 data[key] = data.get(key, 0) - monthly_data.get(key, 0)
 
@@ -246,8 +246,8 @@ def update_category_tree_with_monthly_data(date_pretty=None):
 
         for data in analytics_dict.values():
             monthly_data = monthly_analytics_data.get(data["category_id"], {})
-            if not monthly_data:
-                print("No monthly data for category: ", data["category_id"])
+            # if not monthly_data:
+            #     print("No monthly data for category: ", data["category_id"])
             for key in ["total_orders_amount", "total_orders", "total_products", "total_reviews", "total_shops"]:
                 data[key] = data.get(key, 0) - monthly_data.get(key, 0)
 
@@ -266,8 +266,8 @@ def update_category_tree_with_monthly_data(date_pretty=None):
 
         for data in min_max_dict.values():
             monthly_data = monthly_analytics_data.get(data["category_id"], {})
-            if not monthly_data:
-                print("No monthly data for category: ", data["category_id"])
+            # if not monthly_data:
+            #     print("No monthly data for category: ", data["category_id"])
             for key in ["total_orders_amount", "total_orders", "total_products", "total_reviews", "total_shops"]:
                 data[key] = data.get(key, 0) - monthly_data.get(key, 0)
 
