@@ -831,6 +831,8 @@ class ShopDailySalesView(APIView):
                     "product__category__categoryId",
                     "product__photos",
                     "date_pretty",
+                    "real_orders_amount",
+                    "daily_revenue",
                 )
                 .order_by("-orders_amount")
             )
@@ -961,8 +963,6 @@ class ShopDailySalesView(APIView):
                 ]
             else:
                 final_res = target_analytics
-
-            print("Shop Daily Sales View Time taken: ", time.time() - start)
 
             return Response(
                 final_res,
