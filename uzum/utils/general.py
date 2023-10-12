@@ -41,7 +41,7 @@ def get_today_pretty():
 def get_today_pretty_fake():
     # check if it is 7:00 AM in Tashkent
     # return "2023-07-22"
-    if datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).hour >= 9:
+    if datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).hour >= 6:
         return datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
     else:
         # if not, return yesterday
@@ -195,10 +195,10 @@ def get_days_based_on_tariff(user):
     try:
         tariff = user.tariff
         if tariff == Tariffs.FREE:
-            return 101
+            return 3
 
         elif tariff == Tariffs.TRIAL:
-            return 60
+            return 3
 
         elif tariff == Tariffs.BASE:
             return 60

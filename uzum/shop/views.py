@@ -556,6 +556,8 @@ class ShopAnalyticsView(APIView):
     @extend_schema(tags=["Shop"])
     def get(self, request: Request, seller_id: int):
         try:
+            if request.user.tariff == Tariffs.FREE or request.user.tariff == Tariffs.TRIAL:
+                return Response(status=200, data={"data": []})
             authorize_Base_tariff(request)
             user: User = request.user
 
@@ -588,7 +590,7 @@ class ShopAnalyticsView(APIView):
                 cursor.execute(
                     """
                     SELECT sa.id, sa.total_products, sa.total_orders, sa.total_reviews, sa.total_revenue,
-                        sa.average_purchase_price, sa.average_order_price, sa.rating,
+                        sa.average_purchase_price, sa.daily_revenue, sa.daily_orders, sa.rating,
                         sa.date_pretty, COUNT(sa_categories.category_id) as category_count
                     FROM shop_shopanalytics sa
                     LEFT JOIN shop_shopanalytics_categories sa_categories ON sa.id = sa_categories.shopanalytics_id
@@ -689,8 +691,7 @@ class ShopCompetitorsView(APIView):
 
             if seller_id is None:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
-            print("Shop Competitors View")
-            start = time.time()
+
             shop = get_object_or_404(Shop, seller_id=seller_id)
             days = get_days_based_on_tariff(user)
             print(days, request.user)
@@ -991,6 +992,7 @@ class ShopProductsView(ListAPIView):
         seller_id = self.kwargs["seller_id"]
 
         shop = get_object_or_404(Shop, seller_id=seller_id)
+        link = shop.link
 
         ordering = self.request.query_params.get("order", "desc")
         column = self.request.query_params.get("column", "orders_money")
@@ -1018,7 +1020,7 @@ class ShopProductsView(ListAPIView):
         if ordering == "desc":
             order_by_column = f"-{column}"
 
-        return ProductAnalyticsView.objects.filter(shop_link=shop.link).filter(filter_query).order_by(order_by_column)
+        return ProductAnalyticsView.objects.filter(shop_link=link).filter(filter_query).order_by(order_by_column)
 
     def list(self, request, *args, **kwargs):
         authorize_Base_tariff(request)
@@ -1037,41 +1039,45 @@ class ShopTopProductsView(APIView):
     serializer_class = ProductAnalyticsViewSerializer
 
     def get(self, request: Request, seller_id: int):
-        """
-        This view should return a list of all the products for
-        the category as determined by the category portion of the URL.
-        """
-        authorize_Base_tariff(request)
+        try:
+            """
+            This view should return a list of all the products for
+            the category as determined by the category portion of the URL.
+            """
+            authorize_Base_tariff(request)
 
-        # user: User = request.user
-        # shops = user.shops.all()
+            # user: User = request.user
+            # shops = user.shops.all()
 
-        # if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
-        #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"})
+            # if not shops.filter(seller_id=seller_id).exists() and user.tariff != Tariffs.BUSINESS:
+            #     return Response(status=status.HTTP_403_FORBIDDEN, data={"message": "You don't have access to this shop"})
 
-        seller_id = self.kwargs["seller_id"]
-        shop = Shop.objects.get(seller_id=seller_id)
+            seller_id = self.kwargs["seller_id"]
+            shop = Shop.objects.get(seller_id=seller_id)
 
-        latest_analytics = ShopAnalytics.objects.filter(shop=shop).order_by("-created_at")[0]
-        products = ProductAnalyticsView.objects.filter(shop_link=shop.link)
+            latest_analytics = ShopAnalyticsRecent.objects.get(seller_id=seller_id)
+            products = ProductAnalyticsView.objects.filter(shop_link=shop.link)
 
-        n = 10 if products.count() < 100 else 20
+            n = 10 if products.count() < 20 else 20
 
-        orders_products = products.order_by("-orders_amount")[:n]
-        reviews_products = products.order_by("-reviews_amount")[:n]
-        revenue_products = products.order_by("-orders_money")[:n]
+            orders_products = products.order_by("-monthly_orders")[:n]
+            reviews_products = products.order_by("-reviews_amount")[:n]
+            revenue_products = products.order_by("-monthly_revenue")[:n]
 
-        return Response(
-            data={
-                "orders_products": ProductAnalyticsViewSerializer(orders_products, many=True).data,
-                "reviews_products": ProductAnalyticsViewSerializer(reviews_products, many=True).data,
-                "revenue_products": ProductAnalyticsViewSerializer(revenue_products, many=True).data,
-                "total_orders": latest_analytics.total_orders,
-                "total_reviews": latest_analytics.total_reviews,
-                "total_revenue": latest_analytics.total_revenue,
-            },
-            status=status.HTTP_200_OK,
-        )
+            return Response(
+                data={
+                    "orders_products": ProductAnalyticsViewSerializer(orders_products, many=True).data,
+                    "reviews_products": ProductAnalyticsViewSerializer(reviews_products, many=True).data,
+                    "revenue_products": ProductAnalyticsViewSerializer(revenue_products, many=True).data,
+                    "total_orders": latest_analytics.monthly_orders,
+                    "total_revenue": latest_analytics.monthly_revenue,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=201, data={"orders_products": [], "reviews_products": [], "revenue_products": [], "total_orders": 0, "total_reviews": 0, "total_revenue": 0})
 
 
 # Base tariff
@@ -1235,20 +1241,14 @@ class ShopCategoryAnalyticsView(APIView):
                 datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
-            # if it is before 7 am in Tashkent, it is still yesterday
-            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
-                current_date = timezone.make_aware(
-                    datetime.now() - timedelta(days=1), timezone=pytz.timezone("Asia/Tashkent")
-                ).replace(hour=23, minute=59, second=59, microsecond=999999)
-            else:
-                current_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
-                    hour=23, minute=59, second=59, microsecond=999999
-                )
+            current_date = timezone.make_aware(
+                datetime.strptime(get_today_pretty_fake(), "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
             if category_id == 1:
                 # return shop analytics for dates between start_date and current_date
                 sa = (
-                    ShopAnalytics.objects.filter(shop_id=seller_id, created_at__gte=start_date)
+                    ShopAnalytics.objects.filter(shop_id=seller_id, created_at__range=[start_date, current_date])
                     .order_by("created_at")
                     .values(
                         "date_pretty",
