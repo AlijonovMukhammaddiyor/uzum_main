@@ -624,6 +624,11 @@ class SimilarProductsViewByUzum(APIView):
                 timezone=pytz.timezone("Asia/Tashkent"),
             )
 
+            end_date = timezone.make_aware(
+                datetime.combine(datetime.strptime(get_today_pretty_fake(), "%Y-%m-%d"), datetime.min.time()),
+                timezone=pytz.timezone("Asia/Tashkent"),
+            ).replace(hour=23, minute=59, second=59)
+
             product = Product.objects.get(product_id=product_id)
 
             product_analytics = (
@@ -647,7 +652,7 @@ class SimilarProductsViewByUzum(APIView):
                     ),
                 )
                 .order_by("diff_orders_money", "diff_avg_purchase_price")
-                .values_list("product__product_id", flat=True)[:100]
+                .values_list("product__product_id", flat=True)[:50]
             )
 
             productIds = list(similar_products)
@@ -655,7 +660,7 @@ class SimilarProductsViewByUzum(APIView):
 
             analytics = (
                 ProductAnalytics.objects.select_related("product")
-                .filter(product__product_id__in=productIds, created_at__gte=start_date)
+                .filter(product__product_id__in=productIds, created_at__range=[start_date, end_date])
                 .order_by("product__product_id", "created_at")
                 .values(
                     "product__product_id",
