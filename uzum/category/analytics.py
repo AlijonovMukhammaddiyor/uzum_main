@@ -67,7 +67,7 @@ def update_analytics(date_pretty: str):
         print(f"Creating latest analytics for {date_pretty}...")
         create_product_latestanalytics(date_pretty=date_pretty)
         insert_shop_analytics(date_pretty=date_pretty)
-        update_monthly_for_shops(date_pretty)
+        # update_monthly_for_shops(date_pretty)
 
         print("Creating Materialized View...")
         start = time.time()
@@ -111,6 +111,7 @@ def insert_shop_analytics(date_pretty):
         )
 
 def update_monthly_for_shops(date_pretty):
-    create_shop_analytics_monthly_materialized_view(date_pretty)
-    update_shop_analytics_from_materialized_view(date_pretty)
+    # create_shop_analytics_monthly_materialized_view(date_pretty)
+    # update_shop_analytics_from_materialized_view(date_pretty)
+    pass
 
