@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 import pytz
 from django.db import connection
 from django.db.models import (CharField, Count, F, IntegerField, Max, Min,
-                              OuterRef, Q, Subquery, Sum)
+                              OuterRef, Q, Subquery, Sum, Value)
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -317,7 +318,8 @@ class ShopsView(ListAPIView):
         if order not in self.VALID_ORDERS:
             raise ValidationError({"error": f"Invalid order: {order}"})
 
-        column = f"-{column}" if order == "desc" else column
+        column_ordering = Coalesce(F(column), Value(0))
+        column = f"-{column_ordering}" if order == "desc" else column_ordering
         queryset = ShopAnalyticsRecent.objects.all().order_by(column)
 
         # either title or link contains search search_dict['title']

@@ -358,7 +358,6 @@ def create_combined_shop_analytics_materialized_view(date_pretty):
         # Create the consolidated materialized view
         cursor.execute(
             """
-
             CREATE MATERIALIZED VIEW combined_shop_analytics AS
             SELECT
                 s.seller_id,
