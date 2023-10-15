@@ -318,9 +318,12 @@ class ShopsView(ListAPIView):
         if order not in self.VALID_ORDERS:
             raise ValidationError({"error": f"Invalid order: {order}"})
 
-        column_ordering = Coalesce(F(column), Value(0))
-        column = f"-{column_ordering}" if order == "desc" else column_ordering
-        queryset = ShopAnalyticsRecent.objects.all().order_by(column)
+        # Replace NULL with 0 in the ordering column
+        queryset = ShopAnalyticsRecent.objects.annotate(
+            order_column=Coalesce(F(column), Value(0))
+        )
+        column = "-order_column" if order == "desc" else "order_column"
+        queryset = queryset.order_by(column)
 
         # either title or link contains search search_dict['title']
         if searches_dict:
