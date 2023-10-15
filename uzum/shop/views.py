@@ -317,7 +317,6 @@ class ShopsView(ListAPIView):
         if order not in self.VALID_ORDERS:
             raise ValidationError({"error": f"Invalid order: {order}"})
 
-
         column = f"-{column}" if order == "desc" else column
         queryset = ShopAnalyticsRecent.objects.all().order_by(column)
 

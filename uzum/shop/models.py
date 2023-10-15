@@ -310,13 +310,13 @@ class ShopAnalyticsRecent(models.Model):
     total_products = models.IntegerField(default=0)
     total_orders = models.IntegerField(default=0)
     total_reviews = models.IntegerField(default=0)
-    average_purchase_price = models.FloatField(default=0, null=True, blank=True)
+    average_purchase_price = models.FloatField(default=0)
     rating = models.FloatField(default=0)
-    monthly_orders = models.IntegerField(default=0, null=True, blank=True)
-    monthly_revenue = models.FloatField(default=0, null=True, blank=True)
-    quarterly_orders = models.IntegerField(default=0, null=True, blank=True)
-    quarterly_revenue = models.FloatField(default=0, null=True, blank=True)
-    monthly_transactions = models.IntegerField(default=0, null=True, blank=True)
+    monthly_orders = models.IntegerField(default=0)
+    monthly_revenue = models.FloatField(default=0)
+    quarterly_orders = models.IntegerField(default=0)
+    quarterly_revenue = models.FloatField(default=0)
+    monthly_transactions = models.IntegerField(default=0)
 
     class Meta:
         managed = False  # This ensures that Django won't create a table for this model
