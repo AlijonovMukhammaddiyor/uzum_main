@@ -8,7 +8,7 @@ from django.db import connection
 
 from uzum.banner.models import Banner
 from uzum.category.materialized_views import (
-    create_materialized_view, create_shop_analytics_monthly_materialized_view,
+    create_combined_shop_analytics_materialized_view, create_materialized_view, create_shop_analytics_monthly_materialized_view,
     update_shop_analytics_from_materialized_view)
 from uzum.category.models import CategoryAnalytics
 from uzum.category.utils import vacuum_table
@@ -75,6 +75,7 @@ def update_analytics(date_pretty: str):
         print(f"Materialized View created in {time.time() - start} seconds")
         print("Setting banners...")
         Banner.set_products()
+        create_combined_shop_analytics_materialized_view(date_pretty)
 
     except Exception as e:
         print("Error in update_analytics:", e)

@@ -365,16 +365,16 @@ def create_combined_shop_analytics_materialized_view(date_pretty):
                 s.link,
                 s.registration_date,
                 s.avatar,
-                sa.total_products,
-                sa.total_orders,
-                sa.total_reviews,
-                sa.average_purchase_price,
-                sa.rating,
-                monthly.total_orders_30days AS monthly_orders,
-                monthly.total_revenue_30days AS monthly_revenue,
-                quarterly.total_orders_90days AS quarterly_orders,
-                quarterly.total_revenue_90days AS quarterly_revenue,
-                mon.monthly_total_orders as monthly_transactions
+                COALESCE(sa.total_products, 0) AS total_products,
+                COALESCE(sa.total_orders, 0) AS total_orders,
+                COALESCE(sa.total_reviews, 0) AS total_reviews,
+                COALESCE(sa.average_purchase_price, 0) AS average_purchase_price,
+                COALESCE(sa.rating, 0) AS rating,
+                COALESCE(monthly.total_orders_30days, 0) AS monthly_orders,
+                COALESCE(monthly.total_revenue_30days, 0) AS monthly_revenue,
+                COALESCE(quarterly.total_orders_90days, 0) AS quarterly_orders,
+                COALESCE(quarterly.total_revenue_90days, 0) AS quarterly_revenue,
+                COALESCE(mon.monthly_total_orders, 0) AS monthly_transactions
             FROM
                 shop_shop s
             JOIN
@@ -483,7 +483,6 @@ def create_shop_analytics_monthly_materialized_view(date_pretty):
             """,
             [thirty_days_ago, date_pretty],
         )
-
 
 def create_product_analytics_weekly_materialized_view(date_pretty):
     thirty_days_ago = (
