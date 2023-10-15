@@ -34,7 +34,7 @@ class Category(models.Model):
     ancestors = models.TextField(null=True, blank=True)
     ancestors_ru = models.TextField(null=True, blank=True)  # new field for Russian ancestors
 
-    def generate_ancestors_string(self, language="en"):
+    def generate_ancestors_string(self, language="uz"):
         current_category = self
         ancestors = []
 

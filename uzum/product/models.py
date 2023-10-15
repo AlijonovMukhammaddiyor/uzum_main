@@ -420,6 +420,70 @@ class ProductAnalytics(models.Model):
         except Exception as e:
             print(e)
 
+    @staticmethod
+    def update_positions(date_pretty=get_today_pretty()):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH RECURSIVE ancestors_cte AS (
+                        SELECT
+                            c."categoryId",
+                            c."title" AS category_title,
+                            CAST(SPLIT_PART(SPLIT_PART(c.ancestors, '/', n), ':', 2) AS INTEGER) AS category_id
+                        FROM
+                            (SELECT "categoryId", "title", ancestors, GENERATE_SERIES(1, COALESCE(ARRAY_LENGTH(REGEXP_SPLIT_TO_ARRAY(ancestors, '/'), 1), 1)) AS n FROM category_category) c
+                        WHERE
+                            c.ancestors IS NOT NULL AND
+                            c.ancestors != '' AND
+                            c."categoryId" != 1 AND
+                            LENGTH(c.ancestors) - LENGTH(REPLACE(c.ancestors, '/', '')) >= c.n
+                        UNION ALL
+                        SELECT
+                            c."categoryId",
+                            c."title" AS category_title,
+                            c."categoryId" AS category_id
+                        FROM
+                            category_category c
+                ),
+                product_ranks AS (
+                    SELECT
+                        pav.product_id,
+                        anc.category_title,
+                        anc."categoryId",
+                        RANK() OVER(PARTITION BY anc.category_id ORDER BY pav.monthly_revenue DESC) AS rank
+                    FROM
+                        product_sku_analytics pav
+                    JOIN
+                        ancestors_cte anc ON pav.category_id = anc.category_id
+                    WHERE
+                        anc.category_id IS NOT NULL  -- Ensure only non-NULL category_ids are considered
+                )
+                UPDATE
+                    product_productanalytics pa
+                SET
+                    positions = ranks_concat
+                FROM (
+                    SELECT
+                        pr.product_id,
+                        pr."categoryId",
+                        STRING_AGG(CONCAT(pr.category_title, '#', pr.rank), ',') AS ranks_concat
+                    FROM
+                        product_ranks pr
+                    GROUP BY
+                        pr.product_id, pr."categoryId"
+                ) pr
+                WHERE
+                    pa.product_id = pr.product_id AND pa.date_pretty = %s;
+
+                    """,
+                    [date_pretty],
+                )
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
 
 class ProductAnalyticsView(models.Model):
     product_id = models.IntegerField(primary_key=True)
