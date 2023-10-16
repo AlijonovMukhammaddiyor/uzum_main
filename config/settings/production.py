@@ -25,6 +25,7 @@ ALLOWED_HOSTS += [
     "uzumanalitika.com",
     "207.154.218.194",
     "factual-arachnid-weekly.ngrok-free.app",
+    "uzum.uz",
 ]
 
 # DATABASES
@@ -210,6 +211,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://uzanalitika.uz",
     "https://www.uzanalitika.uz",
     "https://www.uzumanalitika.com",
+    "https://uzum.uz"
 ]
 
 CORS_ORIGIN_WHITELIST = [
@@ -219,7 +221,8 @@ CORS_ORIGIN_WHITELIST = [
     "http://localhost:8000",
     "https://uzanalitika.uz",
     "https://www.uzanalitika.uz",
-    "https://www.uzumanalitika.com"
+    "https://www.uzumanalitika.com",
+    "https://uzum.uz"
     # Add other allowed origins if needed
 ]
 
@@ -231,7 +234,8 @@ CSRF_TRUSTED_ORIGINS = [
     "https://api.alijonov.com",
     "https://www.uzanalitika.uz",
     "https://api.uzanalitika.uz",
-    "https://www.uzumanalitika.com"
+    "https://www.uzumanalitika.com",
+    "https://uzum.uz"
     # Add other allowed origins if needed
 ]
 

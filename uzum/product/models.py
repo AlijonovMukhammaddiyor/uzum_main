@@ -354,6 +354,7 @@ class ProductAnalytics(models.Model):
             ProductAnalytics.set_daily_revenue(date_pretty)
             ProductAnalytics.set_positions(date_pretty)
             ProductAnalytics.set_top_growing_products()
+            ProductAnalytics.update_positions(date_pretty)
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -430,18 +431,20 @@ class ProductAnalytics(models.Model):
                         SELECT
                             c."categoryId",
                             c."title" AS category_title,
-                            CAST(SPLIT_PART(SPLIT_PART(c.ancestors, '/', n), ':', 2) AS INTEGER) AS category_id
+                            SPLIT_PART(SPLIT_PART(c.ancestors_ru, '/', n), ':', 1) AS ancestor_title,
+                            CAST(SPLIT_PART(SPLIT_PART(c.ancestors_ru, '/', n), ':', 2) AS INTEGER) AS category_id
                         FROM
-                            (SELECT "categoryId", "title", ancestors, GENERATE_SERIES(1, COALESCE(ARRAY_LENGTH(REGEXP_SPLIT_TO_ARRAY(ancestors, '/'), 1), 1)) AS n FROM category_category) c
+                            (SELECT "categoryId", "title", ancestors_ru, GENERATE_SERIES(1, COALESCE(ARRAY_LENGTH(REGEXP_SPLIT_TO_ARRAY(ancestors_ru, '/'), 1), 1)) AS n FROM category_category) c
                         WHERE
-                            c.ancestors IS NOT NULL AND
-                            c.ancestors != '' AND
+                            c.ancestors_ru IS NOT NULL AND
+                            c.ancestors_ru != '' AND
                             c."categoryId" != 1 AND
-                            LENGTH(c.ancestors) - LENGTH(REPLACE(c.ancestors, '/', '')) >= c.n
+                            LENGTH(c.ancestors_ru) - LENGTH(REPLACE(c.ancestors_ru, '/', '')) >= c.n - 1
                         UNION ALL
                         SELECT
                             c."categoryId",
-                            c."title" AS category_title,
+                            c."title_ru" AS category_title,
+                            c."title_ru" AS ancestor_title,
                             c."categoryId" AS category_id
                         FROM
                             category_category c
@@ -450,12 +453,14 @@ class ProductAnalytics(models.Model):
                     SELECT
                         pav.product_id,
                         anc.category_title,
+                        anc.category_id,
                         anc."categoryId",
+                        anc.ancestor_title,
                         RANK() OVER(PARTITION BY anc.category_id ORDER BY pav.monthly_revenue DESC) AS rank
                     FROM
                         product_sku_analytics pav
                     JOIN
-                        ancestors_cte anc ON pav.category_id = anc.category_id
+                        ancestors_cte anc ON pav.category_id = anc."categoryId"
                     WHERE
                         anc.category_id IS NOT NULL  -- Ensure only non-NULL category_ids are considered
                 )
@@ -467,7 +472,7 @@ class ProductAnalytics(models.Model):
                     SELECT
                         pr.product_id,
                         pr."categoryId",
-                        STRING_AGG(CONCAT(pr.category_title, '#', pr.rank), ',') AS ranks_concat
+                        STRING_AGG(CONCAT(pr.ancestor_title, '#', pr.rank), ',') AS ranks_concat
                     FROM
                         product_ranks pr
                     GROUP BY

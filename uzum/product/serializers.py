@@ -149,3 +149,15 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
             "recent_analytics",
             "sku_analytics",
         ]
+
+class ExtendedProductAnalyticsCardSerializer(serializers.ModelSerializer):
+    recent_analytics = ProductAnalyticsSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            "created_at",
+            "title",
+            "title_ru",
+            "recent_analytics",
+        ]

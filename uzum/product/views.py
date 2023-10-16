@@ -493,6 +493,163 @@ class ProductsToExcelView(APIView):
             return Response([])
 
 
+class ExtensionProductAnalyticsView(APIView):
+    permission_classes = [AllowAny]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Product"])
+    def get(self, request: Request, product_id: str):
+        try:
+            start = time.time()
+
+            token = request.headers.get("Authorization")
+
+            if not token:
+                return Response({"error": "Authorization header is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            user: User = User.objects.get(telegram_token=token.split()[1].strip())
+
+            days = 3
+            if user.tariff == Tariffs.BASE:
+                days = 30
+            elif user.tariff == Tariffs.SELLER:
+                days = 90
+            elif user.tariff == Tariffs.BUSINESS:
+                days = 120
+
+            # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
+            last_date = (
+                ProductAnalytics.objects.filter(product__product_id=product_id)
+                .order_by("-created_at")
+                .first()
+                .created_at
+            )
+
+            start_date = timezone.make_aware(
+                datetime.combine(last_date - timedelta(days=days), datetime.min.time()),
+                timezone=pytz.timezone("Asia/Tashkent"),
+            )
+
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                end_date = timezone.make_aware(
+                    datetime.combine(date.today() - timedelta(days=1), datetime.min.time()),
+                    timezone=pytz.timezone("Asia/Tashkent"),
+                ).replace(hour=23, minute=59, second=59)
+            else:
+                end_date = timezone.make_aware(
+                    datetime.combine(date.today(), datetime.min.time()),
+                    timezone=pytz.timezone("Asia/Tashkent"),
+                ).replace(hour=23, minute=59, second=59)
+
+            product_analytics_qs = ProductAnalytics.objects.filter(
+                product__product_id=product_id, created_at__range=[start_date, end_date]
+            ).order_by("created_at")
+
+            product = (
+                Product.objects.filter(product_id=product_id)
+                .prefetch_related(
+                    Prefetch("analytics", queryset=product_analytics_qs, to_attr="recent_analytics"),
+                )
+                .first()
+            )
+
+            if not product:
+                return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            serializer = ExtendedProductAnalyticsSerializer(product)
+            print("SingleProductAnalyticsView query time", time.time() - start)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ExtensionSingleProductAnalyticsView(APIView):
+    permission_classes = [AllowAny]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Product"])
+    def get(self, request: Request, product_id: str):
+        try:
+            start = time.time()
+
+            token = request.headers.get("Authorization")
+
+            if not token:
+                return Response({"error": "Authorization header is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            user: User = User.objects.get(telegram_token=token.split()[1].strip())
+
+            days = 3
+            if user.tariff == Tariffs.BASE:
+                days = 30
+            elif user.tariff == Tariffs.SELLER:
+                days = 90
+            elif user.tariff == Tariffs.BUSINESS:
+                days = 120
+
+            # set to the 00:00 of 30 days ago in Asia/Tashkent timezone
+            last_date = (
+                ProductAnalytics.objects.filter(product__product_id=product_id)
+                .order_by("-created_at")
+                .first()
+                .created_at
+            )
+
+            start_date = timezone.make_aware(
+                datetime.combine(last_date - timedelta(days=days), datetime.min.time()),
+                timezone=pytz.timezone("Asia/Tashkent"),
+            )
+
+            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
+                end_date = timezone.make_aware(
+                    datetime.combine(date.today() - timedelta(days=1), datetime.min.time()),
+                    timezone=pytz.timezone("Asia/Tashkent"),
+                ).replace(hour=23, minute=59, second=59)
+            else:
+                end_date = timezone.make_aware(
+                    datetime.combine(date.today(), datetime.min.time()),
+                    timezone=pytz.timezone("Asia/Tashkent"),
+                ).replace(hour=23, minute=59, second=59)
+
+            product_analytics_qs = ProductAnalytics.objects.filter(
+                product__product_id=product_id, created_at__range=[start_date, end_date]
+            ).order_by("created_at")
+
+            sku_analytics_qs = SkuAnalytics.objects.filter(
+                sku__product__product_id=product_id, created_at__range=[start_date, end_date]
+            ).order_by("created_at")
+
+            product = (
+                Product.objects.filter(product_id=product_id)
+                .annotate(
+                    skus_count=Count("skus"),
+                )
+                .prefetch_related(
+                    Prefetch("analytics", queryset=product_analytics_qs, to_attr="recent_analytics"),
+                    Prefetch("skus__analytics", queryset=sku_analytics_qs, to_attr="recent_analytics"),
+                )
+                .first()
+            )
+
+            if not product:
+                return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            # Now, for each product in `products`, you can access `product.recent_analytics`
+            # and `sku.recent_sku_analytics`
+            # for each SKU in `product.skus.all()`, to get the analytics records since the start date.
+
+            serializer = ExtendedProductAnalyticsSerializer(product)
+            print("SingleProductAnalyticsView query time", time.time() - start)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 # Base tariff
 class SingleProductAnalyticsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -579,6 +736,80 @@ class SingleProductAnalyticsView(APIView):
             print(e)
             traceback.print_exc()
             return Response({"error": "Something went wrong"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ExtensionProductCardView(APIView):
+    permission_classes = [AllowAny]
+    allowed_methods = ["GET"]
+
+    @extend_schema(tags=["Product"])
+    def get(self, request: Request):
+        try:
+            start = time.time()
+
+            # get token from header
+            token = request.headers.get("Authorization", None)
+            productIds = request.query_params.get("product_ids", '')
+
+            productIds = productIds.split(",")
+
+            if not token:
+                return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            user: User = User.objects.get(telegram_token=token.split()[1].strip())
+
+            if user.tariff == Tariffs.FREE or user.tariff == Tariffs.TRIAL:
+                data = ProductAnalyticsView.objects.filter(product_id__in=productIds).values(
+                    "product_id",
+                    "orders_3_days",
+                    "shop_title","shop_link",
+                )
+            elif user.tariff == Tariffs.BASE:
+                data = ProductAnalyticsView.objects.filter(product_id__in=productIds).values(
+                    "product_id",
+                    "orders_3_days",
+                    "monthly_orders",
+                    "shop_title","shop_link",
+                )
+            else:
+                data = ProductAnalyticsView.objects.filter(product_id__in=productIds).values(
+                    "product_id",
+                    "orders_3_days",
+                    "monthly_orders",
+                    "orders_90_days",
+                    "shop_title",
+                    "shop_link",
+                )
+
+            positions = ProductAnalytics.objects.filter(product__product_id__in=productIds, date_pretty=get_today_pretty_fake()).values(
+                "positions",
+                "product__product_id",
+            )
+
+            # make a dictionary with product_id as key
+            data_dict = {}
+            for item in data:
+                data_dict[item["product_id"]] = item
+
+            # make a dictionary with product_id as key
+            positions_dict = {}
+            for item in positions:
+                positions_dict[item["product__product_id"]] = item["positions"]
+
+            # add positions into data_dict
+            for product_id, item in data_dict.items():
+                item["positions"] = positions_dict.get(product_id, None)
+
+            return Response(
+                data=data_dict,
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return Response(status=201, data={"data": []})
+
 
 class SimilarProductsViewByUzum(APIView):
     permission_classes = [IsAuthenticated]

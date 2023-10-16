@@ -22,6 +22,16 @@ urlpatterns = [
         name="product-analytics",
     ),
     path(
+        "extension/analytics/<int:product_id>/",
+        views.ExtensionProductAnalyticsView.as_view(),
+        name="product-analytics",
+    ),
+    path(
+        "extension/cards/",
+        views.ExtensionProductCardView.as_view(),
+        name="product-analytics",
+    ),
+    path(
         "similar/<int:product_id>/",
         views.SimilarProductsViewByUzum.as_view(),
         name="similar-products",
