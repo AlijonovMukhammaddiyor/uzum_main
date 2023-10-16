@@ -150,9 +150,23 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
             "sku_analytics",
         ]
 
+class ProductAnalyticsExtensionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductAnalytics
+        fields = [
+            "date_pretty",
+            "orders_amount",
+            "real_orders_amount",
+            "daily_revenue",
+            # "orders_money",
+            "reviews_amount",
+            "available_amount",
+            "positions",
+        ]
+
 class ExtendedProductAnalyticsExtensionSerializer(serializers.ModelSerializer):
     skus = ExtendedSkuSerializer(many=True, read_only=True)
-    recent_analytics = ProductAnalyticsSerializer(many=True, read_only=True)
+    recent_analytics = ProductAnalyticsExtensionSerializer(many=True, read_only=True)
     skus_count = serializers.IntegerField(read_only=True)
     sku_analytics = SkuAnalyticsSerializer(many=True, read_only=True)
 
@@ -175,6 +189,7 @@ class ExtendedProductAnalyticsExtensionSerializer(serializers.ModelSerializer):
             "recent_analytics",
             "sku_analytics",
         ]
+
 
 
 class ExtendedProductAnalyticsCardSerializer(serializers.ModelSerializer):
