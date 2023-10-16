@@ -22,6 +22,11 @@ urlpatterns = [
         name="product-analytics",
     ),
     path(
+        "extension/analytics/details/<int:product_id>/",
+        views.ExtensionSingleProductAnalyticsView.as_view(),
+        name="product-analytics",
+    ),
+    path(
         "extension/analytics/<int:product_id>/",
         views.ExtensionProductAnalyticsView.as_view(),
         name="product-analytics",

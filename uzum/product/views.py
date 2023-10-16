@@ -33,7 +33,7 @@ from uzum.jobs.constants import PRODUCT_HEADER
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.pagination import ExamplePagination
-from uzum.product.serializers import (CurrentProductSerializer,
+from uzum.product.serializers import (CurrentProductSerializer, ExtendedProductAnalyticsExtensionSerializer,
                                       ExtendedProductAnalyticsSerializer,
                                       ExtendedProductSerializer,
                                       ProductSerializer)
@@ -641,7 +641,7 @@ class ExtensionSingleProductAnalyticsView(APIView):
             # and `sku.recent_sku_analytics`
             # for each SKU in `product.skus.all()`, to get the analytics records since the start date.
 
-            serializer = ExtendedProductAnalyticsSerializer(product)
+            serializer = ExtendedProductAnalyticsExtensionSerializer(product)
             print("SingleProductAnalyticsView query time", time.time() - start)
             return Response(serializer.data, status=status.HTTP_200_OK)
 

@@ -150,6 +150,33 @@ class ExtendedProductAnalyticsSerializer(serializers.ModelSerializer):
             "sku_analytics",
         ]
 
+class ExtendedProductAnalyticsExtensionSerializer(serializers.ModelSerializer):
+    skus = ExtendedSkuSerializer(many=True, read_only=True)
+    recent_analytics = ProductAnalyticsSerializer(many=True, read_only=True)
+    skus_count = serializers.IntegerField(read_only=True)
+    sku_analytics = SkuAnalyticsSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            "product_id",
+            "created_at",
+            "title",
+            "characteristics",
+            "title_ru",
+            "description",
+            "adult",
+            "bonus_product",
+            "is_eco",
+            "is_perishable",
+            "volume_discount",
+            "skus_count",
+            "skus",
+            "recent_analytics",
+            "sku_analytics",
+        ]
+
+
 class ExtendedProductAnalyticsCardSerializer(serializers.ModelSerializer):
     recent_analytics = ProductAnalyticsSerializer(many=True, read_only=True)
 
