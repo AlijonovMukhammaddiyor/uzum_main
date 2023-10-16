@@ -254,10 +254,10 @@ class ProductsView(ListAPIView):
             monthly = params.get("monthly", None)  # Get the categories to filter by
 
             if weekly:
-                return ProductAnalyticsView.objects.all().order_by("-weekly_revenue")[:100]
+                return ProductAnalyticsView.objects.all().order_by("-weekly_orders")[:100]
 
             if monthly:
-                return ProductAnalyticsView.objects.all().order_by("-monthly_revenue")[:100]
+                return ProductAnalyticsView.objects.all().order_by("-monthly_orders")[:100]
 
             if not categories:
                 # return empty queryset
