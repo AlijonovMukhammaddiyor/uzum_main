@@ -33,8 +33,10 @@ from twilio.base.exceptions import TwilioRestException
 from twilio.rest import Client
 
 from config.settings.base import env
-from uzum.product.models import Product, ProductAnalytics
-from uzum.shop.models import Shop, ShopAnalytics
+from uzum.category.serializers import ProductAnalyticsViewSerializer
+from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
+from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsRecent
+from uzum.shop.serializers import ShopAnalyticsRecentSerializer
 from uzum.users.api.serializers import (CheckUserNameAndPhoneSerializer,
                                         CustomTokenRefreshSerializer,
                                         LogOutSerializer,
@@ -366,65 +368,11 @@ class GetFavouriteShopsView(APIView):
 
             shop_ids_str = ",".join([f"'{link}'" for link in shop_ids])
 
-            # Raw SQL query to fetch the latest analytics for each shop
-            sql = f"""
-            SELECT
-                s.seller_id AS shop_id,
-                s.title AS shop_name,
-                s.link AS shop_link,
-                a.total_products,
-                a.total_orders,
-                a.total_revenue,
-                a.total_reviews,
-                a.average_purchase_price,
-                a.average_order_price,
-                a.rating,
-                a.monthly_total_orders,
-                a.monthly_total_revenue,
-                a.position
-            FROM shop_shop s
-            LEFT JOIN (
-                SELECT
-                    shop_id,
-                    total_products,
-                    total_orders,
-                    total_revenue,
-                    total_reviews,
-                    average_purchase_price,
-                    average_order_price,
-                    rating,
-                    monthly_total_orders,
-                    monthly_total_revenue,
-                    position
-                FROM shop_shopanalytics
-                WHERE created_at = (
-                    SELECT MAX(created_at)
-                    FROM shop_shopanalytics sa2
-                    WHERE sa2.shop_id = shop_shopanalytics.shop_id
-                )
-            ) a ON s.seller_id = a.shop_id
-            WHERE s.link IN ({shop_ids_str})
-            """
+            shops = ShopAnalyticsRecent.objects.filter(link__in=shop_ids)
 
-            with connection.cursor() as cursor:
-                cursor.execute(sql)
-                rows = cursor.fetchall()
+            serializer = ShopAnalyticsRecentSerializer(shops, many=True)
 
-            shops_data = [
-                {
-                    "shop_title": row[1] + "((" + row[2] + "))",
-                    "total_products": row[3],
-                    "total_orders": row[4],
-                    "total_revenue": row[5],
-                    "total_reviews": row[6],
-                    "average_purchase_price": row[7],
-                    "rating": row[9],
-                    "position": row[10],
-                }
-                for row in rows
-            ]
-
-            return Response(status=200, data={"shops": shops_data})
+            return Response(status=200, data={"shops": serializer.data})
         except Exception as e:
             print("Error in GetFavouriteShopsView: ", e)
             traceback.print_exc()
@@ -577,83 +525,11 @@ class GetFavouriteProductsView(APIView):
             if only_ids:
                 return Response(status=200, data={"products": product_ids})
 
-            # Raw SQL query to fetch the latest analytics for each product
-            sql = f"""
-                SELECT
-                    p.product_id AS product_id, -- 0
-                    p.title AS product_name, -- 1
-                    p.title_ru AS product_name_ru, -- 2
-                    p.photos AS product_photo, -- 3
-                    c.title AS category_title, -- 4
-                    c.title_ru AS category_title_ru, -- 5
-                    c."categoryId" AS category_id, -- 6
-                    s.title AS shop_title, -- 7
-                    s.link AS link, -- 8
-                    a.available_amount, -- 9
-                    a.reviews_amount, -- 10
-                    a.rating, -- 11
-                    a.orders_amount, -- 12
-                    a.orders_money, -- 13
-                    a.position_in_shop, -- 14
-                    a.position_in_category, -- 15
-                    a.position, -- 16
-                    a.average_purchase_price, -- 17
-                    a.score -- 18
-                FROM product_product p
-                LEFT JOIN category_category c ON p.category_id = c."categoryId"
-                LEFT JOIN shop_shop s ON p.shop_id = s.seller_id
-                LEFT JOIN (
-                    SELECT
-                        product_id,
-                        available_amount,
-                        reviews_amount,
-                        rating,
-                        orders_amount,
-                        orders_money,
-                        position_in_shop,
-                        position_in_category,
-                        position,
-                        average_purchase_price,
-                        score
-                    FROM product_productanalytics
-                    WHERE created_at = (
-                        SELECT MAX(created_at)
-                        FROM product_productanalytics pa2
-                        WHERE pa2.product_id = product_productanalytics.product_id
-                    )
-                ) a ON p.product_id = a.product_id
-                WHERE p.product_id IN ({product_ids_str})
-            """
+            products = ProductAnalyticsView.objects.filter(product_id__in=product_ids)
 
-            with connection.cursor() as cursor:
-                cursor.execute(sql)
-                rows = cursor.fetchall()
+            serializer = ProductAnalyticsViewSerializer(products, many=True)
 
-            products_data = [
-                {
-                    "product_id": row[0],
-                    "product_title": row[1] + "((" + str(row[0]) + "))",
-                    "product_title_ru": (row[2] if row[2] else row[1]) + "((" + str(row[0]) + "))",
-                    "category_title": row[4] + "((" + str(row[6]) + "))",
-                    "category_title_ru": (row[5] if row[5] else row[4]) + "((" + str(row[6]) + "))",
-                    "category_id": row[6],
-                    "shop_title": row[7] + "((" + row[8] + "))",
-                    "shop_link": row[8],
-                    "available_amount": row[9],
-                    "reviews_amount": row[10],
-                    "rating": row[11],
-                    "orders_amount": row[12],
-                    "orders_money": row[13],
-                    "position_in_shop": row[14],
-                    "position_in_category": row[15],
-                    "position": row[16],
-                    "average_purchase_price": row[17],
-                    "photos": row[3],
-                }
-                for row in rows
-            ]
-
-            return Response(status=200, data={"products": products_data})
+            return Response(status=200, data={"products": serializer.data})
         except Exception as e:
             print("Error in GetFavouriteProductsView: ", e)
             traceback.print_exc()
