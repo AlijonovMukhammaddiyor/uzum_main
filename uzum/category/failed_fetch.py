@@ -185,26 +185,43 @@ def fetch_single_product(product_id):
             },
             timeout=60
         )
-        print(res.status_code, res.json())
+        if res.status_code != 200:  # Assuming 200 is the successful status code
+            print(f"Failed to fetch product {product_id}. Status Code: {res.status_code}")
+            return None
+
+        return res.json()
     except Exception as e:
         print("Error in fetch_single_product: ", e)
         return None
 
 def fetch_multiple_products(product_ids):
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=60) as executor:
-        future_to_product_id = {executor.submit(fetch_single_product, product_id): product_id for product_id in product_ids}
-        for future in concurrent.futures.as_completed(future_to_product_id):
-            product_id = future_to_product_id[future]
-            try:
-                data = future.result()
-            except Exception as exc:
-                print('%r generated an exception: %s' % (product_id, exc))
-            else:
-                if data:
-                    print(f"Product {product_id} fetched successfully")
-                    results.append(data)
-                else:
-                    print(f"Failed to fetch data for product {product_id}")
+    batches = [product_ids[i:i + BATCH_SIZE] for i in range(0, len(product_ids), BATCH_SIZE)]
 
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for batch in batches:
+            results.extend(batch_fetch_product_ids(executor, batch))
+            time.sleep(SLEEP_INTERVAL)  # prevent hitting rate limits
+
+def batch_fetch_product_ids(executor, product_ids):
+    future_to_product_id = {
+        executor.submit(fetch_single_product, product_id): product_id for product_id in product_ids
+    }
+    results = []
+    for future in concurrent.futures.as_completed(future_to_product_id):
+        product_id = future_to_product_id[future]
+        try:
+            data = future.result()
+        except Exception as exc:
+            print('%r generated an exception: %s' % (product_id, exc))
+        else:
+            if data:
+                print(f"Product {product_id} fetched successfully")
+                results.append(data)
+            else:
+                print(f"Failed to fetch data for product {product_id}")
     return results
+
+MAX_WORKERS = 60
+BATCH_SIZE = 60  # Adjust based on the server's rate limit policy
+SLEEP_INTERVAL = 1  # In seconds, adjust based on the server's rate limit policy
