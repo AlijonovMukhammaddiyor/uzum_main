@@ -92,7 +92,7 @@ async def concurrent_requests_product_details(
                         if res.status_code != 200:
                             _id = product_ids[index + idx]
                             print(
-                                f"Error in concurrent_requests_product_details B: {res.status_code} - {_id}",
+                                f"Error in concurrent_requests_product_details B: {res.status_code} - {_id} - {res.text}",
                             )
                             failed_ids.append(product_ids[index + idx])
                             continue

@@ -232,8 +232,8 @@ def set_orders_amount_sku(date_pretty: str):
                         AVG(real_orders_amount) -
                         SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END) AS remaining_amount,
                         COUNT(*) FILTER (WHERE delta_available_amount <= 0 AND NOT (delta_available_amount = 0 AND available_amount = 0)) AS skus_with_no_delta,
-                        FLOOR((AVG(real_orders_amount) - SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END)) / NULLIF(COUNT(*) FILTER (WHERE delta_available_amount <= 0 AND NOT (delta_available_amount = 0 AND available_amount = 0)), 0)) AS base_amount,
-                        (AVG(real_orders_amount) - SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END)) % NULLIF(COUNT(*) FILTER (WHERE delta_available_amount <= 0 AND NOT (delta_available_amount = 0 AND available_amount = 0)), 0) AS extra_skus,
+                        TRUNC((AVG(real_orders_amount) - SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END)) / NULLIF(COUNT(*) FILTER (WHERE delta_available_amount <= 0 AND NOT (delta_available_amount = 0 AND available_amount = 0)), 0)) AS base_amount,
+                        ABS(AVG(real_orders_amount) - SUM(CASE WHEN delta_available_amount BETWEEN 0 AND real_orders_amount THEN delta_available_amount ELSE 0 END)) % NULLIF(COUNT(*) FILTER (WHERE delta_available_amount <= 0 AND NOT (delta_available_amount = 0 AND available_amount = 0)), 0) AS extra_skus,
                         AVG(real_orders_amount) AS real_orders_amount,
                         MAX(delta_available_amount) AS max_delta
                     FROM
@@ -243,7 +243,18 @@ def set_orders_amount_sku(date_pretty: str):
                 SkuOrdering AS (
                     SELECT
                         tmp.sku_id,
-                        ROW_NUMBER() OVER(PARTITION BY tmp.product_id ORDER BY tmp.sku_id) AS sku_order
+                        -- order by -delta_available amount and sku_id to get the first sku with the max delta_available_amount
+                        ROW_NUMBER() OVER(
+                            PARTITION BY tmp.product_id
+                            ORDER BY
+                                CASE
+                                    WHEN tmp.delta_available_amount < 0 THEN 1  -- highest priority for negatives
+                                    WHEN tmp.delta_available_amount > 0 THEN 2  -- next priority for positives
+                                    ELSE 3  -- lowest priority for zero
+                                END,
+                                ABS(tmp.delta_available_amount) DESC,  -- within each group, order by the magnitude
+                                tmp.sku_id  -- further order by sku_id for ties
+                        ) AS sku_order
                     FROM
                         tmp_orders_distribution tmp
                 )
@@ -253,28 +264,40 @@ def set_orders_amount_sku(date_pretty: str):
                     orders_amount = CASE
                         -- Rule 1: If total_sku_delta matches real_orders_amount
                         WHEN t.total_sku_delta = t.real_orders_amount THEN tmp.delta_available_amount
+
                         -- if real_orders_amount is negative or 0, set all SKU's orders_amount to 0
                         WHEN t.real_orders_amount <= 0 THEN 0
+
                         -- Rule 2: If delta_available_amount is between 0 and real_orders_amount
                         WHEN tmp.delta_available_amount BETWEEN 1 AND t.real_orders_amount THEN tmp.delta_available_amount
+
                         -- Rule 3: If delta_available_amount exceeds real_orders_amount, is the max_delta for the product, and is the first when ordered by sku_id
-                        WHEN tmp.delta_available_amount > t.real_orders_amount AND tmp.delta_available_amount = t.max_delta AND tmp.sku_id = (
+                        WHEN tmp.delta_available_amount > t.real_orders_amount AND tmp.delta_available_amount = t.max_delta AND t.remaining_amount > 0 AND tmp.sku_id = (
                             SELECT sku_id FROM tmp_orders_distribution
                             WHERE product_id = tmp.product_id AND delta_available_amount = t.max_delta
                             ORDER BY sku_id
                             LIMIT 1
                         ) THEN t.remaining_amount
+
                         -- Rule 4: If the delta_available_amount is not the one that took all the remaining_amount, but it's more than real_orders_amount
                         WHEN tmp.delta_available_amount > t.real_orders_amount THEN 0
+
                         -- Rule 5: If any SKU of the product had a delta_available_amount greater than or equal to real_orders_amount, then set to 0
                         WHEN EXISTS (
                             SELECT 1 FROM tmp_orders_distribution
                             WHERE product_id = tmp.product_id AND delta_available_amount >= real_orders_amount
                         ) THEN 0
+
                         -- if both delta_available_amount and available_amount are 0, set orders_amount to 0
                         WHEN tmp.delta_available_amount = 0 AND sa.available_amount = 0 THEN 0
+
                         -- Rule 6: Distribute remaining amount equally for skus with delta_available_amount <= 0
-                        WHEN tmp.delta_available_amount <= 0 AND so.sku_order <= t.extra_skus THEN t.base_amount + 1
+                        WHEN tmp.delta_available_amount <= 0 AND so.sku_order <= t.extra_skus THEN
+                            CASE
+                                WHEN remaining_amount > 0
+                                THEN t.base_amount + 1
+                                ELSE t.base_amount - 1
+                            END
                         ELSE t.base_amount
                     END
                 FROM
