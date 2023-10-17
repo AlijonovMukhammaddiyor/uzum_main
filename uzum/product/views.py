@@ -529,17 +529,11 @@ class ExtensionProductAnalyticsView(APIView):
                 datetime.combine(last_date - timedelta(days=days), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
             )
+            date_pretty = get_today_pretty_fake()
 
-            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
-                end_date = timezone.make_aware(
-                    datetime.combine(date.today() - timedelta(days=1), datetime.min.time()),
-                    timezone=pytz.timezone("Asia/Tashkent"),
-                ).replace(hour=23, minute=59, second=59)
-            else:
-                end_date = timezone.make_aware(
-                    datetime.combine(date.today(), datetime.min.time()),
-                    timezone=pytz.timezone("Asia/Tashkent"),
-                ).replace(hour=23, minute=59, second=59)
+            end_date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
             product_analytics_qs = ProductAnalytics.objects.filter(
                 product__product_id=product_id, created_at__range=[start_date, end_date]
@@ -603,16 +597,11 @@ class ExtensionSingleProductAnalyticsView(APIView):
                 timezone=pytz.timezone("Asia/Tashkent"),
             )
 
-            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
-                end_date = timezone.make_aware(
-                    datetime.combine(date.today() - timedelta(days=1), datetime.min.time()),
-                    timezone=pytz.timezone("Asia/Tashkent"),
-                ).replace(hour=23, minute=59, second=59)
-            else:
-                end_date = timezone.make_aware(
-                    datetime.combine(date.today(), datetime.min.time()),
-                    timezone=pytz.timezone("Asia/Tashkent"),
-                ).replace(hour=23, minute=59, second=59)
+            date_pretty = get_today_pretty_fake()
+
+            end_date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
             product_analytics_qs = ProductAnalytics.objects.filter(
                 product__product_id=product_id, created_at__range=[start_date, end_date]
@@ -690,16 +679,11 @@ class SingleProductAnalyticsView(APIView):
             #     timezone=pytz.timezone("Asia/Tashkent"),
             # )
 
-            if datetime.now().astimezone(pytz.timezone("Asia/Tashkent")).hour < 7:
-                end_date = timezone.make_aware(
-                    datetime.combine(date.today() - timedelta(days=1), datetime.min.time()),
-                    timezone=pytz.timezone("Asia/Tashkent"),
-                ).replace(hour=23, minute=59, second=59)
-            else:
-                end_date = timezone.make_aware(
-                    datetime.combine(date.today(), datetime.min.time()),
-                    timezone=pytz.timezone("Asia/Tashkent"),
-                ).replace(hour=23, minute=59, second=59)
+            date_pretty = get_today_pretty_fake()
+
+            end_date = timezone.make_aware(
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
+            ).replace(hour=23, minute=59, second=59, microsecond=999999)
 
             product_analytics_qs = ProductAnalytics.objects.filter(
                 product__product_id=product_id, created_at__range=[start_date, end_date]

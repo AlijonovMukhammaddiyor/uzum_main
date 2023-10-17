@@ -631,13 +631,11 @@ class CategoryDailyAnalyticsView(APIView):
     @staticmethod
     def analytics(category: Category, start_date: datetime, request: Request):
         try:
-            end_date = timezone.make_aware(datetime.now(), timezone=pytz.timezone("Asia/Tashkent")).replace(
+            date_pretty = get_today_pretty_fake()
+            end_date = timezone.make_aware(datetime.strptime(
+                date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")).replace(
                 hour=23, minute=59, second=59, microsecond=0
             )
-
-            # if it is before 7 am in Tashkent, set end_date to 23:59 of the previous day
-            if datetime.now(tz=pytz.timezone("Asia/Tashkent")).hour < 7:
-                end_date = end_date - timedelta(days=1)
 
             category_analytics = CategoryAnalytics.objects.filter(
                 category=category, created_at__range=[start_date, end_date]
@@ -1305,8 +1303,7 @@ class GrowingCategoriesView(APIView):
             date_pretty = get_today_pretty_fake()
 
             end_date = timezone.make_aware(
-                datetime.combine(date.today(), datetime.min.time()),
-                timezone=pytz.timezone("Asia/Tashkent"),
+                datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
             ).replace(hour=23, minute=59, second=59, microsecond=0)
 
             top_growing_categories = cache.get("top_categories_by_orders", [])
