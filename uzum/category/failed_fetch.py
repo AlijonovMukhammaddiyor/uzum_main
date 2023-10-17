@@ -5,13 +5,14 @@ import traceback
 import httpx
 from asgiref.sync import async_to_sync
 from django.db import transaction
+import requests
 
 from uzum.category.models import CategoryAnalytics
 from uzum.jobs.category.MultiEntry import \
     get_categories_with_less_than_n_products2
 from uzum.jobs.constants import (CATEGORIES_HEADER, CATEGORIES_HEADER_RU,
                                  MAX_ID_COUNT, PAGE_SIZE,
-                                 POPULAR_SEARCHES_PAYLOAD)
+                                 POPULAR_SEARCHES_PAYLOAD, PRODUCT_HEADER)
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.jobs.product.fetch_details import get_product_details_via_ids
 from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
@@ -136,3 +137,20 @@ def fetch_product_ids(date_pretty: str = get_today_pretty()):
 
         time.sleep(30)
         del products_api
+
+
+def fetch_single_product(product_id):
+    try:
+        res = requests.get(
+            f"https://api.uzum.uz/api/product/{product_id}",
+            headers={
+                **PRODUCT_HEADER,
+                "User-Agent": get_random_user_agent(),
+                "x-iid": generateUUID(),
+            },
+            timeout=60
+        )
+        print(res.status_code, res.json())
+    except Exception as e:
+        print("Error in fetch_single_product: ", e)
+        return None
