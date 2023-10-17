@@ -1,6 +1,7 @@
 import asyncio
 import time
 import traceback
+import concurrent.futures
 
 import httpx
 from asgiref.sync import async_to_sync
@@ -14,7 +15,7 @@ from uzum.jobs.constants import (CATEGORIES_HEADER, CATEGORIES_HEADER_RU,
                                  MAX_ID_COUNT, PAGE_SIZE,
                                  POPULAR_SEARCHES_PAYLOAD, PRODUCT_HEADER)
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
-from uzum.jobs.product.fetch_details import get_product_details_via_ids
+from uzum.jobs.product.fetch_details import concurrent_requests_product_details, get_product_details_via_ids
 from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
 from uzum.jobs.product.MultiEntry import create_products_from_api
 from uzum.product.models import ProductAnalytics
@@ -82,16 +83,50 @@ async def fetch_popular_seaches_from_uzum(words: list[str], isRu=False):
 def fetch_failed_products(product_ids: list[int]):
     products_api: list[dict] = []
     print("Starting fetching failed products...")
-    shop_analytics_done = {
-        seller_id: True
-        for seller_id in ShopAnalytics.objects.filter(date_pretty=get_today_pretty()).values_list(
-            "shop__seller_id", flat=True
-        )
-    }
     print("After shop_analytics_done...")
-    async_to_sync(get_product_details_via_ids)(product_ids, products_api)
-    create_products_from_api(products_api, {}, shop_analytics_done)
+    async_to_sync(get_product_details_via_ids2)(product_ids, products_api)
+    create_products_from_api(products_api, {})
     del products_api
+
+
+async def get_product_details_via_ids2(product_ids: list[int], products_api: list[dict]):
+    try:
+        print("Starting get_product_details_via_ids...")
+        start_time = time.time()
+        failed_ids = []
+
+        await concurrent_requests_product_details(product_ids, failed_ids, 0, products_api)
+
+        if len(failed_ids) > 0:
+            failed_again_ids = []
+            print(f"Failed Ids length: {len(failed_ids)}")
+            time.sleep(5)
+            await concurrent_requests_product_details(failed_ids, failed_again_ids, 0, products_api)
+
+            if len(failed_again_ids) > 0:
+                failed_failed = []
+                print(f"Failed again Ids length: {len(failed_again_ids)}")
+                await concurrent_requests_product_details(failed_again_ids, failed_failed, 0, products_api)
+                time.sleep(15)
+                if len(failed_failed) > 0:
+                    final_failed = []
+                    print(
+                        f"Failed failed Ids length: {len(failed_failed)}",
+                    )
+                    await concurrent_requests_product_details(failed_failed, final_failed, 0, products_api)
+                    time.sleep(15)
+                    if len(final_failed) > 0:
+                        ff_failed = []
+                        await concurrent_requests_product_details(final_failed, ff_failed, 0, products_api)
+                        print(f"Total number of failed product ids: {len(ff_failed)}")
+                        print(f"Failed failed Ids: {ff_failed}")
+
+        print(f"Total number of products: {len(products_api)}")
+        print(f"Total time taken by get_product_details_via_ids: {time.time() - start_time}")
+        print("Ending get_product_details_via_ids...\n\n")
+    except Exception as e:
+        print("Error in getProductDetailsViaId: ", e)
+        return None
 
 
 def fetch_product_ids(date_pretty: str = get_today_pretty()):
@@ -154,3 +189,22 @@ def fetch_single_product(product_id):
     except Exception as e:
         print("Error in fetch_single_product: ", e)
         return None
+
+def fetch_multiple_products(product_ids):
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=60) as executor:
+        future_to_product_id = {executor.submit(fetch_single_product, product_id): product_id for product_id in product_ids}
+        for future in concurrent.futures.as_completed(future_to_product_id):
+            product_id = future_to_product_id[future]
+            try:
+                data = future.result()
+            except Exception as exc:
+                print('%r generated an exception: %s' % (product_id, exc))
+            else:
+                if data:
+                    print(f"Product {product_id} fetched successfully")
+                    results.append(data)
+                else:
+                    print(f"Failed to fetch data for product {product_id}")
+
+    return results
