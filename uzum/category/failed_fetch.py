@@ -110,7 +110,7 @@ def fetch_product_ids(date_pretty: str = get_today_pretty()):
 
     unfetched_product_ids = list(product_ids - existing_product_ids)
     print(f"Unfetched products: {len(unfetched_product_ids)}")
-
+    unfetched_product_ids = unfetched_product_ids[:25_000]
     shop_analytics_done = {}
 
     BATCH_SIZE = 10_000
