@@ -92,8 +92,9 @@ async def concurrent_requests_product_details(
                         if res.status_code != 200:
                             _id = product_ids[index + idx]
                             if res.status_code == 429:
-                                retry_after = res.headers.get('Retry-After', -1)
-                                print(f"Rate limit exceeded. Try again in {retry_after} seconds.")
+                                retry_after = res.headers.get('Retry-After', -7)
+                                if retry_after != -7:
+                                    print(f"Rate limit exceeded. Try again in {retry_after} seconds.")
                             print(
                                 f"Error in concurrent_requests_product_details B: {res.status_code} - {_id}",
                             )
