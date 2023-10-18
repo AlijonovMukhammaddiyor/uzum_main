@@ -93,7 +93,7 @@ async def concurrent_requests_product_details(
                         PRODUCT_URL + str(id),
                         client=client,
                     )
-                    for id in product_ids[index : index + 5]
+                    for id in product_ids[index : index + 2]
                 ]
 
                 results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -123,7 +123,7 @@ async def concurrent_requests_product_details(
 
                 del results
                 del tasks
-                index += 5
+                index += 2
 
     except Exception as e:
         print(f"Error in concurrent_requests_product_details C: {e}")
