@@ -68,6 +68,8 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
 #         print(f"Starting concurrent_requests_product_details... {len(product_ids)}")
 #         async with httpx.AsyncClient() as client:
 #             while index < len(product_ids):
+#                 # update the client, cut the session and create a new one
+#                 client = httpx.AsyncClient()
 #                 if len(products_api) - last_length >= 1000:
 #                     string_to_show = f"Fetched: {len(products_api) - last_length}, Failed: {len(failed_ids)}"
 #                     print(
@@ -82,7 +84,7 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
 #                         PRODUCT_URL + str(id),
 #                         client=client,
 #                     )
-#                     for id in product_ids[index : index + PRODUCT_CONCURRENT_REQUESTS_LIMIT]
+#                     for id in product_ids[index : index + 10]
 #                 ]
 
 #                 results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -95,9 +97,8 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
 #                         if res.status_code != 200:
 #                             _id = product_ids[index + idx]
 #                             if res.status_code == 429:
-#                                 retry_after = res.headers.get('Retry-After', -7)
-#                                 if retry_after != -7:
-#                                     print(f"Rate limit exceeded. Try again in {retry_after} seconds.")
+#                                 # print headers
+#                                 print(res.headers)
 #                             print(
 #                                 f"Error in concurrent_requests_product_details B: {res.status_code} - {_id}",
 #                             )
@@ -113,7 +114,7 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
 
 #                 del results
 #                 del tasks
-#                 index += PRODUCT_CONCURRENT_REQUESTS_LIMIT
+#                 index += 10
 
 #     except Exception as e:
 #         print(f"Error in concurrent_requests_product_details C: {e}")
@@ -150,7 +151,7 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
 #                 await asyncio.sleep(sleep_time)
 
 # Constants
-CHUNK_SIZE = 60  # Number of requests in each chunk
+CHUNK_SIZE = 50  # Number of requests in each chunk
 MAX_RETRIES = 3  # Total retries for each request
 BACKOFF_FACTOR = 0.3  # Factor for calculating the sleep time between retries
 RATE_LIMIT_SLEEP = 2  # Sleep time when rate limit is exceeded (in seconds)
@@ -190,8 +191,6 @@ def fetch_product_details_chunk(product_ids_chunk, session):
     products_api_chunk = []
     failed_ids_chunk = []
 
-    session = create_session(100)
-
     with ThreadPoolExecutor(max_workers=CHUNK_SIZE) as executor:
         future_to_url = {
             executor.submit(make_request_product_detail, PRODUCT_URL + str(product_id), session): product_id for product_id in product_ids_chunk
@@ -220,39 +219,30 @@ def fetch_product_details_chunk(product_ids_chunk, session):
 
 def concurrent_requests_product_details(product_ids, failed_ids: list[int], index, products_api):
     start = time.time()
-    with requests.Session() as session:
-        # We divide the product_ids list into chunks.
-        for i in range(0, len(product_ids), CHUNK_SIZE):
-            product_ids_chunk = product_ids[i:i + CHUNK_SIZE]
-            products_chunk, failed_chunk = fetch_product_details_chunk(product_ids_chunk, session)
+    session = create_session(MAX_RETRIES, 100)
 
-            products_api.extend(products_chunk)
-            failed_ids.extend(failed_chunk)
+    for i in range(0, len(product_ids), CHUNK_SIZE):
+        product_ids_chunk = product_ids[i:i + CHUNK_SIZE]
+        products_chunk, failed_chunk = fetch_product_details_chunk(product_ids_chunk, session)
 
-            if failed_chunk:
-                print(f"Failed IDs in this chunk: {failed_chunk}")
+        products_api.extend(products_chunk)
+        failed_ids.extend(failed_chunk)
 
-            # # If we hit the rate limit, we should pause the requests.
-            # if len(failed_chunk) > 0:  # Check if any ID ends with 429, indicating a rate limit error
-            #     print(f"Rate limit likely exceeded. Sleeping for {RATE_LIMIT_SLEEP} seconds before continuing with the next chunk.")
-            #     time.sleep(RATE_LIMIT_SLEEP)
+        if failed_chunk:
+            print(f"Failed IDs in this chunk: {failed_chunk}")
 
     print(f"Total time taken by concurrent_requests_product_details: {time.time() - start}")
 
-def create_session(max_connections):
-    session = Session()
-
-    # Define a retry strategy to add resilience to your requests
+def create_session(max_retries=3, max_connections=100):
+    session = requests.Session()
     retries = Retry(
-        total=5,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
+        total=max_retries,
+        backoff_factor=BACKOFF_FACTOR,
+
+        status_forcelist=[429, 500, 502, 503, 504],  # Retry on specific HTTP status codes
         method_whitelist=["HEAD", "GET", "OPTIONS"]
     )
-
-    # Attach the retry strategy to an HTTPAdapter with an increased connection pool size
     adapter = HTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections, max_retries=retries)
-    session.mount('https://', adapter)
-    session.mount('http://', adapter)
-
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
     return session

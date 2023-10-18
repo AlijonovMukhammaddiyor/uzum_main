@@ -196,31 +196,9 @@ def fetch_single_product(product_id):
 
 def fetch_multiple_products(product_ids):
     results = []
-    batches = [product_ids[i:i + BATCH_SIZE] for i in range(0, len(product_ids), BATCH_SIZE)]
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        for batch in batches:
-            results.extend(batch_fetch_product_ids(executor, batch))
-            time.sleep(SLEEP_INTERVAL)  # prevent hitting rate limits
-
-def batch_fetch_product_ids(executor, product_ids):
-    future_to_product_id = {
-        executor.submit(fetch_single_product, product_id): product_id for product_id in product_ids
-    }
-    results = []
-    for future in concurrent.futures.as_completed(future_to_product_id):
-        product_id = future_to_product_id[future]
-        try:
-            data = future.result()
-        except Exception as exc:
-            print('%r generated an exception: %s' % (product_id, exc))
-        else:
-            if data:
-                print(f"Product {product_id} fetched successfully")
-                results.append(data)
-            else:
-                print(f"Failed to fetch data for product {product_id}")
-    return results
+    failed = []
+    # batches = [product_ids[i:i + BATCH_SIZE] for i in range(0, len(product_ids), BATCH_SIZE)]
+    async_to_sync(concurrent_requests_product_details)(product_ids, failed, 0, results)
 
 MAX_WORKERS = 60
 BATCH_SIZE = 60  # Adjust based on the server's rate limit policy
