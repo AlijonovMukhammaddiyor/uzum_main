@@ -84,50 +84,9 @@ def fetch_failed_products(product_ids: list[int]):
     products_api: list[dict] = []
     print("Starting fetching failed products...")
     print("After shop_analytics_done...")
-    async_to_sync(get_product_details_via_ids2)(product_ids, products_api)
+    async_to_sync(get_product_details_via_ids)(product_ids, products_api)
     create_products_from_api(products_api, {})
     del products_api
-
-
-async def get_product_details_via_ids2(product_ids: list[int], products_api: list[dict]):
-    try:
-        print("Starting get_product_details_via_ids...")
-        start_time = time.time()
-        failed_ids = []
-
-        await concurrent_requests_product_details(product_ids, failed_ids, 0, products_api)
-
-        if len(failed_ids) > 0:
-            failed_again_ids = []
-            print(f"Failed Ids length: {len(failed_ids)}")
-            time.sleep(5)
-            await concurrent_requests_product_details(failed_ids, failed_again_ids, 0, products_api)
-
-            if len(failed_again_ids) > 0:
-                failed_failed = []
-                print(f"Failed again Ids length: {len(failed_again_ids)}")
-                await concurrent_requests_product_details(failed_again_ids, failed_failed, 0, products_api)
-                time.sleep(15)
-                if len(failed_failed) > 0:
-                    final_failed = []
-                    print(
-                        f"Failed failed Ids length: {len(failed_failed)}",
-                    )
-                    await concurrent_requests_product_details(failed_failed, final_failed, 0, products_api)
-                    time.sleep(15)
-                    if len(final_failed) > 0:
-                        ff_failed = []
-                        await concurrent_requests_product_details(final_failed, ff_failed, 0, products_api)
-                        print(f"Total number of failed product ids: {len(ff_failed)}")
-                        print(f"Failed failed Ids: {ff_failed}")
-
-        print(f"Total number of products: {len(products_api)}")
-        print(f"Total time taken by get_product_details_via_ids: {time.time() - start_time}")
-        print("Ending get_product_details_via_ids...\n\n")
-    except Exception as e:
-        print("Error in getProductDetailsViaId: ", e)
-        return None
-
 
 def fetch_product_ids(date_pretty: str = get_today_pretty()):
     # create_and_update_categories()
@@ -173,7 +132,6 @@ def fetch_product_ids(date_pretty: str = get_today_pretty()):
         time.sleep(30)
         del products_api
 
-
 def fetch_single_product(product_id):
     try:
         res = requests.get(
@@ -199,6 +157,7 @@ def fetch_multiple_products(product_ids):
     failed = []
     # batches = [product_ids[i:i + BATCH_SIZE] for i in range(0, len(product_ids), BATCH_SIZE)]
     async_to_sync(concurrent_requests_product_details)(product_ids, failed, 0, results)
+    print(f"Failed to fetch {len(failed)} products")
 
 MAX_WORKERS = 60
 BATCH_SIZE = 60  # Adjust based on the server's rate limit policy

@@ -67,100 +67,100 @@ def get_product_details_via_ids(product_ids: list[int], products_api: list[dict]
         return None
 
 
-# async def concurrent_requests_product_details(
-#     product_ids: list[int], failed_ids: list[int], index: int, products_api: list[dict]
-# ):
-#     try:
-#         index = 0
-#         start_time = time.time()
-#         last_length = len(products_api)
-#         print(f"Starting concurrent_requests_product_details... {len(product_ids)}")
-#         async with httpx.AsyncClient() as client:
-#             while index < len(product_ids):
-#                 # update the client, cut the session and create a new one
-#                 client = httpx.AsyncClient()
-#                 if len(products_api) - last_length >= 1000:
-#                     string_to_show = f"Fetched: {len(products_api) - last_length}, Failed: {len(failed_ids)}"
-#                     print(
-#                         f"Current: {index}/ {len(product_ids)} - {time.time() - start_time:.2f} secs - {string_to_show}"
-#                     )
-#                     last_length = len(products_api)
-#                     time.sleep(2)  # sleep for 2 seconds
-#                     start_time = time.time()
+async def concurrent_requests_product_details(
+    product_ids: list[int], failed_ids: list[int], index: int, products_api: list[dict]
+):
+    try:
+        index = 0
+        start_time = time.time()
+        last_length = len(products_api)
+        print(f"Starting concurrent_requests_product_details... {len(product_ids)}")
+        async with httpx.AsyncClient() as client:
+            while index < len(product_ids):
+                # update the client, cut the session and create a new one
+                client = httpx.AsyncClient()
+                if len(products_api) - last_length >= 1000:
+                    string_to_show = f"Fetched: {len(products_api) - last_length}, Failed: {len(failed_ids)}"
+                    print(
+                        f"Current: {index}/ {len(product_ids)} - {time.time() - start_time:.2f} secs - {string_to_show}"
+                    )
+                    last_length = len(products_api)
+                    time.sleep(2)  # sleep for 2 seconds
+                    start_time = time.time()
 
-#                 tasks = [
-#                     make_request_product_detail(
-#                         PRODUCT_URL + str(id),
-#                         client=client,
-#                     )
-#                     for id in product_ids[index : index + 10]
-#                 ]
+                tasks = [
+                    make_request_product_detail(
+                        PRODUCT_URL + str(id),
+                        client=client,
+                    )
+                    for id in product_ids[index : index + 5]
+                ]
 
-#                 results = await asyncio.gather(*tasks, return_exceptions=True)
+                results = await asyncio.gather(*tasks, return_exceptions=True)
 
-#                 for idx, res in enumerate(results):
-#                     if isinstance(res, Exception):
-#                         print("Error in concurrent_requests_product_details A:", res)
-#                         failed_ids.append(product_ids[index + idx])
-#                     else:
-#                         if res.status_code != 200:
-#                             _id = product_ids[index + idx]
-#                             if res.status_code == 429:
-#                                 # print headers
-#                                 print(res.headers)
-#                             print(
-#                                 f"Error in concurrent_requests_product_details B: {res.status_code} - {_id}",
-#                             )
-#                             failed_ids.append(product_ids[index + idx])
-#                             continue
-#                         # print(res.json())
+                for idx, res in enumerate(results):
+                    if isinstance(res, Exception):
+                        print("Error in concurrent_requests_product_details A:", res)
+                        failed_ids.append(product_ids[index + idx])
+                    else:
+                        if res.status_code != 200:
+                            _id = product_ids[index + idx]
+                            if res.status_code == 429:
+                                # print headers
+                                print(res.headers)
+                            print(
+                                f"Error in concurrent_requests_product_details B: {res.status_code} - {_id}",
+                            )
+                            failed_ids.append(product_ids[index + idx])
+                            continue
+                        # print(res.json())
 
-#                         res_data = res.json()
-#                         if "errors" not in res_data:
-#                             products_api.append(res_data["payload"]["data"])
-#                         else:
-#                             failed_ids.append(product_ids[index + idx])
+                        res_data = res.json()
+                        if "errors" not in res_data:
+                            products_api.append(res_data["payload"]["data"])
+                        else:
+                            failed_ids.append(product_ids[index + idx])
 
-#                 del results
-#                 del tasks
-#                 index += 10
+                del results
+                del tasks
+                index += 5
 
-#     except Exception as e:
-#         print(f"Error in concurrent_requests_product_details C: {e}")
-#         return None
+    except Exception as e:
+        print(f"Error in concurrent_requests_product_details C: {e}")
+        return None
 
 
-# async def make_request_product_detail(url, retries=3, backoff_factor=0.3, client=None):
-#     for i in range(retries):
-#         try:
-#             response = await client.get(
-#                 url,
-#                 headers={
-#                     **PRODUCT_HEADER,
-#                     "User-Agent": get_random_user_agent(),
-#                     "x-iid": generateUUID(),
-#                 },
-#                 timeout=60,  # 60 seconds
-#             )
+async def make_request_product_detail(url, retries=3, backoff_factor=0.3, client=None):
+    for i in range(retries):
+        try:
+            response = await client.get(
+                url,
+                headers={
+                    **PRODUCT_HEADER,
+                    "User-Agent": get_random_user_agent(),
+                    "x-iid": generateUUID(),
+                },
+                timeout=60,  # 60 seconds
+            )
 
-#             if response.status_code == 200:
-#                 return response
-#             if i == retries - 1:
-#                 return response
-#         except Exception as e:
-#             if i == retries - 1:  # This is the last retry, raise the exception
-#                 print("Sleeping for 5 seconds...")
-#                 await asyncio.sleep(5)
-#                 raise e
-#             else:
-#                 print(f"Error in make_request_product_detail (attempt {i + 1}):{url}")
-#                 print(e)
-#                 sleep_time = backoff_factor * (2**i)
-#                 # time.sleep(sleep_time)
-#                 await asyncio.sleep(sleep_time)
+            if response.status_code == 200:
+                return response
+            if i == retries - 1:
+                return response
+        except Exception as e:
+            if i == retries - 1:  # This is the last retry, raise the exception
+                print("Sleeping for 5 seconds...")
+                await asyncio.sleep(5)
+                raise e
+            else:
+                print(f"Error in make_request_product_detail (attempt {i + 1}):{url}")
+                print(e)
+                sleep_time = backoff_factor * (2**i)
+                # time.sleep(sleep_time)
+                await asyncio.sleep(sleep_time)
 
 # Constants
-CHUNK_SIZE = 50  # Number of requests in each chunk
+CHUNK_SIZE = 5  # Number of requests in each chunk
 MAX_RETRIES = 3  # Total retries for each request
 BACKOFF_FACTOR = 0.3  # Factor for calculating the sleep time between retries
 RATE_LIMIT_SLEEP = 2  # Sleep time when rate limit is exceeded (in seconds)
@@ -168,101 +168,101 @@ RETRY_ATTEMPTS = 3  # Total number of attempts for each request
 SLEEP_ON_RATE_LIMIT = 2  # Sleep time when rate limit is exceeded (in seconds)
 
 
-def make_request_product_detail(url, session):
-    """Make a single request with retries in case of failure."""
-    for attempt in range(RETRY_ATTEMPTS):
-        try:
-            response = session.get(
-                url,
-                headers={
-                    **PRODUCT_HEADER,
-                    "User-Agent": get_random_user_agent(),
-                    "x-iid": generateUUID(),
-                },
-                timeout=60  # 60 seconds timeout
-            )
-            if response.status_code == 200:
-                return response
-            elif response.status_code == 429:
-                print(f"Rate limit exceeded. Sleeping for {SLEEP_ON_RATE_LIMIT} seconds.")
-                time.sleep(SLEEP_ON_RATE_LIMIT)  # Sleeping if rate limit is exceeded
-        except requests.RequestException as e:
-            print(f"Request failed (attempt {attempt + 1}): {e}")
-            if attempt < RETRY_ATTEMPTS - 1:
-                sleep_time = BACKOFF_FACTOR * (2 ** attempt)
-                time.sleep(sleep_time)  # Backoff before retrying
-            else:
-                # Last attempt
-                return None
+# def make_request_product_detail(url, session):
+#     """Make a single request with retries in case of failure."""
+#     for attempt in range(RETRY_ATTEMPTS):
+#         try:
+#             response = session.get(
+#                 url,
+#                 headers={
+#                     **PRODUCT_HEADER,
+#                     "User-Agent": get_random_user_agent(),
+#                     "x-iid": generateUUID(),
+#                 },
+#                 timeout=60  # 60 seconds timeout
+#             )
+#             if response.status_code == 200:
+#                 return response
+#             elif response.status_code == 429:
+#                 print(f"Rate limit exceeded. Sleeping for {SLEEP_ON_RATE_LIMIT} seconds.")
+#                 time.sleep(SLEEP_ON_RATE_LIMIT)  # Sleeping if rate limit is exceeded
+#         except requests.RequestException as e:
+#             print(f"Request failed (attempt {attempt + 1}): {e}")
+#             if attempt < RETRY_ATTEMPTS - 1:
+#                 sleep_time = BACKOFF_FACTOR * (2 ** attempt)
+#                 time.sleep(sleep_time)  # Backoff before retrying
+#             else:
+#                 # Last attempt
+#                 return None
 
-def fetch_product_details_chunk(product_ids_chunk, session):
-    """Fetch details for a chunk of product IDs."""
-    products_api_chunk = []
-    failed_ids_chunk = []
+# def fetch_product_details_chunk(product_ids_chunk, session):
+#     """Fetch details for a chunk of product IDs."""
+#     products_api_chunk = []
+#     failed_ids_chunk = []
 
-    # session = create_session(MAX_RETRIES, 100)
+#     # session = create_session(MAX_RETRIES, 100)
 
-    with ThreadPoolExecutor(max_workers=CHUNK_SIZE) as executor:
-        future_to_url = {
-            executor.submit(make_request_product_detail, PRODUCT_URL + str(product_id), session): product_id for product_id in product_ids_chunk
-        }
+#     with ThreadPoolExecutor(max_workers=CHUNK_SIZE) as executor:
+#         future_to_url = {
+#             executor.submit(make_request_product_detail, PRODUCT_URL + str(product_id), session): product_id for product_id in product_ids_chunk
+#         }
 
-        for future in as_completed(future_to_url):
-            product_id = future_to_url[future]
-            try:
-                response = future.result()
-                if response is not None and response.status_code == 200:
-                    data = response.json()
-                    if "errors" not in data:
-                        products_api_chunk.append(data["payload"]["data"])
-                    else:
-                        print(f"Error for product {product_id}: {data['errors']}")
-                        failed_ids_chunk.append(product_id)
-                else:
-                    print(f"Failed request for product {product_id}.")
-                    failed_ids_chunk.append(product_id)
-            except Exception as exc:
-                print(f"Generated an exception for {product_id}: {exc}")
-                failed_ids_chunk.append(product_id)
+#         for future in as_completed(future_to_url):
+#             product_id = future_to_url[future]
+#             try:
+#                 response = future.result()
+#                 if response is not None and response.status_code == 200:
+#                     data = response.json()
+#                     if "errors" not in data:
+#                         products_api_chunk.append(data["payload"]["data"])
+#                     else:
+#                         print(f"Error for product {product_id}: {data['errors']}")
+#                         failed_ids_chunk.append(product_id)
+#                 else:
+#                     print(f"Failed request for product {product_id}.")
+#                     failed_ids_chunk.append(product_id)
+#             except Exception as exc:
+#                 print(f"Generated an exception for {product_id}: {exc}")
+#                 failed_ids_chunk.append(product_id)
 
-    return products_api_chunk, failed_ids_chunk
+#     return products_api_chunk, failed_ids_chunk
 
 
-def concurrent_requests_product_details(product_ids, failed_ids: list[int], index, products_api):
-    start = time.time()
-    session = create_session(MAX_RETRIES, 100)
-    last_length = len(products_api)
+# def concurrent_requests_product_details(product_ids, failed_ids: list[int], index, products_api):
+#     start = time.time()
+#     session = create_session(MAX_RETRIES, 100)
+#     last_length = len(products_api)
 
-    for i in range(0, len(product_ids), CHUNK_SIZE):
-        if len(products_api) - last_length >= 1000:
-            string_to_show = f"Fetched: {len(products_api) - last_length}, Failed: {len(failed_ids)}"
-            print(
-                f"Current: {i}/{len(product_ids)} - {time.time() - start:.2f} secs - {string_to_show}"
-            )
-            last_length = len(products_api)
-            time.sleep(2)
-        product_ids_chunk = product_ids[i:i + CHUNK_SIZE]
-        products_chunk, failed_chunk = fetch_product_details_chunk(product_ids_chunk, session)
-        time.sleep(SLEEP_ON_RATE_LIMIT)
+#     for i in range(0, len(product_ids), CHUNK_SIZE):
+#         if len(products_api) - last_length >= 1000:
+#             string_to_show = f"Fetched: {len(products_api) - last_length}, Failed: {len(failed_ids)}"
+#             print(
+#                 f"Current: {i}/{len(product_ids)} - {time.time() - start:.2f} secs - {string_to_show}"
+#             )
+#             last_length = len(products_api)
+#             time.sleep(2)
+#         product_ids_chunk = product_ids[i:i + CHUNK_SIZE]
+#         products_chunk, failed_chunk = fetch_product_details_chunk(product_ids_chunk, session)
+#         time.sleep(SLEEP_ON_RATE_LIMIT)
 
-        products_api.extend(products_chunk)
-        failed_ids.extend(failed_chunk)
+#         products_api.extend(products_chunk)
+#         failed_ids.extend(failed_chunk)
 
-        if failed_chunk:
-            print(f"Failed IDs in this chunk: {failed_chunk}")
+#         if failed_chunk:
+#             print(f"Failed IDs in this chunk: {failed_chunk}")
 
-    print(f"Total time taken by concurrent_requests_product_details: {time.time() - start}")
+#     print(f"Total time taken by concurrent_requests_product_details: {time.time() - start}")
 
-def create_session(max_retries=3, max_connections=100):
-    session = requests.Session()
-    retries = Retry(
-        total=max_retries,
-        backoff_factor=BACKOFF_FACTOR,
+# def create_session(max_retries=3, max_connections=100):
+#     session = requests.Session()
+#     retries = Retry(
+#         total=max_retries,
+#         backoff_factor=BACKOFF_FACTOR,
 
-        status_forcelist=[429, 500, 502, 503, 504],  # Retry on specific HTTP status codes
-        method_whitelist=["HEAD", "GET", "OPTIONS"]
-    )
-    adapter = HTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections, max_retries=retries)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    return session
+#         status_forcelist=[429, 500, 502, 503, 504],  # Retry on specific HTTP status codes
+#         method_whitelist=["HEAD", "GET", "OPTIONS"]
+#     )
+#     adapter = HTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections, max_retries=retries)
+#     session.mount("http://", adapter)
+#     session.mount("https://", adapter)
+#     return session
