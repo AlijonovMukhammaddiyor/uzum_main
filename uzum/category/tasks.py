@@ -55,12 +55,11 @@ def update_uzum_data(args=None, **kwargs):
     print(get_today_pretty())
     print(datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%H:%M:%S" + " - " + "%d/%m/%Y"))
 
+    create_and_update_categories()
     start = time.time()
     update_all_category_parents()
     Category.update_descendants()
     print("Category parents updated: ", time.time() - start)
-
-    create_and_update_categories()
 
     root = CategoryAnalytics.objects.filter(category__categoryId=1, date_pretty=get_today_pretty())
     print("total_products: ", root[0].total_products)
