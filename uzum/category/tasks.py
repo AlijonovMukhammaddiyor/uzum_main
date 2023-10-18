@@ -52,7 +52,7 @@ def update_uzum_data(args=None, **kwargs):
     # get today's date
     date_pretty = get_today_pretty()
 
-    print(get_today_pretty())
+    print(date_pretty)
     print(datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%H:%M:%S" + " - " + "%d/%m/%Y"))
 
     start = time.time()
@@ -62,7 +62,7 @@ def update_uzum_data(args=None, **kwargs):
 
     create_and_update_categories()
 
-    root = CategoryAnalytics.objects.filter(category__categoryId=1, date_pretty=get_today_pretty())
+    root = CategoryAnalytics.objects.filter(category__categoryId=1, date_pretty=date_pretty)
     print("total_products: ", root[0].total_products)
 
     # 1. Get all categories which have less than N products
