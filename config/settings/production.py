@@ -20,6 +20,7 @@ ALLOWED_HOSTS += [
     "127.0.0.1",
     "146.190.84.109",
     "159.65.193.34",
+    "159.223.251.201",
     "localhost:3000",
     "uzanalitika.uz",
     "www.uzanalitika.uz",

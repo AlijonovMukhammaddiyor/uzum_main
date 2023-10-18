@@ -231,8 +231,16 @@ def fetch_product_details_chunk(product_ids_chunk, session):
 def concurrent_requests_product_details(product_ids, failed_ids: list[int], index, products_api):
     start = time.time()
     session = create_session(MAX_RETRIES, 100)
+    last_length = len(products_api)
 
     for i in range(0, len(product_ids), CHUNK_SIZE):
+        if len(products_api) - last_length >= 1000:
+            string_to_show = f"Fetched: {len(products_api) - last_length}, Failed: {len(failed_ids)}"
+            print(
+                f"Current: {i}/{len(product_ids)} - {time.time() - start:.2f} secs - {string_to_show}"
+            )
+            last_length = len(products_api)
+            time.sleep(2)
         product_ids_chunk = product_ids[i:i + CHUNK_SIZE]
         products_chunk, failed_chunk = fetch_product_details_chunk(product_ids_chunk, session)
 
