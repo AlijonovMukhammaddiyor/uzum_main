@@ -243,6 +243,7 @@ def concurrent_requests_product_details(product_ids, failed_ids: list[int], inde
             time.sleep(2)
         product_ids_chunk = product_ids[i:i + CHUNK_SIZE]
         products_chunk, failed_chunk = fetch_product_details_chunk(product_ids_chunk, session)
+        time.sleep(SLEEP_ON_RATE_LIMIT)
 
         products_api.extend(products_chunk)
         failed_ids.extend(failed_chunk)
