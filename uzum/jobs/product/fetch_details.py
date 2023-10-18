@@ -219,6 +219,7 @@ def fetch_product_details_chunk(product_ids_chunk, session):
 
 
 def concurrent_requests_product_details(product_ids, failed_ids: list[int], index, products_api):
+    start = time.time()
     with requests.Session() as session:
         # We divide the product_ids list into chunks.
         for i in range(0, len(product_ids), CHUNK_SIZE):
@@ -231,10 +232,12 @@ def concurrent_requests_product_details(product_ids, failed_ids: list[int], inde
             if failed_chunk:
                 print(f"Failed IDs in this chunk: {failed_chunk}")
 
-            # If we hit the rate limit, we should pause the requests.
-            if len(failed_chunk) > 0 and any(id.endswith('429') for id in failed_chunk):  # Check if any ID ends with 429, indicating a rate limit error
-                print(f"Rate limit likely exceeded. Sleeping for {RATE_LIMIT_SLEEP} seconds before continuing with the next chunk.")
-                time.sleep(RATE_LIMIT_SLEEP)
+            # # If we hit the rate limit, we should pause the requests.
+            # if len(failed_chunk) > 0:  # Check if any ID ends with 429, indicating a rate limit error
+            #     print(f"Rate limit likely exceeded. Sleeping for {RATE_LIMIT_SLEEP} seconds before continuing with the next chunk.")
+            #     time.sleep(RATE_LIMIT_SLEEP)
+
+    print(f"Total time taken by concurrent_requests_product_details: {time.time() - start}")
 
 def create_session(max_connections):
     session = Session()
