@@ -74,6 +74,7 @@ async def concurrent_requests_product_details(
     product_ids: list[int], failed_ids: list[int], index: int, products_api: list[dict]
 ):
     try:
+
         index = 0
         start_time = time.time()
         last_length = len(products_api)
@@ -96,7 +97,7 @@ async def concurrent_requests_product_details(
                         PRODUCT_URL + str(id),
                         client=client,
                     )
-                    for id in product_ids[index : index + 2]
+                    for id in product_ids[index : index + PRODUCT_CONCURRENT_REQUESTS_LIMIT]
                 ]
 
                 results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -126,7 +127,7 @@ async def concurrent_requests_product_details(
 
                 del results
                 del tasks
-                index += 2
+                index += PRODUCT_CONCURRENT_REQUESTS_LIMIT
 
     except Exception as e:
         print(f"Error in concurrent_requests_product_details C: {e}")
