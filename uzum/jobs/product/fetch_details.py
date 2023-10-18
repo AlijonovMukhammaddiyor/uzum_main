@@ -191,6 +191,8 @@ def fetch_product_details_chunk(product_ids_chunk, session):
     products_api_chunk = []
     failed_ids_chunk = []
 
+    session = create_session(MAX_RETRIES, 100)
+
     with ThreadPoolExecutor(max_workers=CHUNK_SIZE) as executor:
         future_to_url = {
             executor.submit(make_request_product_detail, PRODUCT_URL + str(product_id), session): product_id for product_id in product_ids_chunk
