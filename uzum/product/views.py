@@ -746,14 +746,16 @@ class ExtensionProductCardView(APIView):
                 data = ProductAnalyticsView.objects.filter(product_id__in=productIds).values(
                     "product_id",
                     "orders_3_days",
-                    "shop_title","shop_link",
+                    "shop_title",
+                    "shop_link",
                 )
             elif user.tariff == Tariffs.BASE:
                 data = ProductAnalyticsView.objects.filter(product_id__in=productIds).values(
                     "product_id",
                     "orders_3_days",
                     "monthly_orders",
-                    "shop_title","shop_link",
+                    "shop_title",
+                    "shop_link",
                 )
             else:
                 data = ProductAnalyticsView.objects.filter(product_id__in=productIds).values(
@@ -768,6 +770,7 @@ class ExtensionProductCardView(APIView):
             positions = ProductAnalytics.objects.filter(product__product_id__in=productIds, date_pretty=get_today_pretty_fake()).values(
                 "positions",
                 "product__product_id",
+                "product__created_at"
             )
 
             # make a dictionary with product_id as key
@@ -777,12 +780,15 @@ class ExtensionProductCardView(APIView):
 
             # make a dictionary with product_id as key
             positions_dict = {}
+            created_at_dict = {}
             for item in positions:
                 positions_dict[item["product__product_id"]] = item["positions"]
+                created_at_dict[item["product__product_id"]] = item["product__created_at"]
 
             # add positions into data_dict
             for product_id, item in data_dict.items():
                 item["positions"] = positions_dict.get(product_id, None)
+                item["product__created_at"] = created_at_dict.get(product_id, None)
 
             return Response(
                 data=data_dict,

@@ -85,7 +85,7 @@ def update_category_tree_with_weekly_data(date_pretty=get_today_pretty()):
             children_map.setdefault(category["parent_id"], []).append(category)
 
         # get analytics data
-        analytics_data = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty()).values(
+        analytics_data = CategoryAnalytics.objects.filter(date_pretty=date_pretty).values(
             "category_id",
             "total_orders_amount",
             "total_orders",
@@ -103,12 +103,12 @@ def update_category_tree_with_weekly_data(date_pretty=get_today_pretty()):
         for data in analytics_dict.values():
             monthly_data = monthly_analytics_data.get(data["category_id"], {})
             # if not monthly_data:
-                # print("No monthly data for category: ", data["category_id"])
+            # print("No monthly data for category: ", data["category_id"])
             for key in ["total_orders_amount", "total_orders", "total_products", "total_reviews", "total_shops"]:
                 data[key] = data.get(key, 0) - monthly_data.get(key, 0)
 
         min_max_data = CategoryAnalytics.objects.filter(
-            date_pretty=get_today_pretty(), category__child_categories=None
+            date_pretty=date_pretty, category__child_categories=None
         ).values(
             "category_id",
             "total_orders_amount",
@@ -229,7 +229,7 @@ def update_category_tree_with_monthly_data(date_pretty=None):
             children_map.setdefault(category["parent_id"], []).append(category)
 
         # get analytics data
-        analytics_data = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty()).values(
+        analytics_data = CategoryAnalytics.objects.filter(date_pretty=date_pretty).values(
             "category_id",
             "total_orders_amount",
             "total_orders",
@@ -252,7 +252,7 @@ def update_category_tree_with_monthly_data(date_pretty=None):
                 data[key] = data.get(key, 0) - monthly_data.get(key, 0)
 
         min_max_data = CategoryAnalytics.objects.filter(
-            date_pretty=get_today_pretty(), category__child_categories=None
+            date_pretty=date_pretty, category__child_categories=None
         ).values(
             "category_id",
             "total_orders_amount",
@@ -369,7 +369,7 @@ def update_category_tree_with_data(date_pretty=get_today_pretty()):
         children_map.setdefault(category["parent_id"], []).append(category)
 
     # get analytics data
-    analytics_data = CategoryAnalytics.objects.filter(date_pretty=get_today_pretty()).values(
+    analytics_data = CategoryAnalytics.objects.filter(date_pretty=date_pretty).values(
         "category_id",
         "total_orders_amount",
         "total_orders",
@@ -379,7 +379,7 @@ def update_category_tree_with_data(date_pretty=get_today_pretty()):
     )
 
     min_max_data = CategoryAnalytics.objects.filter(
-        date_pretty=get_today_pretty(), category__child_categories=None
+        date_pretty=date_pretty, category__child_categories=None
     ).values(
         "category_id",
         "total_orders_amount",
