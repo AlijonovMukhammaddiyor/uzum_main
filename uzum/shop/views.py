@@ -30,15 +30,19 @@ from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.serializers import (ProductAnalyticsSerializer,
                                       ProductSerializer)
 from uzum.review.views import CookieJWTAuthentication
-from uzum.shop.models import Shop, ShopAnalytics, ShopAnalyticsRecent, ShopAnalyticsTable
+from uzum.shop.models import (Shop, ShopAnalytics, ShopAnalyticsRecent,
+                              ShopAnalyticsTable)
 from uzum.users.models import User
 from uzum.utils.general import (Tariffs, authorize_Base_tariff,
                                 get_day_before_pretty,
                                 get_days_based_on_tariff, get_next_day_pretty,
                                 get_today_pretty_fake)
 
-from .serializers import (ExtendedShopSerializer, ShopAnalyticsRecentExcelSerializer, ShopAnalyticsRecentSerializer, ShopAnalyticsSerializer,
-                          ShopCompetitorsSerializer, ShopSerializer)
+from .serializers import (ExtendedShopSerializer,
+                          ShopAnalyticsRecentExcelSerializer,
+                          ShopAnalyticsRecentSerializer,
+                          ShopAnalyticsSerializer, ShopCompetitorsSerializer,
+                          ShopSerializer)
 
 
 def get_totals(date_pretty):

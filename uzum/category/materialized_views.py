@@ -7,6 +7,8 @@ import pytz
 from django.db import connection
 from django.utils import timezone
 
+from uzum.utils.general import get_today_pretty
+
 
 def create_materialized_view(date_pretty_str):
     drop_materialized_view()
@@ -220,10 +222,10 @@ def create_product_analytics_monthly_materialized_view(date_pretty):
         )
 
 
-def create_product_analytics_interval_materialized_view(interval: int, table_name="product_analytics_interval"):
+def create_product_analytics_interval_materialized_view(interval: int, table_name="product_analytics_interval", date_pretty=get_today_pretty()):
     # Convert the dates to string format if they're datetime objects
 
-    start_date = timezone.make_aware(datetime.now() - timedelta(days=interval)).strftime("%Y-%m-%d")
+    start_date = timezone.make_aware(datetime.strptime(date_pretty, "%Y-%m-%d") - timedelta(days=interval)).strftime("%Y-%m-%d")
 
     with connection.cursor() as cursor:
         drop_query = f"DROP MATERIALIZED VIEW IF EXISTS {table_name};"

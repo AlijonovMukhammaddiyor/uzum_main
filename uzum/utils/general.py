@@ -41,7 +41,7 @@ def get_today_pretty():
 
 def get_today_pretty_fake():
     # check if it is 7:00 AM in Tashkent
-    return "2023-10-17"
+    return "2023-10-19"
     # if datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).hour >= 23:
     #     return datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
     # else:

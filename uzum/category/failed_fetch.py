@@ -1,12 +1,12 @@
 import asyncio
+import threading
 import time
 import traceback
-import concurrent.futures
 
 import httpx
+import requests
 from asgiref.sync import async_to_sync
 from django.db import transaction
-import requests
 
 from uzum.category.models import CategoryAnalytics
 from uzum.jobs.category.MultiEntry import \
@@ -15,7 +15,8 @@ from uzum.jobs.constants import (CATEGORIES_HEADER, CATEGORIES_HEADER_RU,
                                  MAX_ID_COUNT, PAGE_SIZE,
                                  POPULAR_SEARCHES_PAYLOAD, PRODUCT_HEADER)
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
-from uzum.jobs.product.fetch_details import concurrent_requests_product_details, get_product_details_via_ids
+from uzum.jobs.product.fetch_details import (
+    concurrent_requests_product_details, get_product_details_via_ids)
 from uzum.jobs.product.fetch_ids import get_all_product_ids_from_uzum
 from uzum.jobs.product.MultiEntry import create_products_from_api
 from uzum.product.models import ProductAnalytics
@@ -152,12 +153,46 @@ def fetch_single_product(product_id):
         print("Error in fetch_single_product: ", e)
         return None
 
+NUM_WORKER_THREADS = 10
+
+
+# Synchronous processing for comparison
 def fetch_multiple_products(product_ids):
+    start = time.time()
     results = []
     failed = []
     # batches = [product_ids[i:i + BATCH_SIZE] for i in range(0, len(product_ids), BATCH_SIZE)]
     async_to_sync(concurrent_requests_product_details)(product_ids, failed, 0, results)
     print(f"Failed to fetch {len(failed)} products")
+    end = time.time()
+    print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+
+# Multi-threaded processing
+def fetch_products_with_threads(product_ids):
+    results = []
+    failed = []
+    start_time = time.time()
+
+    # Adjust the number of worker threads based on your system and requirements
+    NUM_WORKER_THREADS = 10
+    threads = []
+
+    def worker(subset_ids):
+        async_to_sync(concurrent_requests_product_details)(subset_ids, failed, 0, results)
+
+    step_size = len(product_ids) // NUM_WORKER_THREADS
+
+    for i in range(0, len(product_ids), step_size):
+        subset_ids = product_ids[i:i + step_size]
+        thread = threading.Thread(target=worker, args=(subset_ids,))
+        thread.start()
+        threads.append(thread)
+
+    for thread in threads:
+        thread.join()
+
+    end_time = time.time()
+    print(f"Multi-threaded: Time taken: {end_time - start_time} seconds, Failed: {len(failed)}")
 
 MAX_WORKERS = 60
 BATCH_SIZE = 60  # Adjust based on the server's rate limit policy

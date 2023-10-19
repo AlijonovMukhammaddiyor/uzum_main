@@ -33,10 +33,10 @@ from uzum.jobs.constants import PRODUCT_HEADER
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 from uzum.product.models import Product, ProductAnalytics, ProductAnalyticsView
 from uzum.product.pagination import ExamplePagination
-from uzum.product.serializers import (CurrentProductSerializer, ExtendedProductAnalyticsExtensionSerializer,
-                                      ExtendedProductAnalyticsSerializer,
-                                      ExtendedProductSerializer,
-                                      ProductSerializer)
+from uzum.product.serializers import (
+    CurrentProductSerializer, ExtendedProductAnalyticsExtensionSerializer,
+    ExtendedProductAnalyticsSerializer, ExtendedProductSerializer,
+    ProductSerializer)
 from uzum.sku.models import SkuAnalytics
 from uzum.users.models import User
 from uzum.utils.general import (Tariffs, authorize_Base_tariff,

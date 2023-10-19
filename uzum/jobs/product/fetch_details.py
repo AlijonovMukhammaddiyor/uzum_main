@@ -1,12 +1,14 @@
 import asyncio
 import logging
 import time
-import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import httpx
+import requests
+from requests import Session
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
-from requests import Session
+
 from uzum.jobs.constants import (PRODUCT_CONCURRENT_REQUESTS_LIMIT,
                                  PRODUCT_HEADER, PRODUCT_URL)
 from uzum.jobs.helpers import generateUUID, get_random_user_agent

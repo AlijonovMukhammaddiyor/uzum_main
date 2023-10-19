@@ -351,7 +351,6 @@ class ProductAnalytics(models.Model):
     @staticmethod
     def update_analytics(date_pretty: str):
         try:
-            ProductAnalytics.set_daily_revenue(date_pretty)
             ProductAnalytics.set_positions(date_pretty)
             ProductAnalytics.set_top_growing_products()
             ProductAnalytics.update_positions(date_pretty)
