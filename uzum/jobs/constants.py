@@ -30,6 +30,7 @@ CATEGORIES_HEADER = {
     "x-iid": "25dc2cba-2d8e-4192-bac7-8f0df42cbdd5",
 }
 
+
 CATEGORIES_HEADER_RU = {
     "Access-Control-Allow-Credentials": "true",
     "Authorization": "Basic YjJjLWZyb250OmNsaWVudFNlY3JldA==",

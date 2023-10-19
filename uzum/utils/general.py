@@ -35,7 +35,7 @@ def decode_request(request: Request, method: str) -> dict:
 
 
 def get_today_pretty():
-    return "2023-10-19"
+    return "2023-10-20"
     # return datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
 
 
