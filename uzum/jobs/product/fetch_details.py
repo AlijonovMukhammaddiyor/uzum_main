@@ -111,9 +111,6 @@ async def concurrent_requests_product_details(
                     else:
                         if res.status_code != 200:
                             _id = product_ids[index + idx]
-                            if res.status_code == 429:
-                                # print headers
-                                print(res.headers)
                             print(
                                 f"Error in concurrent_requests_product_details B: {res.status_code} - {_id}",
                             )

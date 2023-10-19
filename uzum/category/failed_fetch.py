@@ -159,6 +159,7 @@ NUM_WORKER_THREADS = 10
 # Synchronous processing for comparison
 def fetch_multiple_products(product_ids):
     start = time.time()
+    start2 = time.time()
     results = []
     failed = []
     # batches = [product_ids[i:i + BATCH_SIZE] for i in range(0, len(product_ids), BATCH_SIZE)]
@@ -166,6 +167,66 @@ def fetch_multiple_products(product_ids):
     print(f"Failed to fetch {len(failed)} products")
     end = time.time()
     print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+
+    if len(failed) > 0:
+        failed2 = []
+        start = time.time()
+        async_to_sync(concurrent_requests_product_details)(failed, failed2, 0, results)
+        print(f"Failed to fetch {len(failed2)} products")
+        end = time.time()
+        print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+
+        if len(failed2) > 0:
+            failed3 = []
+            start = time.time()
+            async_to_sync(concurrent_requests_product_details)(failed2, failed3, 0, results)
+            print(f"Failed to fetch {len(failed3)} products")
+            end = time.time()
+            print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+
+            if len(failed3) > 0:
+                failed4 = []
+                start = time.time()
+                async_to_sync(concurrent_requests_product_details)(failed3, failed4, 0, results)
+                print(f"Failed to fetch {len(failed4)} products")
+                end = time.time()
+                print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+
+                if len(failed4) > 0:
+                    failed5 = []
+                    start = time.time()
+                    async_to_sync(concurrent_requests_product_details)(failed4, failed5, 0, results)
+                    print(f"Failed to fetch {len(failed5)} products")
+                    end = time.time()
+                    print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+
+                    if len(failed5) > 0:
+                        failed6 = []
+                        start = time.time()
+                        async_to_sync(concurrent_requests_product_details)(failed5, failed6, 0, results)
+                        print(f"Failed to fetch {len(failed6)} products")
+                        end = time.time()
+                        print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+
+                        if len(failed6) > 0:
+                            failed7 = []
+                            start = time.time()
+                            async_to_sync(concurrent_requests_product_details)(failed6, failed7, 0, results)
+                            print(f"Failed to fetch {len(failed7)} products")
+                            end = time.time()
+                            print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+
+                            if len(failed7) > 0:
+                                failed8 = []
+                                start = time.time()
+                                async_to_sync(concurrent_requests_product_details)(failed7, failed8, 0, results)
+                                print(f"Failed to fetch {len(failed8)} products")
+                                end = time.time()
+                                print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+
+    print(f"Total results: {len(results)}")
+    print(f"Time taken: {end - start2} seconds. fetch_multiple_products")
+
 
 # Multi-threaded processing
 def fetch_products_with_threads(product_ids):
