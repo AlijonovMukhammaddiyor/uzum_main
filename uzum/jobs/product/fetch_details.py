@@ -79,7 +79,7 @@ async def concurrent_requests_product_details(
         async with httpx.AsyncClient() as client:
             while index < len(product_ids):
                 # update the client, cut the session and create a new one
-                client = httpx.AsyncClient()
+                # client = httpx.AsyncClient()
                 if len(products_api) - last_length >= 1000:
                     string_to_show = f"Fetched: {len(products_api) - last_length}, Failed: {len(failed_ids)}"
                     print(
@@ -139,7 +139,7 @@ async def make_request_product_detail(url, retries=3, backoff_factor=0.3, client
                     "User-Agent": get_random_user_agent(),
                     "x-iid": generateUUID(),
                 },
-                timeout=60,  # 60 seconds
+                timeout=20,  # 60 seconds
             )
 
             if response.status_code == 200 or response.status_code == 429:
