@@ -119,7 +119,7 @@ async def concurrent_requests_product_details(
                 del results
                 del tasks
                 index += PRODUCT_CONCURRENT_REQUESTS_LIMIT
-
+        print(errors)
         for key, value in errors.items():
             print(f"Status code: {key}, Count: {len(value)}")
 
