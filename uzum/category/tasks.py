@@ -13,7 +13,7 @@ from uzum.category.duplicate_remove import (
     bulk_remove_duplicate_category_analytics,
     bulk_remove_duplicate_product_analytics,
     bulk_remove_duplicate_shop_analytics, bulk_remove_duplicate_sku_analytics)
-from uzum.category.failed_fetch import fetch_popular_seaches_from_uzum
+from uzum.category.failed_fetch import fetch_popular_seaches_from_uzum, fetch_product_ids
 from uzum.category.materialized_views import (
     create_shop_analytics_monthly_materialized_view,
     update_shop_analytics_from_materialized_view)
@@ -59,6 +59,7 @@ def update_uzum_data(args=None, **kwargs):
     start = time.time()
     update_all_category_parents()
     Category.update_descendants()
+    Category.update_ancestors_bulk()
     print("Category parents updated: ", time.time() - start)
 
     root = CategoryAnalytics.objects.filter(category__categoryId=1, date_pretty=get_today_pretty())
@@ -107,7 +108,10 @@ def update_uzum_data(args=None, **kwargs):
     Category.update_descendants()
 
     time.sleep(10)
-
+    try:
+        fetch_product_ids(date_pretty, product_ids)
+    except Exception as e:
+        print("Error in remaining fetch_product_ids:", e)
     # add russian titles to all products
     add_russian_titles()
 

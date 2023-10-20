@@ -76,7 +76,7 @@ async def concurrent_requests_product_details(
     product_ids: list[int], failed_ids: list[int], index: int, products_api: list[dict]
 ):
     try:
-
+        errors = {}
         index = 0
         start_time = time.time()
         last_length = len(products_api)
@@ -105,17 +105,15 @@ async def concurrent_requests_product_details(
 
                 for idx, res in enumerate(results):
                     if isinstance(res, Exception):
-                        print("Error in concurrent_requests_product_details A:", res)
                         failed_ids.append(product_ids[index + idx])
                     else:
                         if res.status_code != 200:
                             _id = product_ids[index + idx]
-                            print(
-                                f"Error in concurrent_requests_product_details B: {res.status_code} - {_id}",
-                            )
                             failed_ids.append(product_ids[index + idx])
+                            if res.status_code not in errors:
+                                errors[res.status_code] = []
+                            errors[res.status_code].append(_id)
                             continue
-                        # print(res.json())
 
                         res_data = res.json()
                         if "errors" not in res_data:
@@ -126,6 +124,9 @@ async def concurrent_requests_product_details(
                 del results
                 del tasks
                 index += PRODUCT_CONCURRENT_REQUESTS_LIMIT
+
+        for key, value in errors.items():
+            print(f"Status code: {key}, Count: {len(value)}")
 
     except Exception as e:
         print(f"Error in concurrent_requests_product_details C: {e}")
@@ -152,7 +153,7 @@ async def make_request_product_detail(url, retries=3, backoff_factor=0.3, client
         except Exception as e:
             if i == retries - 1:  # This is the last retry, raise the exception
                 print("Sleeping for 5 seconds...")
-                await asyncio.sleep(5)
+                await asyncio.sleep(2)
                 raise e
             else:
                 print(f"Error in make_request_product_detail (attempt {i + 1}):{url}")
