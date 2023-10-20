@@ -357,17 +357,21 @@ class ProductsToExcelView(APIView):
             start = time.time()
             category = Category.objects.get(categoryId=category_id)
             categories = category.descendants
+
             if not categories:
+                print("No descendants")
                 categories = [category_id]
             else:
+                print("Categories", categories)
                 categories = categories.split(",")
-                categories.append(category_id)
+                # make them integers
+                categories = list(map(int, categories))
+                categories.append(int(category_id))
             params = self.request.GET
 
             # Dictionary to hold the actual ORM filters
             orm_filters = {}
 
-            # Extracting sorting parameters
             column = params.get("column", "orders_money")  # Get the column to sort by
             order = params.get("order", "desc")  # Get the order (asc/desc)
 
@@ -375,12 +379,59 @@ class ProductsToExcelView(APIView):
             monthly = params.get("monthly", None)  # Get the categories to filter by
 
             if weekly:
-                return ProductAnalyticsView.objects.all().order_by("-weekly_orders_money")[:100]
+                data = ProductAnalyticsView.objects.all().order_by("-weekly_orders")[:100].values(
+                    "product_id",
+                    "product_title_ru",
+                    "product_title",
+                    "orders_amount",
+                    "product_available_amount",
+                    "orders_money",
+                    "reviews_amount",
+                    "rating",
+                    "shop_title",
+                    "category_title",
+                    "category_title_ru",
+                    "avg_purchase_price",
+                    "position_in_category",
+                    "orders_3_days",
+                    "revenue_3_days",
+                    "weekly_orders",
+                    "weekly_revenue",
+                    "monthly_orders",
+                    "monthly_revenue",
+                    "revenue_90_days",
+                    "orders_90_days"
+                )
+                return Response(data)
 
             if monthly:
-                return ProductAnalyticsView.objects.all().order_by("-diff_orders_money")[:100]
+                data = ProductAnalyticsView.objects.all().order_by("-monthly_orders")[:100].values(
+                    "product_id",
+                    "product_title_ru",
+                    "product_title",
+                    "orders_amount",
+                    "product_available_amount",
+                    "orders_money",
+                    "reviews_amount",
+                    "rating",
+                    "shop_title",
+                    "category_title",
+                    "category_title_ru",
+                    "avg_purchase_price",
+                    "position_in_category",
+                    "orders_3_days",
+                    "revenue_3_days",
+                    "weekly_orders",
+                    "weekly_revenue",
+                    "monthly_orders",
+                    "monthly_revenue",
+                    "revenue_90_days",
+                    "orders_90_days"
+                )
+                return Response(data)
 
-            if not categories:
+            if len(categories) == 0:
+                print("No categories")
                 # return empty queryset
                 return ProductAnalyticsView.objects.none()
 
@@ -418,20 +469,10 @@ class ProductsToExcelView(APIView):
                         else:
                             title_exclude_q_objects &= ~Q(product_title__icontains=keyword)
 
-                if key.startswith("orders_money") or key.startswith("diff_orders_money"):
-                    # divide by 1000
-                    values = orm_filters[key]
-                    for keyword in keywords:
-                        if "ru" in key:
-                            title_exclude_q_objects &= ~Q(product_title_ru__iexact=keyword)
-                        else:
-                            title_exclude_q_objects &= ~Q(product_title__iexact=keyword)
-
                 if key.startswith("product_created_at"):
                     # Convert the timestamp back to a datetime object with the correct timezone
                     values = orm_filters.get(key)
                     # check if values is list
-                    print("right")
                     if values and isinstance(values, list) or isinstance(values, tuple):
                         orm_filters[key] = [
                             datetime.fromtimestamp(int(values[0]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
@@ -474,12 +515,14 @@ class ProductsToExcelView(APIView):
                 "category_title_ru",
                 "avg_purchase_price",
                 "position_in_category",
-                "diff_orders_amount",
-                "diff_orders_money",
-                "diff_reviews_amount",
-                "weekly_orders_amount",
-                "weekly_orders_money",
-                "weekly_reviews_amount",
+                "orders_3_days",
+                "revenue_3_days",
+                "weekly_orders",
+                "weekly_revenue",
+                "monthly_orders",
+                "monthly_revenue",
+                "revenue_90_days",
+                "orders_90_days"
             )
 
             logger.info(f"ProductsToExcelView: {time.time() - start}")
