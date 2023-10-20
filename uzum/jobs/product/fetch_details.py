@@ -142,7 +142,7 @@ async def make_request_product_detail(url, retries=3, backoff_factor=0.3, client
                 timeout=60,  # 60 seconds
             )
 
-            if response.status_code == 200:
+            if response.status_code == 200 or response.status_code == 429:
                 return response
             if i == retries - 1:
                 return response
