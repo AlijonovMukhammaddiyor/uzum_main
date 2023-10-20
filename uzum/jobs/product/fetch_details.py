@@ -105,7 +105,7 @@ async def concurrent_requests_product_details(
                         if res.status_code != 200:
                             _id = product_ids[index + idx]
                             failed_ids.append(product_ids[index + idx])
-                            print(f"Failed request for product {_id} - {res.status_code}")
+                            # print(f"Failed request for product {_id} - {res.status_code}")
                             if res.status_code not in errors:
                                 errors[res.status_code] = []
                             errors[res.status_code].append(_id)
