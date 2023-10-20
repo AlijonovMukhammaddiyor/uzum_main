@@ -183,7 +183,7 @@ def fetch_multiple_products(product_ids):
     end_total = time.time()
     print(f"Total time taken: {end_total - start_total} seconds. fetch_multiple_products")
 
-    return results  # Optionally return the results for further processing
+    # return results  # Optionally return the results for further processing
 
 # Multi-threaded processing
 def fetch_products_with_threads(product_ids):
