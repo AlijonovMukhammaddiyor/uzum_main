@@ -156,77 +156,34 @@ def fetch_single_product(product_id):
 NUM_WORKER_THREADS = 10
 
 
-# Synchronous processing for comparison
 def fetch_multiple_products(product_ids):
-    start = time.time()
-    start2 = time.time()
+    MAX_RETRIES = 10  # Maximum number of times to retry fetching failed products
+
+    start_total = time.time()
     results = []
-    failed = []
-    # batches = [product_ids[i:i + BATCH_SIZE] for i in range(0, len(product_ids), BATCH_SIZE)]
-    async_to_sync(concurrent_requests_product_details)(product_ids, failed, 0, results)
-    print(f"Failed to fetch {len(failed)} products")
-    end = time.time()
-    print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+    failed = product_ids  # Initially, all product IDs are considered "failed" until successfully fetched.
 
-    if len(failed) > 0:
-        failed2 = []
+    for attempt in range(MAX_RETRIES):
+        if not failed:
+            break  # Exit the loop if there are no more failed products to fetch
+
+        print(f"Attempt {attempt + 1} of {MAX_RETRIES}")
+        new_failed = []
         start = time.time()
-        async_to_sync(concurrent_requests_product_details)(failed, failed2, 0, results)
-        print(f"Failed to fetch {len(failed2)} products")
+
+        async_to_sync(concurrent_requests_product_details)(failed, new_failed, 0, results)
+
         end = time.time()
-        print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+        print(f"Failed to fetch {len(new_failed)} products on attempt {attempt + 1}")
+        print(f"Time taken for current attempt: {end - start} seconds")
 
-        if len(failed2) > 0:
-            failed3 = []
-            start = time.time()
-            async_to_sync(concurrent_requests_product_details)(failed2, failed3, 0, results)
-            print(f"Failed to fetch {len(failed3)} products")
-            end = time.time()
-            print(f"Time taken: {end - start} seconds. fetch_multiple_products")
-
-            if len(failed3) > 0:
-                failed4 = []
-                start = time.time()
-                async_to_sync(concurrent_requests_product_details)(failed3, failed4, 0, results)
-                print(f"Failed to fetch {len(failed4)} products")
-                end = time.time()
-                print(f"Time taken: {end - start} seconds. fetch_multiple_products")
-
-                if len(failed4) > 0:
-                    failed5 = []
-                    start = time.time()
-                    async_to_sync(concurrent_requests_product_details)(failed4, failed5, 0, results)
-                    print(f"Failed to fetch {len(failed5)} products")
-                    end = time.time()
-                    print(f"Time taken: {end - start} seconds. fetch_multiple_products")
-
-                    if len(failed5) > 0:
-                        failed6 = []
-                        start = time.time()
-                        async_to_sync(concurrent_requests_product_details)(failed5, failed6, 0, results)
-                        print(f"Failed to fetch {len(failed6)} products")
-                        end = time.time()
-                        print(f"Time taken: {end - start} seconds. fetch_multiple_products")
-
-                        if len(failed6) > 0:
-                            failed7 = []
-                            start = time.time()
-                            async_to_sync(concurrent_requests_product_details)(failed6, failed7, 0, results)
-                            print(f"Failed to fetch {len(failed7)} products")
-                            end = time.time()
-                            print(f"Time taken: {end - start} seconds. fetch_multiple_products")
-
-                            if len(failed7) > 0:
-                                failed8 = []
-                                start = time.time()
-                                async_to_sync(concurrent_requests_product_details)(failed7, failed8, 0, results)
-                                print(f"Failed to fetch {len(failed8)} products")
-                                end = time.time()
-                                print(f"Time taken: {end - start} seconds. fetch_multiple_products")
+        failed = new_failed  # Update the list of failed products for the next iteration
 
     print(f"Total results: {len(results)}")
-    print(f"Time taken: {end - start2} seconds. fetch_multiple_products")
+    end_total = time.time()
+    print(f"Total time taken: {end_total - start_total} seconds. fetch_multiple_products")
 
+    return results  # Optionally return the results for further processing
 
 # Multi-threaded processing
 def fetch_products_with_threads(product_ids):
