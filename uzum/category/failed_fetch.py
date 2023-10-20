@@ -158,7 +158,7 @@ NUM_WORKER_THREADS = 10
 
 
 def fetch_multiple_products(product_ids):
-    MAX_RETRIES = 15  # Maximum number of times to retry fetching failed products
+    MAX_RETRIES = 10  # Maximum number of times to retry fetching failed products
 
     start_total = time.time()
     results = []

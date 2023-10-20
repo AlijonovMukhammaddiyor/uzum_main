@@ -31,7 +31,6 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
         if len(failed_ids) > 0:
             failed_again_ids = []
             print(f"Failed Ids length: {len(failed_ids)}")
-            time.sleep(5)
             await concurrent_requests_product_details(failed_ids, failed_again_ids, 0, products_api)
 
             if len(failed_again_ids) > 0:
@@ -39,7 +38,6 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
                 print(f"Failed again Ids length: {len(failed_again_ids)}")
                 await concurrent_requests_product_details(failed_again_ids, failed_failed, 0, products_api)
 
-                time.sleep(5)
                 if len(failed_failed) > 0:
                     final_failed = []
                     print(
@@ -47,7 +45,6 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
                     )
                     await concurrent_requests_product_details(failed_failed, final_failed, 0, products_api)
 
-                    time.sleep(5)
                     if len(final_failed) > 0:
                         ff_failed = []
                         await concurrent_requests_product_details(final_failed, ff_failed, 0, products_api)
@@ -55,8 +52,6 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
                         print(f"Total number of failed product ids: {len(ff_failed)}")
                         print(f"Failed failed Ids: {ff_failed}")
 
-                        # one more
-                        time.sleep(5)
                         if len(ff_failed) > 0:
                             fff_failed = []
                             await concurrent_requests_product_details(ff_failed, fff_failed, 0, products_api)
