@@ -309,7 +309,7 @@ class ProductsView(ListAPIView):
                                 hour=0, minute=0, second=0, microsecond=0
                             ),
                             datetime.fromtimestamp(int(values[1]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
-                                hour=23, minute=59, second=59, microsecond=999999
+                                hour=20, minute=59, second=59, microsecond=999999
                             ),
                         ]
                     elif values and key.endswith("gte"):
@@ -319,7 +319,7 @@ class ProductsView(ListAPIView):
                     elif values and key.endswith("lte"):
                         orm_filters[key] = datetime.fromtimestamp(
                             int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
-                        ).replace(hour=23, minute=59, second=59, microsecond=999999)
+                        ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             logger.warning("Product filters %s", orm_filters)
             # # Now, use the orm_filters to query the database
@@ -479,7 +479,7 @@ class ProductsToExcelView(APIView):
                                 hour=0, minute=0, second=0, microsecond=0
                             ),
                             datetime.fromtimestamp(int(values[1]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
-                                hour=23, minute=59, second=59, microsecond=999999
+                                hour=20, minute=59, second=59, microsecond=999999
                             ),
                         ]
                     elif values and key.endswith("gte"):
@@ -489,7 +489,7 @@ class ProductsToExcelView(APIView):
                     elif values and key.endswith("lte"):
                         orm_filters[key] = datetime.fromtimestamp(
                             int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
-                        ).replace(hour=23, minute=59, second=59, microsecond=999999)
+                        ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             logger.warning("Product filters %s", orm_filters)
             # # Now, use the orm_filters to query the database

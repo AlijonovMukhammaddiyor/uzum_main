@@ -1219,11 +1219,11 @@ class ShopCategoryAnalyticsView(APIView):
             days = get_days_based_on_tariff(user)
             start_date = timezone.make_aware(
                 datetime.now() - timedelta(days=days), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             current_date = timezone.make_aware(
                 datetime.strptime(get_today_pretty_fake(), "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             if category_id == 1:
                 # return shop analytics for dates between start_date and current_date

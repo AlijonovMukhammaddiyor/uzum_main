@@ -55,7 +55,7 @@ class BannersView(APIView):
             date = (
                 datetime.datetime.strptime(date_pretty, "%Y-%m-%d")
                 .astimezone(pytz.timezone("Asia/Tashkent"))
-                .replace(hour=23, minute=59, second=0, microsecond=0)
+                .replace(hour=20, minute=59, second=0, microsecond=0)
             )
 
             latest_analytics_subquery = (
@@ -141,7 +141,7 @@ class BannerImpactView(APIView):
             date = (
                 datetime.datetime.strptime(date_pretty, "%Y-%m-%d")
                 .astimezone(pytz.timezone("Asia/Tashkent"))
-                .replace(hour=23, minute=59, second=0, microsecond=0)
+                .replace(hour=20, minute=59, second=0, microsecond=0)
             )
 
             if not product:

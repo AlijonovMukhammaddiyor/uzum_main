@@ -352,7 +352,7 @@ class CategoryAnalytics(models.Model):
             # Convert date_pretty to datetime
             date = timezone.make_aware(
                 datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=0, microsecond=0)
+            ).replace(hour=20, minute=59, second=0, microsecond=0)
 
             with connection.cursor() as cursor:
                 cursor.execute(

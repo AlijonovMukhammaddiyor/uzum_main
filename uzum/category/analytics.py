@@ -87,7 +87,7 @@ def insert_shop_analytics(date_pretty):
     date = (
         pytz.timezone("Asia/Tashkent")
         .localize(datetime.strptime(date_pretty, "%Y-%m-%d"))
-        .replace(hour=23, minute=59, second=59, microsecond=999999)
+        .replace(hour=20, minute=59, second=59, microsecond=999999)
     )
 
     with connection.cursor() as cursor:

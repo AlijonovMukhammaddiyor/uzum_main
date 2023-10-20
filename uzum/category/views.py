@@ -336,7 +336,7 @@ class CategoryProductsView(ListAPIView):
                                 hour=0, minute=0, second=0, microsecond=0
                             ),
                             datetime.fromtimestamp(int(values[1]) / 1000.0, tz=pytz.timezone("Asia/Tashkent")).replace(
-                                hour=23, minute=59, second=59, microsecond=999999
+                                hour=20, minute=59, second=59, microsecond=999999
                             ),
                         ]
                     elif values and key.endswith("gte"):
@@ -346,7 +346,7 @@ class CategoryProductsView(ListAPIView):
                     elif values and key.endswith("lte"):
                         orm_filters[key] = datetime.fromtimestamp(
                             int(value) / 1000.0, tz=pytz.timezone("Asia/Tashkent")
-                        ).replace(hour=23, minute=59, second=59, microsecond=999999)
+                        ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
                 # deal with searches and filters: the same index in both lists correspond to each other
             # if searches_filter and filters:

@@ -396,7 +396,7 @@ def create_shop_analytics_interval_materialized_view(date_pretty, interval_days)
     end_date = (
         timezone.make_aware(datetime.strptime(date_pretty, "%Y-%m-%d"))
         .astimezone(pytz.timezone("Asia/Tashkent"))
-        .replace(hour=23, minute=59, second=0, microsecond=0)
+        .replace(hour=20, minute=59, second=0, microsecond=0)
     )
     interval_days -= 1
     start_date = end_date - timedelta(days=interval_days)
