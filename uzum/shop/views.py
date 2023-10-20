@@ -305,7 +305,6 @@ class ShopsView(ListAPIView):
         filters = self.request.query_params.get("filters", "")
 
         if search_columns:
-
             searchs = search_columns.split(",")
 
             for col in searchs:
@@ -562,7 +561,7 @@ class ShopAnalyticsView(APIView):
 
             end_date = timezone.make_aware(
                 datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             if seller_id is None:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -682,7 +681,7 @@ class ShopCompetitorsView(APIView):
 
             end_date = timezone.make_aware(
                 datetime.strptime(get_today_pretty_fake(), "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             competitor_shops_data = self.get_competitor_shops(shop)
 
@@ -1539,7 +1538,7 @@ class UzumTotalProducts(APIView):
 
             end_date = timezone.make_aware(
                 datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             product_analytics = ProductAnalytics.objects.only("created_at", "product__product_id").filter(
                 created_at__range=[start_date, end_date]
@@ -1575,7 +1574,7 @@ class UzumTotalShops(APIView):
 
             end_date = timezone.make_aware(
                 datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             product_analytics = ShopAnalytics.objects.filter(created_at__range=[start_date, end_date])
             daily_totals = (
@@ -1742,7 +1741,7 @@ class ShopsWithMostRevenueYesterdayView(APIView):
 
                 end_date = timezone.make_aware(
                     datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+                ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
                 cursor.execute(
                     """

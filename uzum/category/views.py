@@ -634,7 +634,7 @@ class CategoryDailyAnalyticsView(APIView):
             date_pretty = get_today_pretty_fake()
             end_date = timezone.make_aware(datetime.strptime(
                 date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")).replace(
-                hour=23, minute=59, second=59, microsecond=0
+                hour=21, minute=0, second=0, microsecond=0
             )
 
             category_analytics = CategoryAnalytics.objects.filter(
@@ -1304,7 +1304,7 @@ class GrowingCategoriesView(APIView):
 
             end_date = timezone.make_aware(
                 datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=0)
+            ).replace(hour=20, minute=59, second=59, microsecond=0)
 
             top_growing_categories = cache.get("top_categories_by_orders", [])
 
@@ -1377,13 +1377,13 @@ class MainCategoriesAnalyticsView(APIView):
                 end_date = timezone.make_aware(
                     datetime.combine(date.today() - timedelta(days=1), datetime.min.time()),
                     timezone=pytz.timezone("Asia/Tashkent"),
-                ).replace(hour=23, minute=59, second=59, microsecond=0)
+                ).replace(hour=20, minute=59, second=59, microsecond=0)
 
             else:
                 end_date = timezone.make_aware(
                     datetime.combine(date.today(), datetime.min.time()),
                     timezone=pytz.timezone("Asia/Tashkent"),
-                ).replace(hour=23, minute=59, second=59, microsecond=0)
+                ).replace(hour=20, minute=59, second=59, microsecond=0)
 
             analytics = (
                 CategoryAnalytics.objects.filter(category__in=children, created_at__range=[start_date, end_date])

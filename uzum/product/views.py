@@ -576,7 +576,7 @@ class ExtensionProductAnalyticsView(APIView):
 
             end_date = timezone.make_aware(
                 datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             product_analytics_qs = ProductAnalytics.objects.filter(
                 product__product_id=product_id, created_at__range=[start_date, end_date]
@@ -644,7 +644,7 @@ class ExtensionSingleProductAnalyticsView(APIView):
 
             end_date = timezone.make_aware(
                 datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             product_analytics_qs = ProductAnalytics.objects.filter(
                 product__product_id=product_id, created_at__range=[start_date, end_date]
@@ -726,7 +726,7 @@ class SingleProductAnalyticsView(APIView):
 
             end_date = timezone.make_aware(
                 datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-            ).replace(hour=23, minute=59, second=59, microsecond=999999)
+            ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
             product_analytics_qs = ProductAnalytics.objects.filter(
                 product__product_id=product_id, created_at__range=[start_date, end_date]
@@ -891,7 +891,7 @@ class SimilarProductsViewByUzum(APIView):
             end_date = timezone.make_aware(
                 datetime.combine(datetime.strptime(get_today_pretty_fake(), "%Y-%m-%d"), datetime.min.time()),
                 timezone=pytz.timezone("Asia/Tashkent"),
-            ).replace(hour=23, minute=59, second=59)
+            ).replace(hour=20, minute=59, second=59)
 
             product = Product.objects.get(product_id=product_id)
 
@@ -1179,7 +1179,7 @@ class ProductsWithMostRevenueYesterdayView(APIView):
                 ).replace(hour=0, minute=0, second=0, microsecond=0)
                 end_date = timezone.make_aware(
                     datetime.strptime(date_pretty, "%Y-%m-%d"), timezone=pytz.timezone("Asia/Tashkent")
-                ).replace(hour=23, minute=59, second=59, microsecond=999999)
+                ).replace(hour=20, minute=59, second=59, microsecond=999999)
 
                 cursor.execute(
                     """
