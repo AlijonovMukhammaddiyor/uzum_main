@@ -91,7 +91,6 @@ async def concurrent_requests_product_details(
                         f"Current: {index}/ {len(product_ids)} - {time.time() - start_time:.2f} secs - {string_to_show}"
                     )
                     last_length = len(products_api)
-                    time.sleep(2)  # sleep for 2 seconds
                     start_time = time.time()
 
                 tasks = [
