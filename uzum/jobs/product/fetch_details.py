@@ -59,6 +59,13 @@ async def get_product_details_via_ids(product_ids: list[int], products_api: list
                             print(f"Total number of failed product ids: {len(fff_failed)}")
                             print(f"Failed failed Ids: {fff_failed}")
 
+                            if len(fff_failed) > 0:
+                                ffff_failed = []
+                                await concurrent_requests_product_details(fff_failed, ffff_failed, 0, products_api)
+
+                                print(f"Total number of failed product ids: {len(ffff_failed)}")
+                                print(f"Failed failed Ids: {ffff_failed}")
+
         print(f"Total number of products: {len(products_api)}")
         print(f"Total time taken by get_product_details_via_ids: {time.time() - start_time}")
         print("Ending get_product_details_via_ids...\n\n")
