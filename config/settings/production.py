@@ -26,6 +26,7 @@ ALLOWED_HOSTS += [
     "www.uzanalitika.uz",
     "uzumanalitika.com",
     "207.154.218.194",
+    '146.190.238.104',
     "factual-arachnid-weekly.ngrok-free.app",
     "uzum.uz",
 ]
