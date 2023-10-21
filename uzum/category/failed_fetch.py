@@ -96,7 +96,7 @@ def fetch_product_ids(date_pretty: str = get_today_pretty(), product_ids: list[i
         categories_filtered = get_categories_with_less_than_n_products2(MAX_ID_COUNT)
         product_ids: list[int] = []
         async_to_sync(get_all_product_ids_from_uzum)(categories_filtered, product_ids, page_size=PAGE_SIZE)
-        product_ids = set(int(id) for id in product_ids)
+    product_ids = set(int(id) for id in product_ids)
 
     existing_product_ids = set(
         ProductAnalytics.objects.filter(date_pretty=date_pretty).values_list("product__product_id", flat=True)
@@ -131,7 +131,7 @@ def fetch_product_ids(date_pretty: str = get_today_pretty(), product_ids: list[i
         with transaction.atomic():
             create_products_from_api(products_api, {}, shop_analytics_done, category_sales_map)
 
-        time.sleep(30)
+        # time.sleep(0)
         del products_api
 
 def fetch_single_product(product_id):
