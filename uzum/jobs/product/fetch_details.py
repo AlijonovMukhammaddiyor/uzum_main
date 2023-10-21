@@ -94,6 +94,7 @@ async def concurrent_requests_product_details(
                     )
                     last_length = len(products_api)
                     start_time = time.time()
+                    time.sleep(2)
 
                 tasks = [
                     make_request_product_detail(
@@ -149,7 +150,7 @@ async def make_request_product_detail(url, retries=3, backoff_factor=0.3, client
                 timeout=20,  # 60 seconds
             )
 
-            if response.status_code == 200 or response.status_code == 429:
+            if response.status_code == 200:
                 return response
             if i == retries - 1:
                 return response
