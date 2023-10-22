@@ -50,7 +50,7 @@ def get_categories_tree():
                 # In the case of an unsuccessful status code, you might want to consider a retry.
                 # You can decide to increase the count or handle it based on the specific status code.
                 retry_count += 1
-                time.sleep(10)  # Adding delay before retrying.
+                time.sleep(1)  # Adding delay before retrying.
 
         except cloudscraper.exceptions.CloudflareChallengeError as e:
             # Specific handling for Cloudflare challenge errors.
@@ -59,7 +59,7 @@ def get_categories_tree():
             if retry_count == 9:  # last attempt
                 return None
             else:
-                time.sleep(10)
+                time.sleep(1)
                 retry_count += 1
         except Exception as e:
             # Handling other general exceptions.

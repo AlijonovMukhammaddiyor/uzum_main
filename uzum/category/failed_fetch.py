@@ -93,7 +93,7 @@ def fetch_product_ids(date_pretty: str = get_today_pretty(), product_ids: list[i
     # create_and_update_categories()
 
     if not product_ids:
-        categories_filtered = get_categories_with_less_than_n_products2(MAX_ID_COUNT, date_pretty=date_pretty)
+        categories_filtered = get_categories_with_less_than_n_products2(MAX_ID_COUNT, date_pretty="2023-10-21")
         product_ids: list[int] = []
         async_to_sync(get_all_product_ids_from_uzum)(categories_filtered, product_ids, page_size=PAGE_SIZE)
     product_ids = set(int(id) for id in product_ids)

@@ -181,6 +181,7 @@ def get_categories_with_less_than_n_products2(n, date_pretty=get_today_pretty())
             f"getCategoriesWithLessThanNProducts: all category analytics fetched {len(all_category_analytics)}",
         )
         category_tree = get_categories_tree()
+        # print(category_tree)
         cat_dict = {category["category"]["id"]: category["total"] for category in category_tree}
 
         # 1. make dict of all categories: key - categoryId, value - total_products and children
