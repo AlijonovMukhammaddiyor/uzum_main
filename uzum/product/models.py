@@ -242,14 +242,14 @@ class ProductAnalytics(models.Model):
             )
 
     @staticmethod
-    def set_top_growing_products():
+    def set_top_growing_products(date_pretty=get_today_pretty()):
         gc.collect()
         # Set date range (last 30 days)
-        end_date = pd.to_datetime(get_today_pretty()).tz_localize("UTC").astimezone(pytz.timezone("Asia/Tashkent"))
+        end_date = pd.to_datetime(date_pretty).tz_localize("UTC").astimezone(pytz.timezone("Asia/Tashkent"))
         start_date = end_date - pd.DateOffset(days=30)
 
         product_ids = ProductAnalytics.objects.filter(
-            date_pretty=get_today_pretty(), orders_amount__gte=40
+            date_pretty=date_pretty, orders_amount__gte=40
         ).values_list("product_id", flat=True)
 
         print("product_ids", len(product_ids))
