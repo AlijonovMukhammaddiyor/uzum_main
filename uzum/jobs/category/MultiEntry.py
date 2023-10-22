@@ -161,7 +161,7 @@ def get_categories_with_less_than_n_products_for_russian_title(n, cat_totals: di
         return None
 
 
-def get_categories_with_less_than_n_products2(n):
+def get_categories_with_less_than_n_products2(n, date_pretty=get_today_pretty()):
     """
     Get categories with less than n products
     Args:
@@ -174,7 +174,7 @@ def get_categories_with_less_than_n_products2(n):
     try:
         # all_categories = sync_to_async(Category.objects.all().order_by("categoryId"))
         # order_by("categoryId")
-        all_category_analytics = CategoryAnalytics.objects.filter(date_pretty="2023-10-21").order_by(
+        all_category_analytics = CategoryAnalytics.objects.filter(date_pretty=date_pretty).order_by(
             "category__categoryId"
         )
         print(

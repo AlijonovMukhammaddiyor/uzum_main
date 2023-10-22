@@ -36,6 +36,7 @@ def get_categories_tree():
                 json=CATEGORIES_PAYLOAD,
                 headers={
                     **CATEGORIES_HEADER,
+                    "User-Agent": scraper.headers["User-Agent"],
                     "Content-Type": "application/json",
                 },
             )
@@ -67,7 +68,7 @@ def get_categories_tree():
             if retry_count == 9:  # last attempt
                 return None
             else:
-                time.sleep(10)
+                time.sleep(1)
                 retry_count += 1
 
     # If all retries fail and you exit the loop, you may want to return a default value.

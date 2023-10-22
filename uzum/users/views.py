@@ -140,15 +140,15 @@ class SetShopsView(APIView):
             user: User = request.user
 
             last_updated = user.shops_updated_at
-            if not last_updated:
-                pass
-            else:
-                # check if it at least 30 days since the last update
-                if timezone.now() - last_updated < timedelta(days=30):
-                    return Response(
-                        status=400,
-                        data={"message": "Do'konlar tanlangan kundan boshlab 30 kundan so'ng yangilanishi mumkin."},
-                    )
+            # if not last_updated:
+            #     pass
+            # else:
+            #     # check if it at least 30 days since the last update
+            #     if timezone.now() - last_updated < timedelta(days=30):
+            #         return Response(
+            #             status=400,
+            #             data={"message": "Do'konlar tanlangan kundan boshlab 30 kundan so'ng yangilanishi mumkin."},
+            #         )
 
             if user.tariff == Tariffs.FREE:
                 return Response(status=400, data={"message": "Do'konlarni yangilash uchun Pro paketga o'ting"})
