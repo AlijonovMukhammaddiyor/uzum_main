@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import cloudscraper
 
 import httpx
 import requests
@@ -137,34 +137,66 @@ async def concurrent_requests_product_details(
         return None
 
 
-async def make_request_product_detail(url, retries=3, backoff_factor=0.3, client=None):
+async def make_request_product_detail(url, retries=3, backoff_factor=0.3):
+    """
+    Make a single request to fetch product details, creating a new Cloudscraper instance each time.
+    """
+    for attempt in range(retries):
+        try:
+            # Create a new scraper instance for each request
+            scraper = cloudscraper.create_scraper()
+
+            # Simulating a real browser with headers, etc.
+            headers = {
+                **PRODUCT_HEADER,
+                "User-Agent": scraper.headers["User-Agent"],
+                "x-iid": generateUUID(),
+            }
+
+            # Using httpx.AsyncClient to make the asynchronous request with the scraper's cookies and headers
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers, cookies=scraper.cookies, timeout=20)
+
+            if response.status_code == 200:
+                return response
+
+            # If the response code isn't what you expect, you might choose to handle it differently.
+            # Here, we're only making another attempt if we haven't reached the max number of retries.
+            if attempt >= retries - 1:
+                return response
+
+        except Exception as e:
+            if attempt >= retries - 1:
+                print(f"Failed all attempts at {url}, with the last exception being: {str(e)}")
+                raise  # Re-throwing the last exception
+            else:
+                # If you haven't reached the max retry count, print the error and sleep before retrying.
+                print(f"Error in make_request_product_detail (attempt {attempt + 1}):{url} - {str(e)}")
+                await asyncio.sleep(backoff_factor * (2 ** attempt))  # Exponential backoff
+
+
+def make_request_product_detail_sync(url, retries=3, backoff_factor=0.3):
+    scraper = cloudscraper.create_scraper()  # creates a CloudScraper instance.
     for i in range(retries):
         try:
-            response = await client.get(
+            response = scraper.get(
                 url,
                 headers={
                     **PRODUCT_HEADER,
                     "User-Agent": get_random_user_agent(),
                     "x-iid": generateUUID(),
                 },
-                timeout=20,  # 60 seconds
+                timeout=20,
             )
 
             if response.status_code == 200:
                 return response
-            if i == retries - 1:
-                return response
+            elif i < retries - 1:
+                sleep_time = backoff_factor * (2 ** i)
+                time.sleep(sleep_time)  # backoff delay
         except Exception as e:
-            if i == retries - 1:  # This is the last retry, raise the exception
-                print("Sleeping for 5 seconds...")
-                await asyncio.sleep(2)
-                raise e
-            else:
-                print(f"Error in make_request_product_detail (attempt {i + 1}):{url}")
-                print(e)
-                sleep_time = backoff_factor * (2**i)
-                # time.sleep(sleep_time)
-                await asyncio.sleep(sleep_time)
+            if i >= retries - 1:
+                return None  # or handle a way to return an error, or re-raise
 
 # Constants
 CHUNK_SIZE = 5  # Number of requests in each chunk

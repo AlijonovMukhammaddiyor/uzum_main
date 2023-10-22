@@ -13,27 +13,55 @@ from uzum.jobs.constants import (CATEGORIES_HEADER, CATEGORIES_HEADER_RU,
 from uzum.jobs.helpers import generateUUID, get_random_user_agent
 
 
+import cloudscraper
+
+# Assuming other required imports and constants are defined above
+
 def get_categories_tree():
     retry_count = 0
     while retry_count < 10:
         try:
-            tree = requests.post(
+            # Create a new CloudScraper instance for each request. This instance will solve any challenges presented.
+            scraper = cloudscraper.create_scraper(
+                browser={
+                    "browser": "chrome",
+                    "platform": "windows",
+                    "mobile": False,
+                }
+            )
+
+            # Post the request similar to how you would use 'requests.post'.
+            tree = scraper.post(
                 CATEGORIES_URL,
                 json=CATEGORIES_PAYLOAD,
                 headers={
                     **CATEGORIES_HEADER,
-                    "User-Agent": get_random_user_agent(),
-                    "x-iid": generateUUID(),
                     "Content-Type": "application/json",
                 },
             )
+
+            # Check the response status as usual.
             if tree.status_code == 200:
+                # Process the JSON response.
                 return tree.json().get("data").get("makeSearch").get("categoryTree")
             else:
                 print(f"Error in get_categories_tree: {tree.status_code} - {tree.text}")
-                return None
+                # In the case of an unsuccessful status code, you might want to consider a retry.
+                # You can decide to increase the count or handle it based on the specific status code.
+                retry_count += 1
+                time.sleep(10)  # Adding delay before retrying.
 
+        except cloudscraper.exceptions.CloudflareChallengeError as e:
+            # Specific handling for Cloudflare challenge errors.
+            print("Cloudflare challenge error in get_categories_tree: ", e)
+            traceback.print_exc()
+            if retry_count == 9:  # last attempt
+                return None
+            else:
+                time.sleep(10)
+                retry_count += 1
         except Exception as e:
+            # Handling other general exceptions.
             print("Error in get_categories_tree: ", e)
             traceback.print_exc()
             if retry_count == 9:  # last attempt
@@ -41,6 +69,9 @@ def get_categories_tree():
             else:
                 time.sleep(10)
                 retry_count += 1
+
+    # If all retries fail and you exit the loop, you may want to return a default value.
+    return None
 
 
 def get_categories_tree_ru():
