@@ -95,7 +95,8 @@ def update_category_tree_with_weekly_data(date_pretty=get_today_pretty()):
         )
         analytics_dict = {data["category_id"]: data for data in analytics_data}
 
-        thirty_days_ago = (datetime.now(tz=pytz.timezone("Asia/Tashkent")) - timedelta(days=7)).replace(
+        thirty_days_ago = (datetime.strptime(date_pretty, "%Y-%m-%d") - timedelta(days=7)).astimezone(
+            pytz.timezone("Asia/Tashkent")).replace(
             hour=0, minute=0, second=59, microsecond=0
         )
         monthly_analytics_data = fetch_latest_analytics(thirty_days_ago)
@@ -239,7 +240,8 @@ def update_category_tree_with_monthly_data(date_pretty=None):
         )
         analytics_dict = {data["category_id"]: data for data in analytics_data}
 
-        thirty_days_ago = (datetime.now(tz=pytz.timezone("Asia/Tashkent")) - timedelta(days=30)).replace(
+        thirty_days_ago = (datetime.strptime(date_pretty, "%Y-%m-%d") - timedelta(days=30)).astimezone(
+            pytz.timezone("Asia/Tashkent")).replace(
             hour=0, minute=0, second=59, microsecond=0
         )
         monthly_analytics_data = fetch_latest_analytics(thirty_days_ago)

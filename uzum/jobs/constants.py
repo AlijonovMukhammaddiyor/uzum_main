@@ -21,9 +21,9 @@ REVIEWS_URL = "https://api.uzum.uz/api/product/253574/reviews"  # ?amount=10&pag
 CATEGORIES_HEADER = {
     "Access-Control-Allow-Credentials": "true",
     "Authorization": "Basic YjJjLWZyb250OmNsaWVudFNlY3JldA==",
-    "Origin": "https://uzum.uz",
+    # "Origin": "https://uzum.uz",
     "Authority": "graphql.uzum.uz",
-    "Referrer": "https://uzum.uz/",
+    # "Referrer": "https://uzum.uz/",
     "apollographql-client-name": "web-customers",
     "apollographql-client-version": "1.5.6",
     "User-Agent": get_random_user_agent(),

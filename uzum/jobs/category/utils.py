@@ -18,10 +18,16 @@ import cloudscraper
 # Assuming other required imports and constants are defined above
 
 def get_categories_tree():
-    retry_count = 0
-    while retry_count < 10:
+    # URLs and proxy information (update with actual values).
+    PROXY = "https://85.112.193.37:8080"  # Replace with your actual proxy
+
+    # You might want to externalize these settings or pass them as function parameters.
+    MAX_RETRIES = 10
+    RETRY_DELAY = 1  # Delay in seconds between retries
+
+    for attempt in range(MAX_RETRIES):
         try:
-            # Create a new CloudScraper instance for each request. This instance will solve any challenges presented.
+            # Create a new scraper instance, configuring the desired proxy.
             scraper = cloudscraper.create_scraper(
                 browser={
                     "browser": "chrome",
@@ -30,8 +36,8 @@ def get_categories_tree():
                 }
             )
 
-            # Post the request similar to how you would use 'requests.post'.
-            tree = scraper.post(
+            # Making the POST request.
+            response = scraper.post(
                 CATEGORIES_URL,
                 json=CATEGORIES_PAYLOAD,
                 headers={
@@ -39,41 +45,40 @@ def get_categories_tree():
                     "User-Agent": scraper.headers["User-Agent"],
                     "Content-Type": "application/json",
                 },
+                proxies={
+                    "http": PROXY,
+                    "https": PROXY,
+                }
             )
 
-            # Check the response status as usual.
-            if tree.status_code == 200:
-                # Process the JSON response.
-                return tree.json().get("data").get("makeSearch").get("categoryTree")
+            # Successful response
+            if response.status_code == 200:
+                json_response = response.json()
+                # Validate the response structure before attempting to access fields.
+                if 'data' in json_response and 'makeSearch' in json_response['data'] and 'categoryTree' in json_response['data']['makeSearch']:
+                    return json_response['data']['makeSearch']['categoryTree']
+                else:
+                    raise ValueError("Unexpected JSON structure.")
+
+            # Log non-success statuses.
             else:
-                print(f"Error in get_categories_tree: {tree.status_code} - {tree.text}")
-                # In the case of an unsuccessful status code, you might want to consider a retry.
-                # You can decide to increase the count or handle it based on the specific status code.
-                retry_count += 1
-                time.sleep(1)  # Adding delay before retrying.
+                print(f"Attempt {attempt+1} failed with status code: {response.status_code} - {response.text}")
+                time.sleep(RETRY_DELAY)  # Delay before the next attempt.
 
         except cloudscraper.exceptions.CloudflareChallengeError as e:
-            # Specific handling for Cloudflare challenge errors.
-            print("Cloudflare challenge error in get_categories_tree: ", e)
+            print(f"Cloudflare challenge error on attempt {attempt+1}: {e}")
             traceback.print_exc()
-            if retry_count == 9:  # last attempt
-                return None
-            else:
-                time.sleep(1)
-                retry_count += 1
+            time.sleep(RETRY_DELAY)
+
         except Exception as e:
-            # Handling other general exceptions.
-            print("Error in get_categories_tree: ", e)
+            # You may want to distinguish between fatal errors and retryable errors.
+            print(f"An error occurred on attempt {attempt+1}: {e}")
             traceback.print_exc()
-            if retry_count == 9:  # last attempt
-                return None
-            else:
-                time.sleep(1)
-                retry_count += 1
+            time.sleep(RETRY_DELAY)
 
-    # If all retries fail and you exit the loop, you may want to return a default value.
+    # All attempts failed; return None to indicate an unsuccessful operation.
+    print("All attempts failed. Returning None.")
     return None
-
 
 def get_categories_tree_ru():
     try:
