@@ -55,90 +55,90 @@ def update_uzum_data(args=None, **kwargs):
     print(get_today_pretty())
     print(datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%H:%M:%S" + " - " + "%d/%m/%Y"))
 
-    create_and_update_categories()
+    # create_and_update_categories()
     start = time.time()
-    update_all_category_parents()
-    Category.update_descendants()
-    Category.update_ancestors_bulk()
-    print("Category parents updated: ", time.time() - start)
+    # update_all_category_parents()
+    # Category.update_descendants()
+    # Category.update_ancestors_bulk()
+    # print("Category parents updated: ", time.time() - start)
 
-    root = CategoryAnalytics.objects.filter(category__categoryId=1, date_pretty=get_today_pretty())
-    print("total_products: ", root[0].total_products)
+    # root = CategoryAnalytics.objects.filter(category__categoryId=1, date_pretty=get_today_pretty())
+    # print("total_products: ", root[0].total_products)
 
-    # 1. Get all categories which have less than N products
-    categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
+    # # 1. Get all categories which have less than N products
+    # categories_filtered = get_categories_with_less_than_n_products(MAX_ID_COUNT)
 
-    product_ids: list[int] = []
-    async_to_sync(get_all_product_ids_from_uzum)(
-        categories_filtered,
-        product_ids,
-        page_size=PAGE_SIZE,
-    )
+    # product_ids: list[int] = []
+    # async_to_sync(get_all_product_ids_from_uzum)(
+    #     categories_filtered,
+    #     product_ids,
+    #     page_size=PAGE_SIZE,
+    # )
 
-    print(f"Total product ids: {len(product_ids)}")
+    # print(f"Total product ids: {len(product_ids)}")
 
-    product_ids = list(set(product_ids))
+    # product_ids = list(set(product_ids))
 
-    product_campaigns, product_associations, shop_association = update_or_create_campaigns()
+    # product_campaigns, product_associations, shop_association = update_or_create_campaigns()
 
-    shop_analytics_done = {}
+    # shop_analytics_done = {}
 
-    BATCH_SIZE = 10_000
+    # BATCH_SIZE = 10_000
 
-    # Create Latest Analytics of products ->  used for calculating orders_money for product analytics
-    start = time.time()
-    create_product_latestanalytics(get_day_before_pretty(date_pretty))
-    print(f"Latest Analytics created in {time.time() - start} seconds")
+    # # Create Latest Analytics of products ->  used for calculating orders_money for product analytics
+    # start = time.time()
+    # create_product_latestanalytics(get_day_before_pretty(date_pretty))
+    # print(f"Latest Analytics created in {time.time() - start} seconds")
 
-    category_sales_map = {
-        analytics.category.categoryId: {
-            "products_with_sales": set(),
-            "shops_with_sales": set(),
-        }
-        for analytics in CategoryAnalytics.objects.filter(date_pretty=date_pretty).prefetch_related("category")
-    }
+    # category_sales_map = {
+    #     analytics.category.categoryId: {
+    #         "products_with_sales": set(),
+    #         "shops_with_sales": set(),
+    #     }
+    #     for analytics in CategoryAnalytics.objects.filter(date_pretty=date_pretty).prefetch_related("category")
+    # }
 
-    for i in range(0, len(product_ids), BATCH_SIZE):
-        products_api: list[dict] = []
-        print(f"{i}/{len(product_ids)}")
-        async_to_sync(get_product_details_via_ids)(product_ids[i : i + BATCH_SIZE], products_api)
-        create_products_from_api(products_api, product_campaigns, shop_analytics_done, category_sales_map)
-        time.sleep(10)
-        del products_api
-    Category.update_descendants()
+    # for i in range(0, len(product_ids), BATCH_SIZE):
+    #     products_api: list[dict] = []
+    #     print(f"{i}/{len(product_ids)}")
+    #     async_to_sync(get_product_details_via_ids)(product_ids[i : i + BATCH_SIZE], products_api)
+    #     create_products_from_api(products_api, product_campaigns, shop_analytics_done, category_sales_map)
+    #     time.sleep(10)
+    #     del products_api
+    # Category.update_descendants()
 
-    time.sleep(10)
-    try:
-        fetch_product_ids(date_pretty, product_ids)
-    except Exception as e:
-        print("Error in remaining fetch_product_ids:", e)
-    # add russian titles to all products
-    add_russian_titles()
+    # time.sleep(10)
+    # try:
+    #     fetch_product_ids(date_pretty, product_ids)
+    # except Exception as e:
+    #     print("Error in remaining fetch_product_ids:", e)
+    # # add russian titles to all products
+    # add_russian_titles()
 
-    # create popular searches
-    create_todays_searches()
+    # # create popular searches
+    # create_todays_searches()
 
-    # remove duplicate analytics
-    bulk_remove_duplicate_category_analytics(date_pretty)
-    bulk_remove_duplicate_product_analytics(date_pretty)
-    bulk_remove_duplicate_shop_analytics(date_pretty)
-    bulk_remove_duplicate_sku_analytics(date_pretty)
+    # # remove duplicate analytics
+    # bulk_remove_duplicate_category_analytics(date_pretty)
+    # bulk_remove_duplicate_product_analytics(date_pretty)
+    # bulk_remove_duplicate_shop_analytics(date_pretty)
+    # bulk_remove_duplicate_sku_analytics(date_pretty)
 
-    # ANALYTICS STARTS HERE
-    update_category_with_sales(category_sales_map, date_pretty)
+    # # ANALYTICS STARTS HERE
+    # update_category_with_sales(category_sales_map, date_pretty)
 
-    start = time.time()
-    update_analytics(date_pretty)
-    print(f"All Analytics updated in {time.time() - start} seconds")
+    # start = time.time()
+    # update_analytics(date_pretty)
+    # print(f"All Analytics updated in {time.time() - start} seconds")
 
-    start = time.time()
-    send_reports_to_all()
-    print(f"Reports sent in {time.time() - start} seconds")
+    # start = time.time()
+    # send_reports_to_all()
+    # print(f"Reports sent in {time.time() - start} seconds")
 
-    update_category_tree_with_monthly_data(date_pretty)
-    update_category_tree_with_weekly_data(date_pretty)
-    update_category_tree_with_data(date_pretty)
-    update_category_tree(date_pretty)
+    # update_category_tree_with_monthly_data(date_pretty)
+    # update_category_tree_with_weekly_data(date_pretty)
+    # update_category_tree_with_data(date_pretty)
+    # update_category_tree(date_pretty)
     return True
 
 

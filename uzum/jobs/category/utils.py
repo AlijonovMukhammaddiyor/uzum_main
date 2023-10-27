@@ -45,10 +45,10 @@ def get_categories_tree():
                     "User-Agent": scraper.headers["User-Agent"],
                     "Content-Type": "application/json",
                 },
-                proxies={
-                    "http": PROXY,
-                    "https": PROXY,
-                }
+                # proxies={
+                #     "http": PROXY,
+                #     "https": PROXY,
+                # }
             )
 
             # Successful response
