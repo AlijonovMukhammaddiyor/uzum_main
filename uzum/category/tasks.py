@@ -44,10 +44,10 @@ from uzum.utils.general import get_day_before_pretty, get_today_pretty
 )
 def update_uzum_data(args=None, **kwargs):
     # before starting data creation, vacuum all tables
-    vacuum_table("category_categoryanalytics")
-    vacuum_table("product_productanalytics")
-    vacuum_table("shop_shopanalytics")
-    vacuum_table("sku_skuanalytics")
+    # vacuum_table("category_categoryanalytics")
+    # vacuum_table("product_productanalytics")
+    # vacuum_table("shop_shopanalytics")
+    # vacuum_table("sku_skuanalytics")
 
     # get today's date
     date_pretty = get_today_pretty()
@@ -56,7 +56,7 @@ def update_uzum_data(args=None, **kwargs):
     print(datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%H:%M:%S" + " - " + "%d/%m/%Y"))
 
     # create_and_update_categories()
-    start = time.time()
+    # start = time.time()
     # update_all_category_parents()
     # Category.update_descendants()
     # Category.update_ancestors_bulk()
