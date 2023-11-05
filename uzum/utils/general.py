@@ -35,13 +35,13 @@ def decode_request(request: Request, method: str) -> dict:
 
 
 def get_today_pretty():
-    return "2023-10-22"
+    return "2023-10-16"
     # return datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
 
 
 def get_today_pretty_fake():
     # check if it is 7:00 AM in Tashkent
-    return "2023-10-20"
+    return "2023-10-16"
     # if datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).hour >= 23:
     #     return datetime.datetime.now(tz=pytz.timezone("Asia/Tashkent")).strftime("%Y-%m-%d")
     # else:
